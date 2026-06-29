@@ -1,3 +1,43 @@
+<?php
+require_once '../config/db.php';
+
+
+$result = $conn->query("SELECT
+    e.id,
+    e.employee_code,
+    e.name,
+    e.email,
+    d.department_name,
+    p.position_name,
+    e.basic_salary,
+    e.status,
+    epi.allowance,
+    (e.basic_salary + epi.allowance) AS total_salary
+FROM employee e
+LEFT JOIN departments d
+    ON e.department_id = d.id
+LEFT JOIN positions p
+    ON e.position_id = p.id
+LEFT JOIN employee_personal_info epi
+    ON e.id = epi.employee_id;");
+$allemployee = $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
+
+
+if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    // Delete Employee from Database
+    if (isset($_POST['delete_emp'])) {
+        $idToDelete = $_POST['employee_id'];
+
+        $stmt = $conn->prepare("DELETE FROM employee WHERE id = ?");
+        $stmt->bind_param('i', $idToDelete);
+        $stmt->execute();
+        $stmt->close();
+
+        header('Location: employee.php');
+        exit;
+    }
+}
+?>
 <!DOCTYPE html>
 <html lang="en">
 
@@ -32,9 +72,9 @@
                 <h1 class="text-2xl font-bold text-slate-900 tracking-tight">Employee Directory</h1>
                 <p class="text-sm text-slate-500 mt-1">Manage active personnel, department routing, and base profiles.</p>
             </div>
-            <button class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm px-4 py-2.5 rounded-lg shadow-sm transition">
+            <a href="insert1.php" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm px-4 py-2.5 rounded-lg shadow-sm transition">
                 + Add New Employee
-            </button>
+            </a>
         </header>
 
         <!-- Employee Records Table -->
@@ -44,35 +84,46 @@
                     <thead class="bg-slate-50 text-slate-500 font-semibold uppercase tracking-wider text-xs border-b border-slate-200">
                         <tr>
                             <th class="px-6 py-4">Code / Profile</th>
+                            <th class="px-6 py-4">EMP-code</th>
+                            <th class="px-6 py-4">Name</th>
+                            <th class="px-6 py-4">Email</th>
                             <th class="px-6 py-4">Department</th>
-                            <th class="px-6 py-4">Position Title</th>
-                            <th class="px-6 py-4">Base Salary</th>
+                            <th class="px-6 py-4">Designation</th>
+                            <th class="px-6 py-4">Basic Salary</th>
                             <th class="px-6 py-4">Status</th>
                             <th class="px-6 py-4 text-right">Actions</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-slate-200 text-slate-700">
-                        <tr>
-                            <td class="px-6 py-4 flex items-center gap-3">
-                                <div class="w-9 h-9 bg-slate-100 rounded-full flex items-center justify-center text-slate-500 font-semibold border">JD</div>
-                                <div>
-                                    <div class="font-medium text-slate-900">John Doe</div>
-                                    <div class="text-xs text-slate-400">EMP001 · john@company.com</div>
-                                </div>
-                            </td>
-                            <td class="px-6 py-4">Engineering</td>
-                            <td class="px-6 py-4 text-slate-500">Software Engineer</td>
-                            <td class="px-6 py-4 font-mono">$5,000.00</td>
-                            <td class="px-6 py-4">
-                                <span class="bg-emerald-50 text-emerald-700 font-medium px-2 py-1 rounded text-xs border border-emerald-200">Active</span>
-                            </td>
-                            <td class="px-6 py-4 text-right">
-                                <button class="text-indigo-600 hover:text-indigo-900 font-medium mr-3">Edit</button>
-                                <button class="text-slate-400 hover:text-rose-600 font-medium">Archive</button>
-                            </td>
-                        </tr>
-                    </tbody>
+                    <?php foreach ($allemployee as $index => $emp): ?>
+                        <tbody class="divide-y divide-slate-200 text-slate-700">
+                            <tr>
+
+                                <td class=" border-b px-4 py-2"><?php echo $index + 1;  ?></td>
+                                <td class=" border-b px-4 py-2"><?php echo $emp['employee_code']; ?></td>
+                                <td class="px-6 py-4"><?php echo $emp['name']; ?></td>
+                                <td class="px-6 py-4"><?php echo $emp['email']; ?></td>
+                                <td class="px-6 py-4 text-slate-500"><?php echo $emp['department_name']; ?></td>
+                                <td class="px-6 py-4 text-slate-500"><?php echo $emp['position_name']; ?></td>
+                                <td class="px-6 py-4 text-slate-500"><?php echo $emp['basic_salary']; ?></td>
+                                <td class="px-6 py-4">
+                                    <?php if ($emp['status'] === 'active'): ?>
+                                        <span class="bg-emerald-50 text-emerald-700 font-medium px-2 py-1 rounded text-xs border border-emerald-200">Active</span>
+                                    <?php else: ?>
+                                        <span class="bg-red-50 text-red-700 font-medium px-2 py-1 rounded text-xs border border-red-200">Inactive</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td class="px-6 py-4 text-right">
+                                    <a href="view_employee.php?id=<?php echo $emp['id']; ?>" class="text-slate-400 hover:text-rose-600 font-medium mr-3">View Detail</a>
+                                    <a href="edit_employee.php?id=<?php echo $emp['id']; ?>" class="text-indigo-600 hover:text-indigo-900 font-medium mr-3">Edit</a>
+                                    <form action="employee.php" method="POST" onsubmit="return confirm('Are you sure you want to delete this employee?');" class="inline">
+                                        <input type="hidden" name="employee_id" value="<?php echo $emp['id']; ?>">
+                                        <button type="submit" name="delete_emp" value="1" class="text-red-500 hover:text-red-700 font-medium">Delete</button>
+                                    </form>
+                            </tr>
+                        <?php endforeach; ?>
+                        </tbody>
                 </table>
+
             </div>
         </div>
     </main>

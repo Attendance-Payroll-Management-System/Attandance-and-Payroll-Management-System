@@ -5,6 +5,14 @@ require_once '../config/db.php';
 $message = '';
 $message_type = '';
 
+// 1. FETCH DEPARTMENTS FIRST (Moved to top so it's ready for the form)
+// Note: Changed 'departments' to 'department' to match your database structure
+$sql_dept = "SELECT id, department_name FROM departments";
+$result_dept = mysqli_query($conn, $sql_dept);
+
+$sql_dept = "SELECT id, position_name FROM positions";
+$result_opt = mysqli_query($conn, $sql_dept);
+
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     // Get form data
@@ -21,14 +29,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $email = isset($_POST['email']) ? htmlspecialchars(trim($_POST['email'])) : '';
     $password = isset($_POST['password']) ? $_POST['password'] : '';
     $confirm_password = isset($_POST['confirm_password']) ? $_POST['confirm_password'] : '';
-    $department = isset($_POST['department']) ? $_POST['department'] : '';
+    $department_id = isset($_POST['department_id']) ? $_POST['department_id'] : null;
+    $position_id   = isset($_POST['position_id']) ? $_POST['position_id'] : null;
     $designation = isset($_POST['designation']) ? $_POST['designation'] : '';
     $doj = isset($_POST['doj']) ? $_POST['doj'] : '';
     $status = isset($_POST['status']) ? $_POST['status'] : 'active';
     $basic_salary = isset($_POST['basic_salary']) ? $_POST['basic_salary'] : 0;
 
     // Validation
-    if (empty($name) || empty($email) || empty($password) || empty($dob)) {
+    if (empty($name) || empty($email) || empty($password) || empty($dob) || empty($department_id)) {
         $message = 'Please fill in all required fields!';
         $message_type = 'error';
     } elseif ($password !== $confirm_password) {
@@ -52,15 +61,29 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $employee_code = 'EMP-' . date('Ymd') . '-' . rand(1000, 9999);
 
             // Hash password
-            $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+            $hashed_password = $password;
 
-            // Insert into employee table
-            $sql = "INSERT INTO employee (employee_code, name, gender, dob, phone, email, password, hire_date, basic_salary, status, role) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            $sql = "INSERT INTO employee (department_id, position_id, employee_code, name, gender, dob, phone, email, password, hire_date, basic_salary, status, role) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
             $stmt = $conn->prepare($sql);
             $role = $designation ?: 'Employee';
-            $stmt->bind_param("sssssssssss", $employee_code, $name, $gender, $dob, $phone, $email, $hashed_password, $doj, $basic_salary, $status, $role);
+            $stmt->bind_param(
+                "sssssssssssss",
+                $department_id,
+                $position_id,
+                $employee_code,
+                $name,
+                $gender,
+                $dob,
+                $phone,
+                $email,
+                $hashed_password,
+                $doj,
+                $basic_salary,
+                $status,
+                $role
+            );
 
             if ($stmt->execute()) {
                 $employee_id = $conn->insert_id;
@@ -105,8 +128,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <title>Employee Management System - Add Employee</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- FontAwesome for Dashboard Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" integrity="sha512-pZfgWHSbyM6BKej2Xn3FHruSDveLyZWYB+j25B6pjKLFChjYkD2BKufketz4eTFYJtKVe4jUe+q04IyC3LMuoA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
 </head>
 
 <body class="min-h-screen antialiased font-sans text-slate-700 bg-[radial-gradient(circle_at_top_left,_rgba(52,211,153,0.16),_transparent_18%),radial-gradient(circle_at_top_right,_rgba(56,189,248,0.12),_transparent_22%),linear-gradient(180deg,_#f8fafc_0%,_#e2e8f0_100%)]">
@@ -131,13 +154,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <div class="flex pt-16 min-h-screen gap-6 bg-slate-100 px-4 py-6">
         <!-- Sidebar Navigation -->
         <aside class="w-72 rounded-3xl border border-slate-200 bg-slate-900/95 text-slate-300 shadow-xl shadow-slate-900/10 backdrop-blur-xl p-4">
-            <!-- Brand Logo Space -->
             <div class="rounded-3xl bg-slate-800/90 p-5 text-center border border-slate-700/60 shadow-inner">
                 <div class="text-emerald-400 font-bold text-xl uppercase tracking-[0.2em]">Payroll</div>
                 <div class="text-xs text-slate-500 mt-1">Attendance Management</div>
             </div>
 
-            <!-- User Status Panel -->
             <div class="mt-5 rounded-3xl border border-slate-700/70 bg-slate-900/80 p-4 shadow-inner">
                 <div class="flex items-center gap-3">
                     <div class="w-12 h-12 rounded-full bg-emerald-500/15 text-emerald-400 flex items-center justify-center text-lg">
@@ -150,30 +171,29 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 </div>
             </div>
 
-            <!-- Navigation Links -->
             <nav class="mt-6 space-y-2">
-                <a href="#" class="sidebar-link flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium text-slate-200 transition hover:text-white hover:bg-emerald-200/20">
+                <a href="#" class="flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium text-slate-200 transition hover:text-white hover:bg-emerald-200/20">
                     <i class="fa-solid fa-gauge w-5"></i> Dashboard
                 </a>
-                <a href="#" class="sidebar-link flex items-center gap-3 rounded-2xl bg-emerald-500/10 px-4 py-3 text-sm font-medium text-emerald-300 shadow-inner hover:bg-emerald-200/20">
+                <a href="#" class="flex items-center gap-3 rounded-2xl bg-emerald-500/10 px-4 py-3 text-sm font-medium text-emerald-300 shadow-inner hover:bg-emerald-200/20">
                     <i class="fa-solid fa-users w-5"></i> Add Employee
                 </a>
-                <a href="#" class="sidebar-link flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium text-slate-200 transition hover:text-white hover:bg-emerald-200/20">
+                <a href="#" class="flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium text-slate-200 transition hover:text-white hover:bg-emerald-200/20">
                     <i class="fa-solid fa-sitemap w-5"></i> Department
                 </a>
-                <a href="#" class="sidebar-link flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium text-slate-200 transition hover:text-white hover:bg-emerald-200/20">
+                <a href="#" class="flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium text-slate-200 transition hover:text-white hover:bg-emerald-200/20">
                     <i class="fa-solid fa-calendar-check w-5"></i> Attendance
                 </a>
-                <a href="#" class="sidebar-link flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium text-slate-200 transition hover:text-white hover:bg-emerald-200/20">
+                <a href="#" class="flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium text-slate-200 transition hover:text-white hover:bg-emerald-200/20">
                     <i class="fa-solid fa-file-invoice w-5"></i> Leave
                 </a>
-                <a href="#" class="sidebar-link flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium text-slate-200 transition hover:text-white hover:bg-emerald-200/20">
+                <a href="#" class="flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium text-slate-200 transition hover:text-white hover:bg-emerald-200/20">
                     <i class="fa-solid fa-credit-card w-5"></i> Payroll
                 </a>
-                <a href="#" class="sidebar-link flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium text-slate-200 transition hover:text-white hover:bg-emerald-200/20">
+                <a href="#" class="flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium text-slate-200 transition hover:text-white hover:bg-emerald-200/20">
                     <i class="fa-solid fa-umbrella-beach w-5"></i> Holiday
                 </a>
-                <a href="#" class="sidebar-link flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium text-slate-200 transition hover:text-white hover:bg-emerald-200/20">
+                <a href="#" class="flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium text-slate-200 transition hover:text-white hover:bg-emerald-200/20">
                     <i class="fa-solid fa-gear w-5"></i> Settings
                 </a>
             </nav>
@@ -204,6 +224,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             </div>
 
             <div class="grid gap-4 md:grid-cols-3 mb-6">
+                <!-- Counters/Widgets -->
                 <div class="rounded-3xl p-5 shadow-sm bg-white/90 border border-slate-200/20 backdrop-blur-xl">
                     <div class="flex items-start justify-between gap-4">
                         <div>
@@ -239,10 +260,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 </div>
             </div>
 
+            <!-- FORM START -->
             <form action="insert1.php" method="POST" class="grid grid-cols-1 xl:grid-cols-[1.6fr_1fr] gap-6 items-stretch">
 
                 <!-- Left Column: Personal Details Card -->
-                <div class="rounded-3xl border border-slate-200/80 bg-green-500/95 shadow-xl shadow-slate-900/5 backdrop-blur-xl">
+                <div class="rounded-3xl border border-slate-200/80 bg-white/95 shadow-xl shadow-slate-900/5 backdrop-blur-xl">
                     <div class="rounded-t-3xl border-b border-slate-200/80 bg-slate-50 px-6 py-4 text-slate-900 font-semibold shadow-sm">
                         Personal Details
                     </div>
@@ -278,7 +300,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                             <label class="block text-xs font-semibold text-slate-500 mb-2">Married Status</label>
                             <input type="text" name="married_status" value="<?php echo isset($_POST['married_status']) ? htmlspecialchars($_POST['married_status']) : ''; ?>" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 shadow-sm outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200">
                         </div>
-
                         <div>
                             <label class="block text-xs font-semibold text-slate-500 mb-2">Ethnicity</label>
                             <input type="text" name="ethnicity" value="<?php echo isset($_POST['ethnicity']) ? htmlspecialchars($_POST['ethnicity']) : ''; ?>" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 shadow-sm outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200">
@@ -287,7 +308,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                             <label class="block text-xs font-semibold text-slate-500 mb-2">Religion</label>
                             <input type="text" name="religion" value="<?php echo isset($_POST['religion']) ? htmlspecialchars($_POST['religion']) : ''; ?>" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 shadow-sm outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200">
                         </div>
-
                         <div>
                             <label class="block text-xs font-semibold text-slate-500 mb-2">Phone Number</label>
                             <input type="text" name="phone" value="<?php echo isset($_POST['phone']) ? htmlspecialchars($_POST['phone']) : ''; ?>" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 shadow-sm outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200">
@@ -296,7 +316,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                             <label class="block text-xs font-semibold text-slate-500 mb-2">Permanent Address</label>
                             <textarea name="permanent_address" rows="3" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 shadow-sm outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200"><?php echo isset($_POST['permanent_address']) ? htmlspecialchars($_POST['permanent_address']) : ''; ?></textarea>
                         </div>
-
                     </div>
                 </div>
 
@@ -334,23 +353,45 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                 <label class="block text-xs font-semibold text-slate-500 mb-2">Employee Id</label>
                                 <input type="text" name="employee_id" value="Auto Generated" disabled class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500 shadow-sm cursor-not-allowed">
                             </div>
+
                             <div>
-                                <label class="block text-xs font-semibold text-slate-500 mb-2">Department</label>
-                                <select name="department" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 shadow-sm outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200">
-                                    <option value="">Select A Department</option>
-                                    <option value="hr" <?php echo (isset($_POST['department']) && $_POST['department'] === 'hr') ? 'selected' : ''; ?>>HR Department</option>
-                                    <option value="it" <?php echo (isset($_POST['department']) && $_POST['department'] === 'it') ? 'selected' : ''; ?>>IT Department</option>
+                                <label class="block text-xs font-semibold text-slate-500 mb-2">Department <span class="text-red-500">*</span></label>
+                                <select name="department_id" id="department" required class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 shadow-sm outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200">
+                                    <option value="">(Select A Department)</option>
+                                    <?php
+                                    if ($result_dept && mysqli_num_rows($result_dept) > 0) {
+                                        while ($row = mysqli_fetch_assoc($result_dept)) {
+                                            $dept_id   = htmlspecialchars($row['id']);
+                                            $dept_name = htmlspecialchars($row['department_name']);
+                                            $selected  = (isset($_POST['department_id']) && $_POST['department_id'] == $dept_id) ? 'selected' : '';
+                                            echo '<option value="' . $dept_id . '" ' . $selected . '>' . $dept_name . '</option>';
+                                        }
+                                    } else {
+                                        echo '<option value="">No Departments Found</option>';
+                                    }
+                                    ?>
                                 </select>
                             </div>
+
                             <div>
-                                <label class="block text-xs font-semibold text-slate-500 mb-2">Designation</label>
-                                <select name="designation" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 shadow-sm outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200">
-                                    <option value="">Select A Designation</option>
-                                    <option value="manager" <?php echo (isset($_POST['designation']) && $_POST['designation'] === 'manager') ? 'selected' : ''; ?>>Manager</option>
-                                    <option value="officer" <?php echo (isset($_POST['designation']) && $_POST['designation'] === 'officer') ? 'selected' : ''; ?>>Officer</option>
-                                    <option value="staff" <?php echo (isset($_POST['designation']) && $_POST['designation'] === 'staff') ? 'selected' : ''; ?>>Staff</option>
+                                <label class="block text-xs font-semibold text-slate-500 mb-2">Designation <span class="text-red-500">*</span></label>
+                                <select name="position_id" id="designation" required class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 shadow-sm outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200">
+                                    <option value="">(Select A Designation)</option>
+                                    <?php
+                                    if ($result_opt && mysqli_num_rows($result_opt) > 0) {
+                                        while ($row = mysqli_fetch_assoc($result_opt)) {
+                                            $opt_id   = htmlspecialchars($row['id']);
+                                            $opt_name = htmlspecialchars($row['position_name']);
+                                            $selected  = (isset($_POST['position_id']) && $_POST['position_id'] == $opt_id) ? 'selected' : '';
+                                            echo '<option value="' . $opt_id . '" ' . $selected . '>' . $opt_name . '</option>';
+                                        }
+                                    } else {
+                                        echo '<option value="">No Departments Found</option>';
+                                    }
+                                    ?>
                                 </select>
                             </div>
+
                             <div class="grid gap-4 lg:grid-cols-2">
                                 <div>
                                     <label class="block text-xs font-semibold text-slate-500 mb-2">Date Of Joining</label>
@@ -359,7 +400,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                 <div>
                                     <label class="block text-xs font-semibold text-slate-500 mb-2">Status</label>
                                     <select name="status" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 shadow-sm outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200">
-                                        <option value="active" <?php echo (isset($_POST['status']) && $_POST['status'] === 'active') ? 'selected' : 'selected'; ?>>Active</option>
+                                        <option value="active" <?php echo (isset($_POST['status']) && $_POST['status'] === 'active') ? 'selected' : ''; ?>>Active</option>
                                         <option value="inactive" <?php echo (isset($_POST['status']) && $_POST['status'] === 'inactive') ? 'selected' : ''; ?>>Inactive</option>
                                     </select>
                                 </div>
@@ -394,3 +435,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 </body>
 
 </html>
+<?php
+// 3. CLOSE DATABASE AT THE VERY END
+mysqli_close($conn);
+?>
