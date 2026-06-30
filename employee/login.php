@@ -1,6 +1,14 @@
 <?php
 session_start();
-require_once "config/db.php";
+require_once "../config/db.php";
+
+// Handle logout
+if (isset($_GET['logout'])) {
+    session_destroy();
+    header('Location: login.php');
+    exit;
+}
+
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $email = trim($_POST['email']);
     $password = $_POST['password'];
@@ -9,19 +17,20 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (empty($email) || empty($password)) {
         $error = "Please fill in all fields.";
     } else {
-        $stmt = $conn->prepare("SELECT id,email,password FROM employee WHERE email=? "); //SQL jump ဖြစ်မှာဆိုးလို့
-        $stmt->bind_param('s', $email); //user input write on database
+        $stmt = $conn->prepare("SELECT id, email, password, name FROM employee WHERE email=?");
+        $stmt->bind_param('s', $email);
         $stmt->execute();
 
-
         $result = $stmt->get_result();
-        $email = $result->fetch_assoc(); //database change array
+        $user = $result->fetch_assoc();
         $stmt->close();
 
-        if ($email && $password == $email['password']) {
+        if ($user && $password == $user['password']) {
             session_regenerate_id(true);
             $_SESSION['logged_in'] = true;
-            $_SESSION['email'] = $email['email'];
+            $_SESSION['employee_id'] = $user['id'];
+            $_SESSION['employee_name'] = $user['name'];
+            $_SESSION['email'] = $user['email'];
             header('Location: attendance.php');
             exit;
         } else {

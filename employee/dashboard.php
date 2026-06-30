@@ -23,14 +23,14 @@
         </li>
 
         <li>
-            <a href="leave.php"
+            <a href="leaverequest.php"
                 class="block p-3 rounded-lg hover:bg-blue-600">
                 Leave Request
             </a>
         </li>
 
         <li>
-            <a href="overtime.php"
+            <a href="overtimerequest.php"
                 class="block p-3 rounded-lg hover:bg-blue-600">
                 Overtime
             </a>

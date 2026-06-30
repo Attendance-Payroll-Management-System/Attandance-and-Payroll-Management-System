@@ -59,8 +59,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             <a href="dashboard.php" class="flex items-center px-4 py-3 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition">📊 Dashboard</a>
             <a href="employee.php" class="flex items-center px-4 py-3 rounded-lg bg-indigo-600 text-white font-medium">👥 Employees</a>
             <a href="attendance.php" class="flex items-center px-4 py-3 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition">📅 Attendance</a>
-            <a href="insert.php" class="flex items-center px-4 py-3 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition">🏖️ Leave Requests</a>
-            <a href="profile.php" class="flex items-center px-4 py-3 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition">💰 Payroll Center</a>
+            <a href="leaveApproval.php" class="flex items-center px-4 py-3 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition">🏖️ Leave Requests</a>
+            <a href="overtimeApproval.php" class="flex items-center px-4 py-3 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition">⏰ Overtime Requests</a>
+            <a href="payroll.php" class="flex items-center px-4 py-3 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition">💰 Payroll Center</a>
         </nav>
     </aside>
 
