@@ -1,4 +1,7 @@
 <?php
+session_start();
+require_once '../config/auth.php';
+require_admin_login();
 require_once '../config/db.php';
 
 
@@ -44,90 +47,86 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Employee Directory</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>AURA HR · Employees</title>
+    <link rel="icon" type="image/svg+xml" href="../favicon.svg">
+    <?php include "../includes/header.php"; ?>
 </head>
 
-<body class="bg-gray-50 font-sans flex min-h-screen">
+<body x-data="{ sidebarOpen: false }" class="bg-slate-50 dark:bg-[#09090b] text-slate-900 dark:text-white font-sans antialiased min-h-screen flex">
+    <?php include "../includes/sidebar.php"; ?>
+    <div class="flex-1 flex flex-col min-w-0 main-wrapper">
+        <?php $page_title = "Employee Directory"; include "../includes/topbar.php"; ?>
+        <main class="flex-1 p-8">
+            <header class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+                <div class="animate-fade-in-up">
+                    <h1 class="text-2xl font-bold text-body tracking-tight">Employee Directory</h1>
+                    <p class="text-sm text-body-secondary mt-1">Manage active personnel, department routing, and base profiles.</p>
+                </div>
+                <a href="insert1.php" class="rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700 text-white font-semibold text-sm px-5 py-2.5 shadow-sm transition flex items-center gap-2">
+                    <i class="fa-solid fa-plus"></i> Add New Employee
+                </a>
+            </header>
 
-    <!-- Persistent Sidebar Navigation Layout -->
-    <aside class="w-64 bg-slate-900 text-slate-200  flex-col hidden md:flex border-r border-slate-800">
-        <div class="p-6 border-b border-slate-800">
-            <h1 class="text-xl font-bold tracking-wider text-white">HRMS Core</h1>
-        </div>
-        <nav class="flex-1 px-4 py-6 space-y-2 text-sm">
-            <a href="dashboard.php" class="flex items-center px-4 py-3 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition">📊 Dashboard</a>
-            <a href="employee.php" class="flex items-center px-4 py-3 rounded-lg bg-indigo-600 text-white font-medium">👥 Employees</a>
-            <a href="attendance.php" class="flex items-center px-4 py-3 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition">📅 Attendance</a>
-            <a href="leaveApproval.php" class="flex items-center px-4 py-3 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition">🏖️ Leave Requests</a>
-            <a href="overtimeApproval.php" class="flex items-center px-4 py-3 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition">⏰ Overtime Requests</a>
-            <a href="payroll.php" class="flex items-center px-4 py-3 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition">💰 Payroll Center</a>
-        </nav>
-    </aside>
-
-    <!-- Main Workspace Container -->
-    <main class="flex-1 p-8">
-        <!-- Control Header Workspace Bar -->
-        <header class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
-            <div>
-                <h1 class="text-2xl font-bold text-slate-900 tracking-tight">Employee Directory</h1>
-                <p class="text-sm text-slate-500 mt-1">Manage active personnel, department routing, and base profiles.</p>
-            </div>
-            <a href="insert1.php" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm px-4 py-2.5 rounded-lg shadow-sm transition">
-                + Add New Employee
-            </a>
-        </header>
-
-        <!-- Employee Records Table -->
-        <div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-            <div class="overflow-x-auto">
-                <table class="w-full text-left border-collapse text-sm">
-                    <thead class="bg-slate-50 text-slate-500 font-semibold uppercase tracking-wider text-xs border-b border-slate-200">
-                        <tr>
-                            <th class="px-6 py-4">Code / Profile</th>
-                            <th class="px-6 py-4">EMP-code</th>
-                            <th class="px-6 py-4">Name</th>
-                            <th class="px-6 py-4">Email</th>
-                            <th class="px-6 py-4">Department</th>
-                            <th class="px-6 py-4">Designation</th>
-                            <th class="px-6 py-4">Basic Salary</th>
-                            <th class="px-6 py-4">Status</th>
-                            <th class="px-6 py-4 text-right">Actions</th>
-                        </tr>
-                    </thead>
-                    <?php foreach ($allemployee as $index => $emp): ?>
-                        <tbody class="divide-y divide-slate-200 text-slate-700">
+            <div class="card-hover glass-strong rounded-2xl overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm">
+                        <thead class="text-zinc-500 text-xs font-bold uppercase tracking-wider border-b border-white/[0.06]">
                             <tr>
-
-                                <td class=" border-b px-4 py-2"><?php echo $index + 1;  ?></td>
-                                <td class=" border-b px-4 py-2"><?php echo $emp['employee_code']; ?></td>
-                                <td class="px-6 py-4"><?php echo $emp['name']; ?></td>
-                                <td class="px-6 py-4"><?php echo $emp['email']; ?></td>
-                                <td class="px-6 py-4 text-slate-500"><?php echo $emp['department_name']; ?></td>
-                                <td class="px-6 py-4 text-slate-500"><?php echo $emp['position_name']; ?></td>
-                                <td class="px-6 py-4 text-slate-500"><?php echo $emp['basic_salary']; ?></td>
-                                <td class="px-6 py-4">
-                                    <?php if ($emp['status'] === 'active'): ?>
-                                        <span class="bg-emerald-50 text-emerald-700 font-medium px-2 py-1 rounded text-xs border border-emerald-200">Active</span>
-                                    <?php else: ?>
-                                        <span class="bg-red-50 text-red-700 font-medium px-2 py-1 rounded text-xs border border-red-200">Inactive</span>
-                                    <?php endif; ?>
-                                </td>
-                                <td class="px-6 py-4 text-right">
-                                    <a href="view_employee.php?id=<?php echo $emp['id']; ?>" class="text-slate-400 hover:text-rose-600 font-medium mr-3">View Detail</a>
-                                    <a href="edit_employee.php?id=<?php echo $emp['id']; ?>" class="text-indigo-600 hover:text-indigo-900 font-medium mr-3">Edit</a>
-                                    <form action="employee.php" method="POST" onsubmit="return confirm('Are you sure you want to delete this employee?');" class="inline">
-                                        <input type="hidden" name="employee_id" value="<?php echo $emp['id']; ?>">
-                                        <button type="submit" name="delete_emp" value="1" class="text-red-500 hover:text-red-700 font-medium">Delete</button>
-                                    </form>
+                                <th class="px-6 py-4">#</th>
+                                <th class="px-6 py-4">EMP Code</th>
+                                <th class="px-6 py-4">Name</th>
+                                <th class="px-6 py-4">Email</th>
+                                <th class="px-6 py-4">Department</th>
+                                <th class="px-6 py-4">Designation</th>
+                                <th class="px-6 py-4">Basic Salary</th>
+                                <th class="px-6 py-4">Status</th>
+                                <th class="px-6 py-4 text-right">Actions</th>
                             </tr>
-                        <?php endforeach; ?>
+                        </thead>
+                        <tbody class="divide-y divide-white/[0.06] text-zinc-300">
+                            <?php foreach ($allemployee as $index => $emp): ?>
+                                <tr class="hover:bg-white/[0.02] transition">
+                                    <td class="px-6 py-4"><?php echo $index + 1; ?></td>
+                                    <td class="px-6 py-4 font-mono text-xs text-zinc-400"><?php echo $emp['employee_code']; ?></td>
+                                    <td class="px-6 py-4 font-medium text-white"><?php echo $emp['name']; ?></td>
+                                    <td class="px-6 py-4 text-zinc-400"><?php echo $emp['email']; ?></td>
+                                    <td class="px-6 py-4 text-zinc-400"><?php echo $emp['department_name']; ?></td>
+                                    <td class="px-6 py-4 text-zinc-400"><?php echo $emp['position_name']; ?></td>
+                                    <td class="px-6 py-4 text-zinc-300 font-mono">$<?php echo number_format($emp['basic_salary'], 2); ?></td>
+                                    <td class="px-6 py-4">
+                                        <?php if ($emp['status'] === 'active'): ?>
+                                            <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold bg-emerald-500/20 text-emerald-400">Active</span>
+                                        <?php else: ?>
+                                            <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold bg-red-500/20 text-red-400">Inactive</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td class="px-6 py-4 text-right whitespace-nowrap">
+                                        <a href="view_employee.php?id=<?php echo $emp['id']; ?>" class="text-zinc-500 hover:text-violet-400 font-medium mr-3 text-xs"><i class="fa-solid fa-eye"></i></a>
+                                        <a href="edit_employee.php?id=<?php echo $emp['id']; ?>" class="text-violet-400 hover:text-violet-300 font-medium mr-3 text-xs"><i class="fa-solid fa-pen"></i></a>
+                                        <form action="employee.php" method="POST" onsubmit="return confirm('Are you sure you want to delete this employee?');" class="inline">
+                                            <input type="hidden" name="employee_id" value="<?php echo $emp['id']; ?>">
+                                            <button type="submit" name="delete_emp" value="1" class="text-red-400 hover:text-red-300 font-medium text-xs"><i class="fa-solid fa-trash"></i></button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                            <?php if (empty($allemployee)): ?>
+                                <tr><td colspan="9" class="px-6 py-12 text-center text-zinc-500">No employees found.</td></tr>
+                            <?php endif; ?>
                         </tbody>
-                </table>
-
+                    </table>
+                </div>
             </div>
-        </div>
-    </main>
+        </main>
+
+        <footer class="glass-strong border-t border-white/[0.06] px-8 py-3 text-xs text-zinc-500 flex justify-between items-center mt-auto">
+            <span>&copy; <?php echo date('Y'); ?> ENTERPRISE HR PLATFORMS</span>
+            <span class="flex items-center space-x-1.5 font-medium text-emerald-400">
+                <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
+                <span>System Secure</span>
+            </span>
+        </footer>
+    </div>
 </body>
 
 </html>

@@ -1,6 +1,12 @@
 <?php
+session_start();
+require_once '../config/auth.php';
+require_admin_login();
 require_once '../config/db.php';
+require_once '../config/helpers.php';
 require_once '../config/notifications.php';
+
+set_mmt_timezone();
 
 $message = '';
 $message_type = '';
@@ -17,30 +23,86 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $request_id = $_POST['request_id'] ?? 0;
     $action = $_POST['action'] ?? '';
 
-    if ($action == 'approve') {
-        $status = 'Approved';
-    } elseif ($action == 'reject') {
-        $status = 'Rejected';
-    }
+    if (in_array($action, ['approve', 'reject']) && $request_id > 0) {
+        $status = $action === 'approve' ? 'Approved' : 'Rejected';
 
-    if (isset($status) && $request_id > 0) {
-        $stmt = $conn->prepare("UPDATE leave_requests SET status = ? WHERE id = ?");
-        $stmt->bind_param('si', $status, $request_id);
-        if ($stmt->execute()) {
-            $message = "Leave request $status successfully.";
-            $message_type = "success";
+        // Get the leave request details first
+        $req_stmt = $conn->prepare("SELECT lr.*, e.name as employee_name FROM leave_requests lr JOIN employee e ON lr.employee_id = e.id WHERE lr.id = ?");
+        $req_stmt->bind_param('i', $request_id);
+        $req_stmt->execute();
+        $leave_req = $req_stmt->get_result()->fetch_assoc();
+        $req_stmt->close();
 
-            $req = $conn->prepare("SELECT employee_id, leave_type FROM leave_requests WHERE id = ?");
-            $req->bind_param('i', $request_id);
-            $req->execute();
-            $r = $req->get_result()->fetch_assoc();
-            $req->close();
+        if ($leave_req) {
+            $admin_id = $_SESSION['admin_id'] ?? null;
+            $stmt = $conn->prepare("UPDATE leave_requests SET status = ?, approved_by = ?, approved_at = NOW() WHERE id = ?");
+            $stmt->bind_param('sii', $status, $admin_id, $request_id);
+            if ($stmt->execute()) {
+                $message = "Leave request $status successfully.";
+                $message_type = "success";
 
-            if ($r) {
-                create_notification($conn, $r['employee_id'], 'leave_' . strtolower($status), "Your $r[leave_type] request has been $status.", 'leaverequest.php');
+                // ── Leave Balance Update ──
+                if ($status === 'Approved') {
+                    $start = new DateTime($leave_req['start_date']);
+                    $end = new DateTime($leave_req['end_date']);
+                    $end->modify('+1 day');
+                    $interval = new DateInterval('P1D');
+                    $period = new DatePeriod($start, $interval, $end);
+
+                    $leave_days = 0;
+                    $half_day_counted = false;
+                    foreach ($period as $date) {
+                        $d = $date->format('Y-m-d');
+                        $day_of_week = (int)$date->format('N');
+                        // Count only weekdays (Mon-Fri) as leave days
+                        if ($day_of_week <= 5) {
+                            if ($leave_req['leave_duration'] === 'half_day') {
+                                if (!$half_day_counted) {
+                                    $leave_days += 0.5;
+                                    $half_day_counted = true;
+                                }
+                            } else {
+                                $leave_days += 1;
+                            }
+                        }
+                        // Mark attendance for each leave date
+                        $att_check = $conn->prepare("SELECT id FROM attendance WHERE employee_id = ? AND attendance_date = ?");
+                        $att_check->bind_param('is', $leave_req['employee_id'], $d);
+                        $att_check->execute();
+                        $att_check->store_result();
+                        if ($att_check->num_rows === 0) {
+                            $ins_att = $conn->prepare("INSERT INTO attendance (employee_id, attendance_date, status) VALUES (?, ?, 'leave')");
+                            $ins_att->bind_param('is', $leave_req['employee_id'], $d);
+                            $ins_att->execute();
+                            $ins_att->close();
+                        } else {
+                            $upd_att = $conn->prepare("UPDATE attendance SET status = 'leave' WHERE employee_id = ? AND attendance_date = ?");
+                            $upd_att->bind_param('is', $leave_req['employee_id'], $d);
+                            $upd_att->execute();
+                            $upd_att->close();
+                        }
+                        $att_check->close();
+                    }
+
+                    // Update leave balance
+                    $year = (int)date('Y', strtotime($leave_req['start_date']));
+                    $bal_stmt = $conn->prepare(
+                        "INSERT INTO leave_balances (employee_id, leave_type, total_taken, total_pending, year) 
+                         VALUES (?, ?, ?, 0, ?)
+                         ON DUPLICATE KEY UPDATE total_taken = total_taken + VALUES(total_taken), total_pending = 0"
+                    );
+                    $bal_stmt->bind_param('isdi', $leave_req['employee_id'], $leave_req['leave_type'], $leave_days, $year);
+                    $bal_stmt->execute();
+                    $bal_stmt->close();
+                }
+
+                create_notification($conn, $leave_req['employee_id'], 'leave_' . strtolower($status), "Your {$leave_req['leave_type']} request ({$leave_req['start_date']} to {$leave_req['end_date']}) has been $status.", 'leaverequest.php');
+            } else {
+                $message = "Error updating leave request.";
+                $message_type = "error";
             }
+            $stmt->close();
         }
-        $stmt->close();
     }
 }
 
@@ -62,129 +124,124 @@ foreach ($requests as $r) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Leave Approval - HRMS Admin</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <title>AURA HR · Leave Approvals</title>
+    <link rel="icon" type="image/svg+xml" href="../favicon.svg">
+    <?php include "../includes/header.php"; ?>
 </head>
-<body class="bg-gray-50 font-sans flex min-h-screen">
-
-    <aside class="w-64 bg-slate-900 text-slate-200 flex-col hidden md:flex border-r border-slate-800">
-        <div class="p-6 border-b border-slate-800">
-            <h1 class="text-xl font-bold tracking-wider text-white">HRMS Core</h1>
-        </div>
-        <nav class="flex-1 px-4 py-6 space-y-2 text-sm">
-            <a href="dashboard.php" class="flex items-center px-4 py-3 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition"><i class="fa-solid fa-chart-pie w-5"></i> Dashboard</a>
-            <a href="employee.php" class="flex items-center px-4 py-3 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition"><i class="fa-solid fa-users w-5"></i> Employees</a>
-            <a href="leaveApproval.php" class="flex items-center px-4 py-3 rounded-lg bg-indigo-600 text-white font-medium relative">
-                <i class="fa-solid fa-envelope-open-text w-5"></i> Leave Requests
-                <?php if ($pending_count > 0): ?>
-                <span class="ml-auto bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full"><?php echo $pending_count; ?></span>
-                <?php endif; ?>
-            </a>
-            <a href="overtimeApproval.php" class="flex items-center px-4 py-3 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition"><i class="fa-solid fa-clock w-5"></i> Overtime Requests</a>
-            <a href="payroll.php" class="flex items-center px-4 py-3 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition"><i class="fa-solid fa-coins w-5"></i> Payroll</a>
-        </nav>
-    </aside>
-
-    <main class="flex-1 p-8">
-        <header class="mb-8 flex items-center justify-between">
-            <div>
-                <h1 class="text-2xl font-bold text-slate-900 tracking-tight">Leave Approvals</h1>
-                <p class="text-sm text-slate-500 mt-1">Review and manage employee leave requests.</p>
-            </div>
-            <div class="relative" x-data="{ open: false }">
-                <button @click="open = !open" class="relative p-2 text-slate-500 hover:text-slate-700 bg-white rounded-full border border-slate-200">
-                    <i class="fa-solid fa-bell text-lg"></i>
-                    <?php if ($unread_notifications > 0): ?>
-                    <span class="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center"><?php echo $unread_notifications; ?></span>
+<body x-data="{ sidebarOpen: false }" class="bg-slate-50 dark:bg-[#09090b] text-slate-900 dark:text-white font-sans antialiased min-h-screen flex">
+    <?php include "../includes/sidebar.php"; ?>
+    <div class="flex-1 flex flex-col min-w-0 main-wrapper">
+        <?php $page_title = "Leave Approvals"; include "../includes/topbar.php"; ?>
+        <main class="flex-1 p-8">
+            <header class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+                <div class="animate-fade-in-up">
+                    <h1 class="text-2xl font-bold text-body tracking-tight">Leave Approvals</h1>
+                    <p class="text-sm text-body-secondary mt-1">Review and manage employee leave requests. Approved leaves will auto-mark attendance.</p>
+                </div>
+                <div class="flex items-center gap-3">
+                    <?php if ($pending_count > 0): ?>
+                    <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold bg-amber-500/20 text-amber-400">
+                        <i class="fa-solid fa-clock mr-1"></i> <?php echo $pending_count; ?> pending
+                    </span>
                     <?php endif; ?>
-                </button>
-                <div x-show="open" @click.outside="open = false" class="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-xl border border-slate-200 z-50" style="display: none;">
-                    <div class="p-3 border-b border-slate-100 flex items-center justify-between">
-                        <h4 class="text-sm font-bold text-slate-800">Notifications</h4>
-                        <a href="?mark_read=1" class="text-xs text-blue-600 font-semibold">Mark all read</a>
-                    </div>
-                    <div class="max-h-64 overflow-y-auto">
-                        <?php if (empty($notifications)): ?>
-                            <p class="p-4 text-xs text-slate-400 text-center">No notifications</p>
-                        <?php else: ?>
-                            <?php foreach ($notifications as $noti): ?>
-                            <div class="px-4 py-3 border-b border-slate-50 <?php echo !$noti['is_read'] ? 'bg-blue-50/50' : ''; ?>">
-                                <p class="text-xs text-slate-700"><?php echo htmlspecialchars($noti['message']); ?></p>
-                                <p class="text-[10px] text-slate-400 mt-1"><?php echo $noti['emp_name'] ? htmlspecialchars($noti['emp_name']) . ' - ' : ''; ?><?php echo date('M d, h:i A', strtotime($noti['created_at'])); ?></p>
-                            </div>
-                            <?php endforeach; ?>
-                        <?php endif; ?>
+                </div>
+            </header>
+
+            <?php if ($message): ?>
+                <div class="mb-6 rounded-2xl px-6 py-4 shadow-sm border <?php echo $message_type == 'success' ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400' : 'bg-red-500/20 border-red-500/30 text-red-400'; ?>">
+                    <div class="flex items-center gap-3">
+                        <i class="fa-solid <?php echo $message_type == 'success' ? 'fa-circle-check' : 'fa-circle-exclamation'; ?> text-lg"></i>
+                        <p class="font-medium"><?php echo htmlspecialchars($message); ?></p>
                     </div>
                 </div>
-            </div>
-        </header>
+            <?php endif; ?>
 
-        <?php if ($message): ?>
-            <div class="mb-4 px-4 py-3 rounded-lg border <?php echo $message_type == 'success' ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-700'; ?>">
-                <?php echo htmlspecialchars($message); ?>
+            <div class="card-hover glass-strong rounded-2xl overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm">
+                        <thead class="text-zinc-500 text-xs font-bold uppercase tracking-wider border-b border-white/[0.06]">
+                            <tr>
+                                <th class="px-6 py-4">Employee</th>
+                                <th class="px-6 py-4">Leave Type</th>
+                                <th class="px-6 py-4">Duration</th>
+                                <th class="px-6 py-4">Reason</th>
+                                <th class="px-6 py-4">Submitted</th>
+                                <th class="px-6 py-4">Status</th>
+                                <th class="px-6 py-4 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-white/[0.06] text-zinc-300">
+                            <?php foreach ($requests as $req): ?>
+                            <tr class="<?php echo $req['status'] == 'Pending' ? 'bg-amber-500/5' : ''; ?> hover:bg-white/[0.02] transition">
+                                <td class="px-6 py-4">
+                                    <div class="font-medium text-white"><?php echo htmlspecialchars($req['employee_name']); ?></div>
+                                    <div class="text-xs text-zinc-500"><?php echo htmlspecialchars($req['employee_code']); ?></div>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold bg-white/10 text-zinc-300"><?php echo htmlspecialchars($req['leave_type']); ?></span>
+                                </td>
+                                <td class="px-6 py-4 text-sm">
+                                    <div class="font-medium"><?php echo format_mmt($req['start_date'], 'M d'); ?> - <?php echo format_mmt($req['end_date'], 'M d, Y'); ?></div>
+                                    <?php if ($req['leave_duration'] === 'half_day'): ?>
+                                        <span class="text-[10px] text-amber-400">Half-Day (<?php echo $req['half_day_period'] ?? 'N/A'; ?>)</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td class="px-6 py-4 text-zinc-400 max-w-[200px] truncate text-sm" title="<?php echo htmlspecialchars($req['reason']); ?>"><?php echo htmlspecialchars($req['reason']); ?></td>
+                                <td class="px-6 py-4 text-xs text-zinc-500"><?php echo format_mmt($req['created_at'], 'M d, h:i A'); ?></td>
+                                <td class="px-6 py-4">
+                                    <?php 
+                                    $display_status = $req['status'];
+                                    $status_class = '';
+                                    if ($req['status'] == 'Approved') {
+                                        if (strtotime($req['end_date']) < strtotime(mmt_date())) {
+                                            $display_status = 'Completed';
+                                            $status_class = 'bg-white/10 text-zinc-400';
+                                        } else {
+                                            $status_class = 'bg-emerald-500/20 text-emerald-400';
+                                        }
+                                    } elseif ($req['status'] == 'Rejected') {
+                                        $status_class = 'bg-red-500/20 text-red-400';
+                                    } else {
+                                        $status_class = 'bg-amber-500/20 text-amber-400';
+                                    }
+                                    ?>
+                                    <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold <?php echo $status_class; ?>">
+                                        <?php echo $display_status; ?>
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 text-right whitespace-nowrap">
+                                    <?php if ($req['status'] == 'Pending'): ?>
+                                    <form method="POST" class="inline">
+                                        <input type="hidden" name="request_id" value="<?php echo $req['id']; ?>">
+                                        <button type="submit" name="action" value="approve" class="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs px-4 py-2 shadow-sm transition">
+                                            <i class="fa-solid fa-check"></i> Approve
+                                        </button>
+                                        <button type="submit" name="action" value="reject" class="rounded-xl border border-red-500/30 hover:bg-red-500/10 text-red-400 font-semibold text-xs px-4 py-2 transition">
+                                            <i class="fa-solid fa-times"></i> Reject
+                                        </button>
+                                    </form>
+                                    <?php else: ?>
+                                    <span class="text-xs text-zinc-500">--</span>
+                                    <?php endif; ?>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                            <?php if (empty($requests)): ?>
+                            <tr><td colspan="7" class="px-6 py-12 text-center text-zinc-500">No leave requests found.</td></tr>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
             </div>
-        <?php endif; ?>
+        </main>
 
-        <div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-            <div class="overflow-x-auto">
-                <table class="w-full text-left border-collapse text-sm">
-                    <thead class="bg-slate-50 text-slate-500 font-semibold uppercase tracking-wider text-xs border-b border-slate-200">
-                        <tr>
-                            <th class="px-6 py-4">Employee</th>
-                            <th class="px-6 py-4">Leave Type</th>
-                            <th class="px-6 py-4">Duration</th>
-                            <th class="px-6 py-4">Reason</th>
-                            <th class="px-6 py-4">Submitted</th>
-                            <th class="px-6 py-4">Status</th>
-                            <th class="px-6 py-4 text-right">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-200 text-slate-700">
-                        <?php foreach ($requests as $req): ?>
-                        <tr class="<?php echo $req['status'] == 'Pending' ? 'bg-amber-50/30' : ''; ?>">
-                            <td class="px-6 py-4">
-                                <div class="font-medium text-slate-900"><?php echo htmlspecialchars($req['employee_name']); ?></div>
-                                <div class="text-xs text-slate-400"><?php echo htmlspecialchars($req['employee_code']); ?></div>
-                            </td>
-                            <td class="px-6 py-4"><?php echo htmlspecialchars($req['leave_type']); ?></td>
-                            <td class="px-6 py-4">
-                                <div class="font-medium"><?php echo date('M d', strtotime($req['start_date'])); ?> - <?php echo date('M d, Y', strtotime($req['end_date'])); ?></div>
-                            </td>
-                            <td class="px-6 py-4 text-slate-500 max-w-[200px] truncate" title="<?php echo htmlspecialchars($req['reason']); ?>"><?php echo htmlspecialchars($req['reason']); ?></td>
-                            <td class="px-6 py-4 text-xs text-slate-400"><?php echo date('M d, h:i A', strtotime($req['created_at'])); ?></td>
-                            <td class="px-6 py-4">
-                                <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold
-                                    <?php echo $req['status'] == 'Approved' ? 'bg-green-100 text-green-700' : ''; ?>
-                                    <?php echo $req['status'] == 'Rejected' ? 'bg-red-100 text-red-700' : ''; ?>
-                                    <?php echo $req['status'] == 'Pending' ? 'bg-yellow-100 text-yellow-700' : ''; ?>
-                                "><?php echo $req['status']; ?></span>
-                            </td>
-                            <td class="px-6 py-4 text-right whitespace-nowrap">
-                                <?php if ($req['status'] == 'Pending'): ?>
-                                <form method="POST" class="inline">
-                                    <input type="hidden" name="request_id" value="<?php echo $req['id']; ?>">
-                                    <button type="submit" name="action" value="approve" class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs px-3 py-1.5 rounded shadow-sm mr-2 transition">
-                                        <i class="fa-solid fa-check"></i> Approve
-                                    </button>
-                                    <button type="submit" name="action" value="reject" class="border border-red-200 hover:bg-red-50 text-red-600 font-medium text-xs px-3 py-1.5 rounded transition">
-                                        <i class="fa-solid fa-times"></i> Reject
-                                    </button>
-                                </form>
-                                <?php else: ?>
-                                <span class="text-xs text-slate-400">--</span>
-                                <?php endif; ?>
-                            </td>
-                        </tr>
-                        <?php endforeach; ?>
-                        <?php if (empty($requests)): ?>
-                        <tr><td colspan="7" class="px-6 py-8 text-center text-slate-400">No leave requests found.</td></tr>
-                        <?php endif; ?>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </main>
+        <footer class="glass-strong border-t border-white/[0.06] px-8 py-3 text-xs text-zinc-500 flex justify-between items-center mt-auto">
+            <span>&copy; <?php echo date('Y'); ?> ENTERPRISE HR PLATFORMS</span>
+            <span class="flex items-center space-x-1.5 font-medium text-emerald-400">
+                <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
+                <span>System Secure</span>
+            </span>
+        </footer>
+    </div>
 </body>
 </html>

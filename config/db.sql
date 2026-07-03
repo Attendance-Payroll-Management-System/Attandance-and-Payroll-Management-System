@@ -31,7 +31,7 @@ CREATE TABLE employee (
     dob DATE,
     phone VARCHAR(14),
     email VARCHAR(30),
-    password VARCHAR(30),
+    password VARCHAR(255) NOT NULL DEFAULT '',
     hire_date DATE,   
     basic_salary DECIMAL(10,2),
     status VARCHAR(20),
@@ -143,5 +143,6 @@ INSERT INTO bonus_types (bonus_name) VALUES ('Performance Bonus');
 INSERT INTO deduction_types (deduction_name) VALUES ('Health Insurance');
 
 -- 2. Populate an active employee profile
+-- Password: pass123 (use PHP password_hash() to generate the hash for production)
 INSERT INTO employee (employee_code, name, role, gender, phone, email, password, hire_date, department_id, position_id, basic_salary, status)
 VALUES ('EMP001', 'John Doe', 'Developer', 'Male', '1234567890', 'john@company.com', 'pass123', '2026-01-15', 1, 1, 5000.00, 'active');

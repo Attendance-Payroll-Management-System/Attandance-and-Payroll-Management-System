@@ -27,7 +27,6 @@ function get_unread_count($conn, $employee_id = null) {
         $stmt->bind_param('i', $employee_id);
     } else {
         $stmt = $conn->prepare("SELECT COUNT(*) as cnt FROM notifications WHERE employee_id IS NULL AND is_read = 0");
-        $stmt->execute();
     }
     $stmt->execute();
     $row = $stmt->get_result()->fetch_assoc();

@@ -25,14 +25,34 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $user = $result->fetch_assoc();
         $stmt->close();
 
-        if ($user && $password == $user['password']) {
-            session_regenerate_id(true);
-            $_SESSION['logged_in'] = true;
-            $_SESSION['employee_id'] = $user['id'];
-            $_SESSION['employee_name'] = $user['name'];
-            $_SESSION['email'] = $user['email'];
-            header('Location: attendance.php');
-            exit;
+        if ($user) {
+            $stored = $user['password'];
+            $is_hashed = strlen($stored) === 60 && strpos($stored, '$2y$') === 0;
+
+            if ($is_hashed) {
+                $valid = password_verify($password, $stored);
+            } else {
+                $valid = $password === $stored;
+                if ($valid) {
+                    $hashed = password_hash($password, PASSWORD_DEFAULT);
+                    $update = $conn->prepare("UPDATE employee SET password = ? WHERE id = ?");
+                    $update->bind_param("si", $hashed, $user['id']);
+                    $update->execute();
+                    $update->close();
+                }
+            }
+
+            if ($valid) {
+                session_regenerate_id(true);
+                $_SESSION['logged_in'] = true;
+                $_SESSION['employee_id'] = $user['id'];
+                $_SESSION['employee_name'] = $user['name'];
+                $_SESSION['email'] = $user['email'];
+                header('Location: attendance.php');
+                exit;
+            } else {
+                $error = "Invalid email or password";
+            }
         } else {
             $error = "Invalid email or password";
         }
@@ -47,56 +67,148 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>employee Login</title>
+    <title>AURA HR · Employee Login</title>
+    <link rel="icon" type="image/svg+xml" href="../favicon.svg">
+    <link rel="stylesheet" href="../assets/css/app.css">
+    <script>
+    (function() {
+        var theme = localStorage.getItem('aura-theme');
+        if (theme === 'light') {
+            document.documentElement.classList.remove('dark');
+        } else if (theme === 'dark') {
+            document.documentElement.classList.add('dark');
+        } else {
+            if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
+                document.documentElement.classList.remove('dark');
+            } else {
+                document.documentElement.classList.add('dark');
+            }
+        }
+    })();
+    </script>
+    <script>tailwind.config = { darkMode: 'class' }</script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <style>
+    :root:not(.dark) .glass-strong.text-white,
+    :root:not(.dark) .glass-strong .text-white { color: #0f172a !important; }
+    :root:not(.dark) .glass-strong.text-zinc-400,
+    :root:not(.dark) .glass-strong.text-zinc-300,
+    :root:not(.dark) .glass-strong .text-zinc-400,
+    :root:not(.dark) .glass-strong .text-zinc-300 { color: #475569 !important; }
+    :root:not(.dark) .glass-strong.text-zinc-500,
+    :root:not(.dark) .glass-strong .text-zinc-500 { color: #94a3b8 !important; }
+    :root:not(.dark) .glass-strong.bg-white\/\[0\.06\],
+    :root:not(.dark) .glass-strong.bg-white\/10,
+    :root:not(.dark) .glass-strong.bg-white\/\[0\.04\],
+    :root:not(.dark) .glass-strong .bg-white\/\[0\.06\],
+    :root:not(.dark) .glass-strong .bg-white\/10,
+    :root:not(.dark) .glass-strong .bg-white\/\[0\.04\] { background-color: #f1f5f9 !important; }
+    :root:not(.dark) .glass-strong.border-white\/10,
+    :root:not(.dark) .glass-strong.border-white\/\[0\.06\],
+    :root:not(.dark) .glass-strong .border-white\/10,
+    :root:not(.dark) .glass-strong .border-white\/\[0\.06\] { border-color: #e2e8f0 !important; }
+    :root:not(.dark) .glass-strong button.text-white { color: #ffffff !important; }
+    :root:not(.dark) .glass-strong button.hover\:text-white:hover { color: #475569 !important; }
+    :root:not(.dark) .glass-strong .hover\:bg-white\/5:hover { background-color: #f1f5f9 !important; }
+    </style>
 </head>
 
 
-<body class="flex flex-col justify-center items-center bg-gray-300">
+<body class="min-h-screen flex flex-col items-center justify-center bg-grid px-4 bg-body text-body overflow-hidden">
+    <div class="fixed inset-0 overflow-hidden pointer-events-none">
+        <div class="absolute -top-40 -right-40 w-96 h-96 bg-violet-500/10 rounded-full blur-3xl animate-breathe"></div>
+        <div class="absolute -bottom-40 -left-40 w-96 h-96 bg-fuchsia-500/10 rounded-full blur-3xl animate-breathe" style="animation-delay: 2s;"></div>
+        <div class="absolute top-1/3 -translate-y-1/2 right-10 w-40 h-40 bg-amber-500/5 rounded-full blur-3xl animate-breathe" style="animation-delay: 4s;"></div>
+        <div class="absolute top-20 left-20 w-32 h-32 border border-violet-500/10 rounded-full animate-spin-slow"></div>
+        <div class="absolute bottom-20 right-20 w-24 h-24 border border-fuchsia-500/10 rounded-full animate-spin-slow" style="animation-direction: reverse;"></div>
+        <svg class="absolute top-1/4 right-1/4 w-16 h-16 text-violet-500/5 animate-float" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+        <svg class="absolute bottom-1/3 left-1/4 w-20 h-20 text-fuchsia-500/5 animate-float" style="animation-delay: 2s;" viewBox="0 0 24 24" fill="currentColor"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/></svg>
+    </div>
 
-    <div class="flex flex-col gap-6">
-        <div class=" flex justify-center mt-10">
-            <p class="w-10 h-10 bg-purple-700/30 flex items-center rounded-xl justify-center">
-                <img src="image/key.png" alt="Profile" class="w-6 h-6">
-            </p>
+    <div class="fixed top-4 right-4 z-50">
+        <button onclick="toggleTheme()" class="theme-toggle-btn">
+            <i class="fa-solid fa-sun icon-sun text-base"></i>
+            <i class="fa-solid fa-moon icon-moon text-base"></i>
+        </button>
+    </div>
 
+    <div class="flex flex-col gap-6 w-full max-w-[420px] px-4 relative z-10">
+        <div class="flex flex-col items-center gap-4 mt-10 animate-fade-in-up">
+            <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-500 via-fuchsia-500 to-amber-500 flex items-center justify-center shadow-2xl shadow-violet-500/20 animate-float ring-2 ring-white/20 glow-violet card-inner-glow">
+                <i class="fas fa-bolt text-white text-2xl"></i>
+            </div>
+            <div class="text-center">
+                <h1 class="text-2xl font-bold text-body tracking-tight">Welcome Back</h1>
+                <p class="text-body-secondary text-sm">Sign in to your employee account</p>
+            </div>
         </div>
-        <div class="text-center">
-            <h1 class="text-2xl font-bold text-white">Welcome back</h1>
-            <p class="text-gray-600">Sign in to your account</p>
-        </div>
 
-        <div class="bg-gray-900 text-white w-[400px] flex flex-col p-6 gap-6 rounded-2xl">
-            <!-- Error -->
+        <div class="border-gradient text-body w-full flex flex-col p-8 gap-6 rounded-2xl animate-fade-in-up stagger-1">
+            <div class="glass-strong text-white w-full flex flex-col gap-6 -m-[1px] p-8 rounded-2xl" style="background: var(--glass-strong-bg);">
             <?php if (!empty($error)) : ?>
-                <div class="flex gap-4 items-center p-2  bg-red-500/10 rounded-2xl ring-2 ring-red-800 text-red-500 font-semibold" <?php echo "Registration Fail!" ?>>
-                    <img src="image/false.png" class="w-4 h-4 gap-4 items-center">
+                <div class="flex items-center gap-3 p-3 bg-red-500/10 rounded-xl ring-1 ring-red-500/20 text-red-400 text-sm font-medium animate-slide-down">
+                    <i class="fas fa-circle-exclamation text-red-400"></i>
                     <?php echo htmlspecialchars($error); ?>
                 </div>
-
             <?php endif; ?>
 
+            <?php if (!empty($success)) : ?>
+                <div class="flex items-center gap-3 p-3 bg-emerald-500/10 rounded-xl ring-1 ring-emerald-500/20 text-emerald-400 text-sm font-medium animate-slide-down">
+                    <i class="fas fa-check-circle text-emerald-400"></i>
+                    <?php echo htmlspecialchars($success); ?>
+                </div>
+            <?php endif; ?>
 
-            <!-- form -->
             <form action="login.php" method="POST" class="space-y-5">
-
-                <div class="flex flex-col">
-                    <label for="email" class="">Email:</label>
-                    <input type="email" id="email" name="email" placeholder="Enter your " class="p-2 rounded-2xl bg-opacity-25 bg-gray-500 " />
+                <div class="space-y-1.5">
+                    <label for="email" class="text-sm font-medium text-zinc-300"><i class="fa-regular fa-envelope mr-1.5 text-violet-400"></i>Email</label>
+                    <input type="email" id="email" name="email" placeholder="you@company.com" class="w-full px-4 py-3 rounded-xl bg-white/[0.06] border border-white/10 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50 transition-all duration-200" />
                 </div>
-                <div class="flex flex-col">
-                    <label for="password">Password</label>
-                    <input type="password" id="password" name="password" placeholder="Enter your password" class="p-2 rounded-2xl bg-opacity-25 bg-gray-500 " />
+                <div class="space-y-1.5">
+                    <label for="password" class="text-sm font-medium text-zinc-300"><i class="fa-solid fa-lock mr-1.5 text-violet-400"></i>Password</label>
+                    <input type="password" id="password" name="password" placeholder="Enter your password" class="w-full px-4 py-3 rounded-xl bg-white/[0.06] border border-white/10 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50 transition-all duration-200" />
                 </div>
 
-                <button type="submit" class="bg-blue-500 text-center w-full text-black block font-semibold px-4 py-3 rounded-2xl shadow-md ">Sign In</button>
-
-
+                <button type="submit" class="w-full bg-gradient-to-r from-violet-600 via-fuchsia-600 to-amber-600 hover:from-violet-500 hover:via-fuchsia-500 hover:to-amber-500 text-white font-semibold px-4 py-3.5 rounded-xl shadow-lg shadow-violet-600/20 hover:shadow-xl hover:shadow-violet-500/30 transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 animate-gradient btn-hover-lift relative overflow-hidden">
+                    <span class="relative z-10"><i class="fa-solid fa-right-to-bracket mr-2"></i> Sign In</span>
+                    <span class="absolute inset-0 bg-white/10 opacity-0 hover:opacity-100 transition-opacity"></span>
+                </button>
+                <div class="flex items-center justify-between text-xs">
+                    <a href="forgot_password.php" class="text-zinc-400 hover:text-violet-400 font-medium transition-colors"><i class="fa-solid fa-key mr-1"></i> Forgot Password?</a>
+                    <a href="../admin/login.php" class="text-zinc-400 hover:text-violet-400 font-medium transition-colors"><i class="fa-solid fa-shield-halved mr-1"></i> Admin Login</a>
+                </div>
             </form>
-
+            </div>
         </div>
-        <p class="text-center">Don't have an account?<a href="home/home.php" class="text-blue-900 font-bold">Register here</a></p>
+
+        <div class="flex items-center justify-center gap-3 animate-fade-in-up stagger-2">
+            <span class="h-px w-12 bg-body-secondary"></span>
+            <p class="text-sm text-body-muted">New employee?</p>
+            <span class="h-px w-12 bg-body-secondary"></span>
+        </div>
+        <p class="text-center text-sm animate-fade-in-up stagger-3">
+            <a href="../home/home.php" class="text-violet-400 hover:text-violet-300 font-semibold transition-colors"><i class="fa-solid fa-user-plus mr-1"></i> Register here</a>
+        </p>
+
+        <p class="text-center text-[10px] text-body-muted animate-fade-in-up stagger-4">
+            <i class="fa-solid fa-shield-halved mr-1 text-[8px]"></i>Secured with AES-256 encryption
+        </p>
     </div>
+<script>
+function toggleTheme() {
+    var html = document.documentElement;
+    var isDark = html.classList.contains('dark');
+    if (isDark) {
+        html.classList.remove('dark');
+        localStorage.setItem('aura-theme', 'light');
+    } else {
+        html.classList.add('dark');
+        localStorage.setItem('aura-theme', 'dark');
+    }
+}
+</script>
 </body>
 
 
