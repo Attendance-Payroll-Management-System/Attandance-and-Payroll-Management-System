@@ -333,7 +333,10 @@ function get_attendance_summary_for_payroll(mysqli $conn, int $employee_id, stri
             SUM(CASE WHEN status = 'present' THEN 1 ELSE 0 END) as present_days,
             SUM(CASE WHEN status = 'absent' THEN 1 ELSE 0 END) as absent_days,
             SUM(CASE WHEN status = 'late' THEN 1 ELSE 0 END) as late_days,
-            SUM(CASE WHEN status = 'leave' THEN 1 ELSE 0 END) as leave_days
+            SUM(CASE WHEN status = 'leave' THEN 1 ELSE 0 END) as leave_days,
+            SUM(CASE WHEN status IN ('present', 'late') THEN 1 ELSE 0 END) as effective_present_days,
+            SUM(CASE WHEN status IN ('awol', 'absent', 'full_absent', 'half_absent') THEN 1 ELSE 0 END) as absent_days_total,
+            SUM(CASE WHEN status IN ('weekend', 'public_holiday') THEN 1 ELSE 0 END) as non_working_days
          FROM attendance 
          WHERE employee_id = ? AND attendance_date BETWEEN ? AND ?"
     );
@@ -341,7 +344,7 @@ function get_attendance_summary_for_payroll(mysqli $conn, int $employee_id, stri
     $stmt->execute();
     $result = $stmt->get_result()->fetch_assoc();
     $stmt->close();
-    return $result ?: ['total_days' => 0, 'present_days' => 0, 'absent_days' => 0, 'late_days' => 0, 'leave_days' => 0];
+    return $result ?: ['total_days' => 0, 'present_days' => 0, 'absent_days' => 0, 'late_days' => 0, 'leave_days' => 0, 'effective_present_days' => 0, 'absent_days_total' => 0, 'non_working_days' => 0];
 }
 
 function calculate_overtime_amount_for_payroll(mysqli $conn, int $employee_id, string $month_start, string $month_end, float $hourly_rate): float {
@@ -386,4 +389,410 @@ function get_message(): array {
     $type = $_SESSION['message_type'] ?? '';
     unset($_SESSION['message'], $_SESSION['message_type']);
     return ['message' => $msg, 'message_type' => $type];
+}
+
+// ─── CSRF Protection ──────────────────────────────────────────
+function generate_csrf_token(): string {
+    if (session_status() === PHP_SESSION_NONE) session_start();
+    if (empty($_SESSION['csrf_token'])) {
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+    }
+    return $_SESSION['csrf_token'];
+}
+
+function csrf_field(): string {
+    return '<input type="hidden" name="csrf_token" value="' . htmlspecialchars(generate_csrf_token()) . '">';
+}
+
+function validate_csrf_token(): bool {
+    if (session_status() === PHP_SESSION_NONE) session_start();
+    $token = $_POST['csrf_token'] ?? '';
+    return !empty($token) && hash_equals($_SESSION['csrf_token'] ?? '', $token);
+}
+
+// ─── Day Type Checks (Weekend / Holiday / Working Day) ─────────
+
+function is_weekend(string $date): bool {
+    set_mmt_timezone();
+    $day_of_week = (int)date('N', strtotime($date));
+    return $day_of_week >= 6; // Saturday=6, Sunday=7
+}
+
+function is_public_holiday(mysqli $conn, string $date): bool {
+    $stmt = $conn->prepare("SELECT COUNT(*) as cnt FROM holidays WHERE holiday_date = ?");
+    $stmt->bind_param('s', $date);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    return ($row['cnt'] ?? 0) > 0;
+}
+
+function is_working_day(mysqli $conn, string $date): bool {
+    return !is_weekend($date) && !is_public_holiday($conn, $date);
+}
+
+// ─── Late Check-in Detection ───────────────────────────────────
+
+function is_late_checkin(string $check_in_time): bool {
+    $threshold = '09:00:00';
+    return strtotime($check_in_time) > strtotime($threshold);
+}
+
+function get_late_threshold(): string {
+    return '09:00:00';
+}
+
+// ─── Attendance Status Auto-Calculation ────────────────────────
+
+function calculate_attendance_status(mysqli $conn, int $employee_id, string $date, ?string $check_in, ?string $check_out, ?float $total_hours): string {
+    set_mmt_timezone();
+
+    // Rule 1: Weekend
+    if (is_weekend($date)) {
+        return 'weekend';
+    }
+
+    // Rule 2: Public Holiday
+    if (is_public_holiday($conn, $date)) {
+        return 'public_holiday';
+    }
+
+    // Rule 3: Approved Leave
+    if (has_approved_leave_on_date($conn, $employee_id, $date)) {
+        return 'leave';
+    }
+
+    // No check-in at all
+    if ($check_in === null) {
+        return 'awol';
+    }
+
+    // Has check-in
+    $is_late = is_late_checkin($check_in);
+
+    // Has check-out
+    if ($check_out !== null) {
+        $check_out_time = date('H:i:s', strtotime($check_out));
+
+        // Rule 4: Check-out before 12:00 PM → Full-Day Absent
+        if (strtotime($check_out_time) < strtotime('12:00:00')) {
+            return 'full_absent';
+        }
+
+        // Rule 5: Check-out at/after 12:00 PM but incomplete day → Half-Day Absent
+        $standard_hours = (float)get_system_setting($conn, 'payroll_working_hours_per_day', '8');
+        if ($total_hours !== null && $total_hours < $standard_hours) {
+            return 'half_absent';
+        }
+    }
+
+    // Rule 3: Late check-in but present
+    if ($is_late) {
+        return 'late';
+    }
+
+    return 'present';
+}
+
+function get_system_setting(mysqli $conn, string $key, $default = null) {
+    $stmt = $conn->prepare("SELECT setting_value FROM system_settings WHERE setting_key = ?");
+    $stmt->bind_param('s', $key);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    return $row['setting_value'] ?? $default;
+}
+
+function is_attendance_blocked_date(mysqli $conn, string $date): string {
+    if (is_weekend($date)) {
+        return 'weekend';
+    }
+    if (is_public_holiday($conn, $date)) {
+        return 'public_holiday';
+    }
+    return '';
+}
+
+function get_attendance_block_message(string $block_type): string {
+    return match ($block_type) {
+        'weekend' => 'Attendance cannot be recorded on Saturdays or Sundays.',
+        'public_holiday' => 'Attendance cannot be recorded on public holidays.',
+        default => '',
+    };
+}
+
+// ─── Attendance Record Update after Check-out ──────────────────
+
+function recalculate_attendance_after_checkout(mysqli $conn, int $attendance_id, int $employee_id, string $date, string $check_in, string $check_out, float $total_hours): string {
+    $new_status = calculate_attendance_status($conn, $employee_id, $date, $check_in, $check_out, $total_hours);
+
+    $is_late_flag = is_late_checkin($check_in) ? 1 : 0;
+
+    $stmt = $conn->prepare(
+        "UPDATE attendance SET status = ?, is_late = ?, auto_calculated = 1, total_working_hours = ? WHERE id = ?"
+    );
+    $stmt->bind_param('sidi', $new_status, $is_late_flag, $total_hours, $attendance_id);
+    $stmt->execute();
+    $stmt->close();
+
+    return $new_status;
+}
+
+// ─── Auto-Mark AWOL, Weekend, Public Holiday ──────────────────
+
+function auto_mark_daily_attendance(mysqli $conn, string $date): array {
+    set_mmt_timezone();
+
+    $result = [
+        'processed' => 0,
+        'awol' => 0,
+        'weekend' => 0,
+        'holiday' => 0,
+        'errors' => [],
+    ];
+
+    // Get all active employees
+    $emps = $conn->query("SELECT id, name FROM employee WHERE status = 'active'");
+    if (!$emps) return $result;
+
+    $is_wknd = is_weekend($date);
+    $is_hol = is_public_holiday($conn, $date);
+
+    while ($emp = $emps->fetch_assoc()) {
+        $eid = (int)$emp['id'];
+
+        // Check if attendance already exists for this date
+        $check = $conn->prepare("SELECT id FROM attendance WHERE employee_id = ? AND attendance_date = ?");
+        $check->bind_param('is', $eid, $date);
+        $check->execute();
+        $check->store_result();
+        $exists = $check->num_rows > 0;
+        $check->close();
+
+        if ($exists) continue;
+
+        $result['processed']++;
+
+        if ($is_wknd) {
+            $stmt = $conn->prepare("INSERT INTO attendance (employee_id, attendance_date, status, auto_calculated) VALUES (?, ?, 'weekend', 1)");
+            $stmt->bind_param('is', $eid, $date);
+            $stmt->execute();
+            $stmt->close();
+            $result['weekend']++;
+        } elseif ($is_hol) {
+            $stmt = $conn->prepare("INSERT INTO attendance (employee_id, attendance_date, status, auto_calculated) VALUES (?, ?, 'public_holiday', 1)");
+            $stmt->bind_param('is', $eid, $date);
+            $stmt->execute();
+            $stmt->close();
+            $result['holiday']++;
+        } elseif (!has_approved_leave_on_date($conn, $eid, $date) && !has_pending_leave_on_date($conn, $eid, $date)) {
+            $stmt = $conn->prepare("INSERT INTO attendance (employee_id, attendance_date, status, auto_calculated) VALUES (?, ?, 'awol', 1)");
+            $stmt->bind_param('is', $eid, $date);
+            $stmt->execute();
+            $stmt->close();
+            $result['awol']++;
+        }
+    }
+
+    return $result;
+}
+
+// ─── Duplicate Check Prevention ────────────────────────────────
+
+function has_duplicate_attendance(mysqli $conn, int $employee_id, string $date): bool {
+    $stmt = $conn->prepare("SELECT id FROM attendance WHERE employee_id = ? AND attendance_date = ?");
+    $stmt->bind_param('is', $employee_id, $date);
+    $stmt->execute();
+    $stmt->store_result();
+    $exists = $stmt->num_rows > 0;
+    $stmt->close();
+    return $exists;
+}
+
+function has_check_in_today(mysqli $conn, int $employee_id, string $date): bool {
+    $att = has_checked_in_today($conn, $employee_id, $date);
+    return $att !== null && $att['check_in'] !== null;
+}
+
+function has_check_out_today(mysqli $conn, int $employee_id, string $date): bool {
+    $att = has_checked_in_today($conn, $employee_id, $date);
+    return $att !== null && $att['check_out'] !== null;
+}
+
+// ─── Cross-Module Conflict Detection ──────────────────────────
+
+function check_attendance_leave_conflict(mysqli $conn, int $employee_id, string $date): ?string {
+    $att = has_checked_in_today($conn, $employee_id, $date);
+
+    if ($att && $att['check_in'] && has_approved_leave_on_date($conn, $employee_id, $date)) {
+        return 'Employee has both attendance check-in and approved leave on ' . $date . '. Please resolve the conflict.';
+    }
+
+    $has_pending = has_pending_leave_on_date($conn, $employee_id, $date);
+    if ($att && $att['check_in'] && $has_pending) {
+        return 'Employee has check-in and a pending leave request on ' . $date . '.';
+    }
+
+    return null;
+}
+
+function check_overtime_leave_conflict(mysqli $conn, int $employee_id, string $date): ?string {
+    if (has_approved_leave_on_date($conn, $employee_id, $date)) {
+        $ot_stmt = $conn->prepare("SELECT id FROM overtime_requests WHERE employee_id = ? AND ot_date = ? AND status IN ('Pending', 'Approved')");
+        $ot_stmt->bind_param('is', $employee_id, $date);
+        $ot_stmt->execute();
+        $ot_stmt->store_result();
+        if ($ot_stmt->num_rows > 0) {
+            $ot_stmt->close();
+            return 'Employee has overtime request on a date with approved leave.';
+        }
+        $ot_stmt->close();
+    }
+    return null;
+}
+
+function check_overtime_attendance_conflict(mysqli $conn, int $employee_id, string $date): ?string {
+    $att = has_checked_in_today($conn, $employee_id, $date);
+    $has_completed = $att && $att['check_in'] && $att['check_out'];
+
+    if (!$has_completed) {
+        $ot_stmt = $conn->prepare("SELECT id FROM overtime_requests WHERE employee_id = ? AND ot_date = ? AND status IN ('Pending', 'Approved')");
+        $ot_stmt->bind_param('is', $employee_id, $date);
+        $ot_stmt->execute();
+        $ot_stmt->store_result();
+        if ($ot_stmt->num_rows > 0) {
+            $ot_stmt->close();
+            return 'Employee has overtime request but no completed attendance (check-in & check-out) on ' . $date . '.';
+        }
+        $ot_stmt->close();
+    }
+    return null;
+}
+
+// ─── Status Display Helpers ────────────────────────────────────
+
+function get_attendance_status_label(string $status): string {
+    return match ($status) {
+        'present' => 'Present',
+        'absent' => 'Absent',
+        'late' => 'Late',
+        'leave' => 'Approved Leave',
+        'half_absent' => 'Half-Day Absent',
+        'full_absent' => 'Full-Day Absent',
+        'awol' => 'AWOL',
+        'public_holiday' => 'Public Holiday',
+        'weekend' => 'Weekend',
+        default => ucfirst($status),
+    };
+}
+
+function get_attendance_status_badge_class(string $status): string {
+    return match ($status) {
+        'present' => 'bg-emerald-500/20 text-emerald-400',
+        'absent' => 'bg-red-500/20 text-red-400',
+        'late' => 'bg-amber-500/20 text-amber-400',
+        'leave' => 'bg-blue-500/20 text-blue-400',
+        'half_absent' => 'bg-orange-500/20 text-orange-400',
+        'full_absent' => 'bg-rose-600/20 text-rose-400',
+        'awol' => 'bg-red-700/20 text-red-500',
+        'public_holiday' => 'bg-pink-500/20 text-pink-400',
+        'weekend' => 'bg-purple-500/20 text-purple-400',
+        default => 'bg-white/10 text-zinc-300',
+    };
+}
+
+function is_present_status(string $status): bool {
+    return in_array($status, ['present', 'late']);
+}
+
+function is_absent_status(string $status): bool {
+    return in_array($status, ['absent', 'full_absent', 'half_absent', 'awol']);
+}
+
+function is_non_working_status(string $status): bool {
+    return in_array($status, ['weekend', 'public_holiday', 'leave']);
+}
+
+// ─── NRC (National Registration Card) Helpers ────────────────────
+
+function get_nrc_state_codes(): array {
+    return [
+        '1'  => '1 - Kachin',
+        '2'  => '2 - Kayah',
+        '3'  => '3 - Kayin',
+        '4'  => '4 - Chin',
+        '5'  => '5 - Sagaing',
+        '6'  => '6 - Tanintharyi',
+        '7'  => '7 - Bago',
+        '8'  => '8 - Magway',
+        '9'  => '9 - Mandalay',
+        '10' => '10 - Mon',
+        '11' => '11 - Rakhine',
+        '12' => '12 - Yangon',
+        '13' => '13 - Shan',
+        '14' => '14 - Ayeyarwady',
+    ];
+}
+
+function get_nrc_township_codes(): array {
+    return [
+        '1' => ['AHGAYA', 'BAMANA', 'DAPHAYA', 'HAPANA', 'KAMANA', 'KAMATA', 'KAPATA', 'KHABADA', 'KHALAPHA', 'KHAPHANA', 'LAGANA', 'MAKANA', 'MAKATA', 'MAKHABA', 'MALANA', 'MAMANA', 'MANYANA', 'MASANA', 'NAMANA', 'PANADA', 'PATAAH', 'PAWANA', 'PHAKANA', 'SABATA', 'SADANA', 'SALANA', 'SAPABA', 'TANANA', 'WAMANA', 'YABAYA', 'YAKANA'],
+        '2' => ['BALAKHA', 'DAMASA', 'LAKANA', 'MASANA', 'PHASANA', 'PHAYASA', 'YATANA', 'YATHANA'],
+        '3' => ['BAAHNA', 'BAGALA', 'BATHASA', 'KADANA', 'KAKAYA', 'KAMAMA', 'KASAKA', 'LABANA', 'LATHANA', 'MAWATA', 'PAKANA', 'PHAPANA', 'SAKALA', 'THATAKA', 'THATANA', 'WALAMA', 'YAYATHA'],
+        '4' => ['HAKHANA', 'HTATALA', 'KAKHANA', 'KAPALA', 'MATANA', 'MATAPA', 'PALAWA', 'PHALANA', 'SAMANA', 'TATANA', 'TAZANA', 'YAKHADA', 'YAZANA'],
+        '5' => ['AHTANA', 'AHYATA', 'BAMANA', 'BATALA', 'DAHANA', 'DAPAYA', 'HAMALA', 'HSAMARA', 'HTAKHANA', 'HTAPAKHA', 'KABALA', 'KALAHTA', 'KALANA', 'KALATA', 'KALAWA', 'KAMANA', 'KANANA', 'KATHANA', 'KHAOUNA', 'KHAOUTA', 'KHAPANA', 'KHATANA', 'LAHANA', 'LAYANA', 'MAKANA', 'MALANA', 'MAMANA', 'MAMATA', 'MAPALA', 'MATHANA', 'MAYANA', 'NAYANA', 'PALABA', 'PALANA', 'PASANA', 'PHAPANA', 'SAKANA', 'SALAKA', 'TAMANA', 'TASANA', 'WALANA', 'WATHANA', 'YABANA', 'YAMAPA', 'YAOUNA'],
+        '6' => ['BAPANA', 'HTAWANA', 'KALAAH', 'KASANA', 'KATHANA', 'KAYAYA', 'KHAMAKA', 'LALANA', 'MAMANA', 'MATANA', 'PAKAMA', 'PALANA', 'PALATA', 'TANATHA', 'TATHAYA', 'THAYAKHA', 'YAPHANA'],
+        '7' => ['AHPHANA', 'AHTANA', 'DAOUNA', 'HTATAPA', 'KAKANA', 'KAPAKA', 'KATAKHA', 'KATATA', 'KAWANA', 'LAPATA', 'MADANA', 'MALANA', 'MANYANA', 'NATALA', 'NYALAPA', 'PAKHANA', 'PAKHATA', 'PAMANA', 'PANAKA', 'PATALA', 'PATANA', 'PATASA', 'PATATA', 'PHAMANA', 'TANGANA', 'THAKANA', 'THANAPA', 'THASANA', 'THAWATA', 'WAMANA', 'YAKANA', 'YATANA', 'YATAYA', 'ZAKANA'],
+        '8' => ['AHLANA', 'GAGANA', 'HTALANA', 'KAHTANA', 'KAMANA', 'KHAMANA', 'MABANA', 'MAKANA', 'MALANA', 'MAMANA', 'MATANA', 'MATHANA', 'NAMANA', 'NGAPHANA', 'PAKHAKA', 'PAMANA', 'PAPHANA', 'SAKANA', 'SALANA', 'SAMANA', 'SAPAWA', 'SAPHANA', 'SATAYA', 'TATAKA', 'THAYANA', 'YANAKHA', 'YASAKA'],
+        '9' => ['AHMAYA', 'AHMAZA', 'AUTATHA', 'DAKHATHA', 'KAMANA', 'KAPATA', 'KASANA', 'KHAAHZA', 'KHAMASA', 'LAWANA', 'MAHAMA', 'MAHTALA', 'MAKANA', 'MAKHANA', 'MALANA', 'MATAYA', 'MATHANA', 'NAHTAKA', 'NGATHAYA', 'NGAZANA', 'NYAOUNA', 'PABANA', 'PABATHA', 'PAKAKHA', 'PAMANA', 'PATHAKA', 'SAKANA', 'SAKATA', 'TAKANA', 'TAKATA', 'TATAOU', 'TATHANA', 'THAPAKA', 'THASANA', 'WATANA', 'YAMATHA', 'ZABATHA', 'ZAYATHA'],
+        '10' => ['BALANA', 'KAHTANA', 'KAKHAMA', 'KAMAYA', 'KHASANA', 'KHAZANA', 'LAMANA', 'MADANA', 'MALAMA', 'PAMANA', 'THAHTANA', 'THAPHAYA', 'YAMANA'],
+        '11' => ['AHMANA', 'BATHATA', 'GAMANA', 'KAPHANA', 'KATALA', 'KATANA', 'MAAHNA', 'MAAHTA', 'MAOUNA', 'MAPANA', 'MAPATA', 'PANAKA', 'PATANA', 'SATANA', 'TAKANA', 'TAPAWA', 'THATANA', 'YABANA', 'YATHATA'],
+        '12' => ['AHLANA', 'AHSANA', 'BAHANA', 'BATAHTA', 'DAGAMA', 'DAGANA', 'DAGASA', 'DAGATA', 'DAGAYA', 'DALANA', 'DAPANA', 'HTATAPA', 'KAKAKA', 'KAKHAKA', 'KAMANA', 'KAMATA', 'KAMAYA', 'KATANA', 'KATATA', 'KHAYANA', 'LAKANA', 'LAMANA', 'LAMATA', 'LATHANA', 'LATHAYA', 'MABANA', 'MAGADA', 'MAGATA', 'MAYAKA', 'OUKAMA', 'OUKATA', 'PABATA', 'PAZATA', 'SAKANA', 'SAKHANA', 'TAKANA', 'TAMANA', 'TATAHTA', 'TATANA', 'THAGAKA', 'THAKATA', 'THAKHANA', 'THALANA', 'YAKANA', 'YAPATHA'],
+        '13' => ['AHPANA', 'AHTANA', 'AHTHAYA', 'HAHANA', 'HAMANA', 'HAPANA', 'HAPATA', 'KAHANA', 'KAKANA', 'KAKHANA', 'KALADA', 'KALAHTA', 'KALANA', 'KALATA', 'KAMANA', 'KATALA', 'KATANA', 'KATATA', 'KATHANA', 'KHALANA', 'KHAYAHA', 'LAKANA', 'LAKHANA', 'LAKHATA', 'LALANA', 'LAYANA', 'MABANA', 'MAHAYA', 'MAHTANA', 'MAHTATA', 'MAKAHTA', 'MAKANA', 'MAKATA', 'MAKHANA', 'MAKHATA', 'MALANA', 'MALATA', 'MAMAHTA', 'MAMANA', 'MAMATA', 'MANANA', 'MANATA', 'MANGANA', 'MAPAHTA', 'MAPANA', 'MAPATA', 'MAPHANA', 'MAPHATA', 'MARATA', 'MASANA', 'MASATA', 'MATANA', 'MATATA', 'MAYAHTA', 'MAYANA', 'MAYATA', 'NAHSANA', 'NAKHANA', 'NAKHATA', 'NAMATA', 'NAPHANA', 'NATAYA', 'NYAYANA', 'PALAHTA', 'PALANA', 'PALATA', 'PASANA', 'PASATA', 'PATAYA', 'PAWANA', 'PAYANA', 'PHAKHANA', 'SASANA', 'TAKANA', 'TAKHALA', 'TALANA', 'TAMANYA', 'TATANA', 'TAYANA', 'THANANA', 'THAPANA', 'YANGANA', 'YANYANA', 'YASANA'],
+        '14' => ['AHGAPA', 'AHMANA', 'AHMATA', 'BAKALA', 'DADAYA', 'DANAPHA', 'HAKAKA', 'HATHATA', 'KAKAHTA', 'KAKANA', 'KAKHANA', 'KALANA', 'KAPANA', 'LAMANA', 'LAPATA', 'MAAHNA', 'MAAHPA', 'MAMAKA', 'MAMANA', 'NGAPATA', 'NGASANA', 'NGATHAKHA', 'NGAYAKA', 'NYATANA', 'PASALA', 'PATANA', 'PHAPANA', 'THAPANA', 'WAKHAMA', 'YAKANA', 'YATHAYA', 'ZALANA'],
+    ];
+}
+
+function get_nrc_citizenship_types(): array {
+    return [
+        'N' => '(N) - Citizen',
+        'E' => '(E) - Associate Citizen',
+        'P' => '(P) - Naturalized Citizen',
+        'T' => '(T) - Temporary',
+    ];
+}
+
+function get_nrc_religion_options(): array {
+    return [
+        'Buddhism'     => 'Buddhism',
+        'Christianity' => 'Christianity',
+        'Islam'        => 'Islam',
+        'Hinduism'     => 'Hinduism',
+        'No Religion'  => 'No Religion',
+    ];
+}
+
+function build_nrc(string $state, string $township, string $citizenship, string $number): string {
+    $state = trim($state);
+    $township = trim($township);
+    $citizenship = strtoupper(trim($citizenship));
+    $number = trim($number);
+    if (empty($state) || empty($township) || empty($citizenship) || empty($number)) {
+        return '';
+    }
+    return $state . '/' . $township . '(' . $citizenship . ')' . str_pad($number, 6, '0', STR_PAD_LEFT);
+}
+
+function parse_nrc(string $nrc): array {
+    $state = '';
+    $township = '';
+    $citizenship = '';
+    $number = '';
+    if (preg_match('/^(\d{1,2})\/([A-Za-z]+)\(([NEPT])\)(\d{1,6})$/', trim($nrc), $m)) {
+        $state = $m[1];
+        $township = $m[2];
+        $citizenship = $m[3];
+        $number = $m[4];
+    }
+    return [$state, $township, $citizenship, $number];
 }

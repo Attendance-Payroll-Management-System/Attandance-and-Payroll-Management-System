@@ -12,7 +12,7 @@ if (!isset($sidebar_role)) {
 
 $current_page = basename($_SERVER['SCRIPT_NAME'] ?? 'index.php');
 
-$admin_name  = $admin_name  ?? 'Admin';
+$admin_name  = $admin_name  ?? ($_SESSION['admin_name'] ?? 'Admin');
 $admin_title = $admin_title ?? 'HR Administrator';
 $emp_name    = $emp_name    ?? ($_SESSION['employee_name'] ?? 'Employee');
 
@@ -145,6 +145,7 @@ function nav_section($label, $icon, $children, $current_page, $badge = null)
             <?php echo nav_section('Attendance', 'calendar-check', [
                 ['page' => 'attendance.php', 'href' => 'attendance.php', 'label' => 'Monthly Attendance'],
                 ['page' => 'dailyattendance.php', 'href' => 'dailyattendance.php', 'label' => 'Daily Attendance'],
+                ['page' => 'process_daily_attendance.php', 'href' => 'process_daily_attendance.php', 'label' => 'Process Attendance'],
             ], $current_page); ?>
             <?php echo nav_section('Leave', 'envelope-open-text', [
                 ['page' => 'leaveApproval.php', 'href' => 'leaveApproval.php', 'label' => 'Leave Approvals'],

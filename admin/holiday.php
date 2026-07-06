@@ -3,6 +3,7 @@ session_start();
 require_once '../config/auth.php';
 require_admin_login();
 require_once '../config/db.php';
+require_once '../config/helpers.php';
 
 $message = '';
 $message_type = '';
@@ -82,23 +83,20 @@ for ($m = 1; $m <= 12; $m++) {
 <body x-data="{ sidebarOpen: false }" class="bg-slate-50 dark:bg-[#09090b] text-slate-900 dark:text-white font-sans antialiased min-h-screen flex">
     <?php include "../includes/sidebar.php"; ?>
     <div class="flex-1 flex flex-col min-w-0 main-wrapper">
-        <?php $page_title = "Holiday Calendar"; include "../includes/topbar.php"; ?>
+        <?php
+            $page_title = "Holiday Calendar";
+            $page_subtitle = "Manage company holidays for the year.";
+            ob_start();
+        ?>
+        <form method="GET" class="flex items-center gap-2">
+            <select name="year" onchange="this.form.submit()" class="bg-white/[0.06] border-white/10 text-white text-sm rounded-lg p-2.5">
+                <?php for ($y = date('Y') - 1; $y <= date('Y') + 2; $y++): ?>
+                <option value="<?php echo $y; ?>" <?php echo $y == $selected_year ? 'selected' : ''; ?>><?php echo $y; ?></option>
+                <?php endfor; ?>
+            </select>
+        </form>
+        <?php $page_actions = ob_get_clean(); include "../includes/topbar.php"; ?>
         <main class="flex-1 p-8 overflow-y-auto">
-            <header class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
-                <div class="animate-fade-in-up">
-                    <h1 class="text-2xl font-bold text-body tracking-tight">Holiday Calendar</h1>
-                    <p class="text-sm text-body-secondary mt-1">Manage company holidays for the year.</p>
-                </div>
-                <div class="flex items-center gap-3">
-                    <form method="GET">
-                        <select name="year" onchange="this.form.submit()" class="bg-white/[0.06] border-white/10 text-white text-sm rounded-lg p-2.5">
-                            <?php for ($y = date('Y') - 1; $y <= date('Y') + 2; $y++): ?>
-                            <option value="<?php echo $y; ?>" <?php echo $y == $selected_year ? 'selected' : ''; ?>><?php echo $y; ?></option>
-                            <?php endfor; ?>
-                        </select>
-                    </form>
-                </div>
-            </header>
 
             <?php if ($message): ?>
                 <div class="mb-6 rounded-2xl px-6 py-4 shadow-sm border <?php echo $message_type == 'success' ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400' : 'bg-red-500/20 border-red-500/30 text-red-400'; ?>">
@@ -152,6 +150,7 @@ for ($m = 1; $m <= 12; $m++) {
                     <section class="group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-6">
                         <h2 class="font-bold text-white text-lg mb-6"><i class="fa-solid fa-plus text-violet-400 mr-2"></i>Add Holiday</h2>
                         <form method="POST" class="space-y-4 text-sm">
+                        <?php echo csrf_field(); ?>
                             <div>
                                 <label class="text-xs font-semibold text-zinc-400 block mb-1.5">Holiday Name</label>
                                 <input type="text" name="holiday_name" required class="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white placeholder-zinc-500 shadow-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-500/30">
@@ -178,7 +177,7 @@ for ($m = 1; $m <= 12; $m++) {
         </main>
 
         <footer class="glass-strong border-t border-white/[0.06] px-8 py-3 text-xs text-zinc-500 flex justify-between items-center mt-auto">
-            <span>&copy; <?php echo date('Y'); ?> ENTERPRISE HR PLATFORMS</span>
+            <span>&copy; <?php echo date('Y'); ?> AURA HR PLATFORMS</span>
             <span class="flex items-center space-x-1.5 font-medium text-emerald-400">
                 <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
                 <span>System Secure</span>

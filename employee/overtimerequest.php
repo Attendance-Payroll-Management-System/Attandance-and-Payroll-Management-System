@@ -23,6 +23,7 @@ $is_inactive = validate_employee_active($conn, $employee_id) !== null;
 $has_source = $conn->query("SHOW COLUMNS FROM overtime_requests LIKE 'source'")->num_rows > 0;
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['submit_ot'])) {
+    if (!validate_csrf_token()) { $message = "Invalid request."; $message_type = "error"; } else {
     $ot_date = $_POST['ot_date'] ?? '';
     $start_time = $_POST['start_time'] ?? '';
     $end_time = $_POST['end_time'] ?? '';
@@ -61,10 +62,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['submit_ot'])) {
             $stmt->close();
         }
     }
+    }
 }
 
 // Handle accept/reject for admin-assigned overtime
 if ($has_source && $_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['respond_ot'])) {
+    if (!validate_csrf_token()) { $message = "Invalid request."; $message_type = "error"; } else {
     $request_id = $_POST['request_id'] ?? 0;
     $response = $_POST['response'] ?? '';
 
@@ -81,6 +84,7 @@ if ($has_source && $_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['respond
             $message_type = "error";
         }
         $stmt->close();
+    }
     }
 }
 
@@ -117,31 +121,34 @@ $ot_requests->close();
 <body class="bg-slate-50 dark:bg-[#09090b] text-slate-900 dark:text-white font-sans antialiased flex h-screen overflow-hidden" x-data="{ sidebarOpen: false }">
     <?php include "../includes/sidebar.php"; ?>
     <div class="flex-1 flex flex-col h-full overflow-y-auto lg:ml-64">
-        <header class="glass-strong px-8 py-4 flex items-center justify-between shrink-0">
+        <header class="glass-strong px-8 py-4 flex items-center justify-between shrink-0 sticky top-0 z-20">
             <div class="animate-fade-in-up">
                 <h2 class="text-xl font-bold text-white">Overtime Request</h2>
                 <p class="text-xs text-zinc-400"><?php echo format_mmt(mmt_date(), 'l, F j, Y'); ?> (MMT)</p>
             </div>
             <div class="flex items-center gap-4">
-                <div class="relative" x-data="{ open: false }">
-                    <button @click="open = !open" class="relative p-2 text-zinc-400 hover:text-white bg-white/10 rounded-full">
+                <div class="relative" x-data="{ notifOpen: false }">
+                    <button @click="notifOpen = !notifOpen" class="relative p-2 text-zinc-400 hover:text-white glass rounded-full transition">
                         <i class="fa-solid fa-bell text-lg"></i>
                         <?php if ($unread_notifications > 0): ?>
-                            <span class="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center"><?php echo $unread_notifications; ?></span>
+                            <span class="absolute -top-1 -right-1 w-5 h-5 bg-rose-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-lg shadow-rose-500/30 animate-scale-in"><?php echo $unread_notifications; ?></span>
                         <?php endif; ?>
                     </button>
-                    <div x-show="open" @click.outside="open = false" class="absolute right-0 mt-2 w-80 glass-strong rounded-xl shadow-xl z-50" style="display: none;">
-                        <div class="p-3 border-b border-white/[0.06]">
-                            <h4 class="text-sm font-bold text-white">Notifications</h4>
+                    <div x-show="notifOpen" @click.outside="notifOpen = false" class="absolute right-0 mt-2 w-96 glass-strong rounded-xl shadow-xl border border-white/10 z-50" style="display: none;">
+                        <div class="p-3 border-b border-white/[0.06] flex items-center justify-between">
+                            <h4 class="text-sm font-bold text-white"><i class="fa-regular fa-bell mr-1.5 text-violet-400"></i>Notifications</h4>
+                            <?php if ($unread_notifications > 0): ?>
+                            <a href="mark_notifications_read.php" class="text-[10px] text-violet-400 hover:text-violet-300 font-semibold transition-colors">Mark all read</a>
+                            <?php endif; ?>
                         </div>
-                        <div class="max-h-64 overflow-y-auto">
+                        <div class="max-h-96 overflow-y-auto">
                             <?php if (empty($notifications)): ?>
                                 <p class="p-4 text-xs text-zinc-500 text-center">No notifications</p>
                             <?php else: ?>
                                 <?php foreach ($notifications as $noti): ?>
-                                    <a href="<?php echo $noti['link'] ?: '#'; ?>" class="block px-4 py-3 border-b border-white/[0.06] hover:bg-white/5 transition <?php echo !$noti['is_read'] ? 'bg-blue-500/10' : ''; ?>">
+                                    <a href="<?php echo $noti['link'] ?: '#'; ?>" class="block px-4 py-3 border-b border-white/[0.04] hover:bg-white/[0.02] transition <?php echo !$noti['is_read'] ? 'bg-violet-500/5' : ''; ?>">
                                         <p class="text-xs text-zinc-300"><?php echo htmlspecialchars($noti['message']); ?></p>
-                                        <p class="text-[10px] text-zinc-500 mt-1"><?php echo format_mmt($noti['created_at'], 'M d, h:i A'); ?></p>
+                                        <p class="text-[10px] text-zinc-500 mt-1"><?php echo htmlspecialchars($employee_name) . ' - '; ?><?php echo date('M d, h:i A', strtotime($noti['created_at'])); ?></p>
                                     </a>
                                 <?php endforeach; ?>
                             <?php endif; ?>
@@ -198,6 +205,7 @@ $ot_requests->close();
                                     <?php endif; ?>
                                 </div>
                                 <form method="POST" class="flex gap-2 shrink-0 ml-4">
+                                <?php echo csrf_field(); ?>
                                     <input type="hidden" name="request_id" value="<?php echo $row['id']; ?>">
                                     <button type="submit" name="respond_ot" value="1" onclick="this.form.response.value='accepted'" class="bg-emerald-500 hover:bg-emerald-600 text-white font-medium text-xs px-4 py-2 rounded-lg transition flex items-center gap-1.5">
                                         <i class="fa-solid fa-check"></i> Accept
@@ -217,6 +225,7 @@ $ot_requests->close();
                 <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-5">
                     <h3 class="font-bold text-white mb-4">New Overtime Request</h3>
                     <form method="POST" class="space-y-4 text-zinc-300">
+                    <?php echo csrf_field(); ?>
                         <div>
                             <label class="text-xs font-semibold text-zinc-400 block mb-1">OT Date (Calendar Date Picker)</label>
                             <input type="text" name="ot_date" id="ot_date_picker" required readonly
@@ -292,17 +301,6 @@ $ot_requests->close();
         </main>
     </div>
 <script>
-function toggleTheme() {
-    var html = document.documentElement;
-    var isDark = html.classList.contains('dark');
-    if (isDark) {
-        html.classList.remove('dark');
-        localStorage.setItem('aura-theme', 'light');
-    } else {
-        html.classList.add('dark');
-        localStorage.setItem('aura-theme', 'dark');
-    }
-}
 // Initialize flatpickr for OT date with only valid dates (attendance exists)
 document.addEventListener('DOMContentLoaded', function() {
     // Fetch valid OT dates from server-side (dates with completed attendance)

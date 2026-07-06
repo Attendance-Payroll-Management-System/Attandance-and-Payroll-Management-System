@@ -3,6 +3,7 @@ session_start();
 require_once '../config/auth.php';
 require_admin_login();
 require_once '../config/db.php';
+require_once '../config/helpers.php';
 require_once '../config/notifications.php';
 
 $message = '';
@@ -17,6 +18,7 @@ if (isset($_GET['mark_read'])) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    if (!validate_csrf_token()) { http_response_code(403); exit('CSRF validation failed.'); }
     $request_id = $_POST['request_id'] ?? 0;
     $action = $_POST['action'] ?? '';
 
@@ -84,21 +86,8 @@ foreach ($requests as $r) {
 <body x-data="{ sidebarOpen: false }" class="bg-slate-50 dark:bg-[#09090b] text-slate-900 dark:text-white font-sans antialiased min-h-screen flex">
     <?php include "../includes/sidebar.php"; ?>
     <div class="flex-1 flex flex-col min-w-0 main-wrapper">
-        <?php $page_title = "Overtime Approvals"; include "../includes/topbar.php"; ?>
+        <?php $page_title = "Overtime Approvals"; $page_subtitle = "Review and manage employee overtime requests."; $page_actions = ($pending_count > 0) ? '<span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold bg-amber-500/20 text-amber-400"><i class="fa-solid fa-clock mr-1"></i> ' . $pending_count . ' pending</span>' : ''; include "../includes/topbar.php"; ?>
         <main class="flex-1 p-8">
-            <header class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
-                <div class="animate-fade-in-up">
-                    <h1 class="text-2xl font-bold text-body tracking-tight">Overtime Approvals</h1>
-                    <p class="text-sm text-body-secondary mt-1">Review and manage employee overtime requests.</p>
-                </div>
-                <div class="flex items-center gap-3">
-                    <?php if ($pending_count > 0): ?>
-                    <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold bg-amber-500/20 text-amber-400">
-                        <i class="fa-solid fa-clock mr-1"></i> <?php echo $pending_count; ?> pending
-                    </span>
-                    <?php endif; ?>
-                </div>
-            </header>
 
             <?php if ($message): ?>
                 <div class="mb-6 rounded-2xl px-6 py-4 shadow-sm border <?php echo $message_type == 'success' ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400' : 'bg-red-500/20 border-red-500/30 text-red-400'; ?>">
@@ -109,6 +98,22 @@ foreach ($requests as $r) {
                 </div>
             <?php endif; ?>
 
+            <?php if (empty($requests)): ?>
+            <div class="empty-state glass-strong rounded-2xl p-12">
+                <svg class="w-24 h-24 mx-auto mb-6 text-zinc-600 dark:text-zinc-700" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="50" cy="50" r="35" stroke="currentColor" stroke-width="2" opacity="0.2"/>
+                    <circle cx="50" cy="50" r="28" stroke="currentColor" stroke-width="1.5" opacity="0.1"/>
+                    <line x1="50" y1="32" x2="50" y2="50" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" opacity="0.3"/>
+                    <line x1="50" y1="50" x2="65" y2="55" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" opacity="0.3"/>
+                    <circle cx="50" cy="50" r="4" fill="currentColor" opacity="0.15"/>
+                    <path d="M78 32l6-6 10 10" stroke="url(#grad)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.6"/>
+                    <circle cx="85" cy="25" r="14" stroke="currentColor" stroke-width="2" opacity="0.15"/>
+                    <defs><linearGradient id="grad" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#a78bfa"/><stop offset="100%" stop-color="#e879f9"/></linearGradient></defs>
+                </svg>
+                <h3 class="text-xl font-bold text-white">No overtime requests</h3>
+                <p class="text-zinc-400 mt-2 max-w-md mx-auto">Overtime submissions from employees will show up here once they are filed.</p>
+            </div>
+            <?php else: ?>
             <div class="card-hover glass-strong rounded-2xl overflow-hidden">
                 <div class="overflow-x-auto">
                     <table class="w-full text-left text-sm">
@@ -148,6 +153,7 @@ foreach ($requests as $r) {
                                 <td class="px-6 py-4 text-right whitespace-nowrap">
                                     <?php if ($req['status'] == 'Pending'): ?>
                                     <form method="POST" class="inline">
+                                    <?php echo csrf_field(); ?>
                                         <input type="hidden" name="request_id" value="<?php echo $req['id']; ?>">
                                         <button type="submit" name="action" value="approve" class="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs px-4 py-2 shadow-sm transition">
                                             <i class="fa-solid fa-check"></i> Approve
@@ -162,17 +168,15 @@ foreach ($requests as $r) {
                                 </td>
                             </tr>
                             <?php endforeach; ?>
-                            <?php if (empty($requests)): ?>
-                            <tr><td colspan="8" class="px-6 py-12 text-center text-zinc-500">No overtime requests found.</td></tr>
-                            <?php endif; ?>
                         </tbody>
                     </table>
                 </div>
             </div>
+            <?php endif; ?>
         </main>
 
         <footer class="glass-strong border-t border-white/[0.06] px-8 py-3 text-xs text-zinc-500 flex justify-between items-center mt-auto">
-            <span>&copy; <?php echo date('Y'); ?> ENTERPRISE HR PLATFORMS</span>
+            <span>&copy; <?php echo date('Y'); ?> AURA HR PLATFORMS</span>
             <span class="flex items-center space-x-1.5 font-medium text-emerald-400">
                 <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
                 <span>System Secure</span>

@@ -3,6 +3,7 @@ session_start();
 require_once '../config/auth.php';
 require_admin_login();
 require_once '../config/db.php';
+require_once '../config/helpers.php';
 require_once '../config/pdf_generator.php';
 require_once '../config/smtp_mailer.php';
 
@@ -197,36 +198,29 @@ foreach ($statsResult as $s) {
 <body x-data="{ sidebarOpen: false }" class="bg-slate-50 dark:bg-[#09090b] text-slate-900 dark:text-white font-sans antialiased min-h-screen flex">
     <?php include "../includes/sidebar.php"; ?>
     <div class="flex-1 flex flex-col min-w-0 main-wrapper">
-        <?php $page_title = "Salary Slips"; include "../includes/topbar.php"; ?>
+        <?php
+            $page_title = "Salary Slips";
+            $page_subtitle = "Generate, download, and email salary slips to employees";
+            ob_start();
+        ?>
+        <form method="GET" class="flex items-center gap-3 glass-strong rounded-xl p-3">
+            <select name="month" class="bg-white/[0.06] border border-white/10 text-white text-sm rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-violet-500/30">
+                <?php for ($m = 1; $m <= 12; $m++): ?>
+                <option value="<?php echo $m; ?>" <?php echo $m == $selected_month ? 'selected' : ''; ?>><?php echo date('F', mktime(0,0,0,$m,1)); ?></option>
+                <?php endfor; ?>
+            </select>
+            <select name="year" class="bg-white/[0.06] border border-white/10 text-white text-sm rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-violet-500/30">
+                <?php for ($y = date('Y') - 2; $y <= date('Y'); $y++): ?>
+                <option value="<?php echo $y; ?>" <?php echo $y == $selected_year ? 'selected' : ''; ?>><?php echo $y; ?></option>
+                <?php endfor; ?>
+            </select>
+            <button type="submit" class="rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700 text-white font-semibold text-sm px-5 py-2.5 shadow-sm transition flex items-center gap-2">
+                <i class="fa-solid fa-magnifying-glass"></i> View
+            </button>
+        </form>
+        <?php $page_actions = ob_get_clean(); include "../includes/topbar.php"; ?>
         <main class="flex-1 p-8 overflow-y-auto">
             <div class="max-w-7xl mx-auto">
-                <!-- Header -->
-                <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8 animate-fade-in-up">
-                    <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 flex items-center justify-center">
-                            <i class="fas fa-file-invoice text-violet-400"></i>
-                        </div>
-                        <div>
-                            <h1 class="text-2xl font-bold text-body">Salary Slips</h1>
-                            <p class="text-sm text-body-secondary">Generate, download, and email salary slips to employees</p>
-                        </div>
-                    </div>
-                    <form method="GET" class="flex items-center gap-3 glass-strong rounded-xl p-3">
-                        <select name="month" class="bg-white/[0.06] border border-white/10 text-white text-sm rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-violet-500/30">
-                            <?php for ($m = 1; $m <= 12; $m++): ?>
-                            <option value="<?php echo $m; ?>" <?php echo $m == $selected_month ? 'selected' : ''; ?>><?php echo date('F', mktime(0,0,0,$m,1)); ?></option>
-                            <?php endfor; ?>
-                        </select>
-                        <select name="year" class="bg-white/[0.06] border border-white/10 text-white text-sm rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-violet-500/30">
-                            <?php for ($y = date('Y') - 2; $y <= date('Y'); $y++): ?>
-                            <option value="<?php echo $y; ?>" <?php echo $y == $selected_year ? 'selected' : ''; ?>><?php echo $y; ?></option>
-                            <?php endfor; ?>
-                        </select>
-                        <button type="submit" class="rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700 text-white font-semibold text-sm px-5 py-2.5 shadow-sm transition flex items-center gap-2">
-                            <i class="fa-solid fa-magnifying-glass"></i> View
-                        </button>
-                    </form>
-                </div>
 
                 <!-- Notification -->
                 <?php if ($message): ?>
@@ -267,6 +261,7 @@ foreach ($statsResult as $s) {
                 <!-- Bulk Send Button -->
                 <div class="flex justify-end mb-6 animate-fade-in-up stagger-2">
                     <form method="POST" onsubmit="return confirm('Send salary slips to ALL employees for <?php echo $month_name . ' ' . $selected_year; ?>?')">
+                    <?php echo csrf_field(); ?>
                         <button type="submit" name="send_all" value="1" class="rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-semibold text-sm px-6 py-2.5 shadow-sm transition flex items-center gap-2">
                             <i class="fa-solid fa-paper-plane"></i> Send All Slips
                         </button>
@@ -337,6 +332,7 @@ foreach ($statsResult as $s) {
                                     <td class="px-6 py-4 text-center">
                                         <?php if (!empty($p['email']) && filter_var($p['email'], FILTER_VALIDATE_EMAIL)): ?>
                                         <form method="POST" style="display:inline">
+                                        <?php echo csrf_field(); ?>
                                             <input type="hidden" name="payroll_id" value="<?php echo $p['id']; ?>">
                                             <button type="submit" name="send_email" onclick="return confirm('<?php echo ($emailStatus && $emailStatus['status'] === 'sent') ? 'Resend' : 'Send'; ?> salary slip to <?php echo htmlspecialchars(addslashes($p['email'])); ?>?')" class="text-xs <?php echo ($emailStatus && $emailStatus['status'] === 'failed') ? 'bg-amber-600 hover:bg-amber-700' : 'bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700'; ?> text-white font-semibold px-3 py-1.5 rounded-lg transition flex items-center gap-1 mx-auto shadow-sm">
                                                 <i class="fa-solid <?php echo ($emailStatus && ($emailStatus['status'] === 'sent' || $emailStatus['status'] === 'failed')) ? 'fa-rotate-right' : 'fa-envelope'; ?>"></i>

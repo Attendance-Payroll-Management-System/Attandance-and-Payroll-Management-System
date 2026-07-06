@@ -21,6 +21,7 @@ $unread_notifications = get_unread_count($conn, $employee_id);
 $is_inactive = validate_employee_active($conn, $employee_id) !== null;
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['submit_leave'])) {
+    if (!validate_csrf_token()) { $message = "Invalid request."; $message_type = "error"; } else {
     $leave_type = $_POST['leave_type'];
     $start_date = $_POST['start_date'];
     $end_date = $_POST['end_date'];
@@ -39,22 +40,58 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['submit_leave'])) {
         $message = "End date must be after start date.";
         $message_type = "error";
     } else {
+        // ── Rule: Weekend / holiday leave check ──
+        $period_start = new DateTime($start_date);
+        $period_end = new DateTime($end_date);
+        $period_end->modify('+1 day');
+        $interval = new DateInterval('P1D');
+        $period = new DatePeriod($period_start, $interval, $period_end);
+        $has_weekend_or_holiday = false;
+        foreach ($period as $dt) {
+            $d = $dt->format('Y-m-d');
+            if (is_public_holiday($conn, $d)) {
+                $has_weekend_or_holiday = true;
+                break;
+            }
+        }
+        if ($has_weekend_or_holiday) {
+            $message = "Leave request includes public holidays. Please exclude holiday dates from your leave range.";
+            $message_type = "error";
+        }
+
         // ── Integration: Check if today is within the leave range and employee is checked in ──
         $today = mmt_date();
-        if ($start_date <= $today && $end_date >= $today) {
+        if (empty($message) && $start_date <= $today && $end_date >= $today) {
             $today_att = has_checked_in_today($conn, $employee_id, $today);
             if ($today_att && $today_att['check_in'] && $today_att['check_out'] === null) {
-                $message = "Please check out before submitting a leave request.";
+                $message = "You are currently checked in. Please check out first and provide a reason before submitting a leave request.";
                 $message_type = "error";
             } elseif ($today_att && $today_att['check_in'] === null) {
-                // Not checked in today - OK, but check for approved leave on this date
-                // No action needed, it's fine
+                // Not checked in today - OK
             }
         }
 
         if (empty($message)) {
-            // ── Validate leave request (overlaps, balance, etc.) ──
-            $errors = validate_leave_request($conn, $employee_id, $leave_type, $start_date, $end_date);
+            // ── Cross-module: Check for overtime conflicts ──
+            $period_start = new DateTime($start_date);
+            $period_end = new DateTime($end_date);
+            $period_end->modify('+1 day');
+            $period = new DatePeriod($period_start, $interval, $period_end);
+            foreach ($period as $dt) {
+                $d = $dt->format('Y-m-d');
+                $conflict = check_overtime_leave_conflict($conn, $employee_id, $d);
+                if ($conflict) {
+                    $message = $conflict;
+                    $message_type = "error";
+                    break;
+                }
+            }
+
+            }
+
+            if (empty($message)) {
+                // ── Validate leave request (overlaps, balance, etc.) ──
+                $errors = validate_leave_request($conn, $employee_id, $leave_type, $start_date, $end_date);
 
             if (!empty($errors)) {
                 $message = implode(' ', $errors);
@@ -98,6 +135,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['submit_leave'])) {
             }
         }
     }
+    }
 }
 
 // Get leave balance info
@@ -128,31 +166,34 @@ $notifications = get_notifications($conn, $employee_id, 5);
 <body class="bg-slate-50 dark:bg-[#09090b] text-slate-900 dark:text-white font-sans antialiased flex h-screen overflow-hidden" x-data="{ sidebarOpen: false }">
     <?php include "../includes/sidebar.php"; ?>
     <div class="flex-1 flex flex-col h-full overflow-y-auto lg:ml-64">
-        <header class="glass-strong px-8 py-4 flex items-center justify-between shrink-0">
+        <header class="glass-strong px-8 py-4 flex items-center justify-between shrink-0 sticky top-0 z-20">
             <div class="animate-fade-in-up">
                 <h2 class="text-xl font-bold text-white">Leave Request</h2>
                 <p class="text-xs text-zinc-400"><?php echo format_mmt(mmt_date(), 'l, F j, Y'); ?> (MMT)</p>
             </div>
             <div class="flex items-center gap-4">
-                <div class="relative" x-data="{ open: false }">
-                    <button @click="open = !open" class="relative p-2 text-zinc-400 hover:text-white bg-white/10 rounded-full">
+                <div class="relative" x-data="{ notifOpen: false }">
+                    <button @click="notifOpen = !notifOpen" class="relative p-2 text-zinc-400 hover:text-white glass rounded-full transition">
                         <i class="fa-solid fa-bell text-lg"></i>
                         <?php if ($unread_notifications > 0): ?>
-                            <span class="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center"><?php echo $unread_notifications; ?></span>
+                            <span class="absolute -top-1 -right-1 w-5 h-5 bg-rose-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-lg shadow-rose-500/30 animate-scale-in"><?php echo $unread_notifications; ?></span>
                         <?php endif; ?>
                     </button>
-                    <div x-show="open" @click.outside="open = false" class="absolute right-0 mt-2 w-80 glass-strong rounded-xl shadow-xl z-50" style="display: none;">
-                        <div class="p-3 border-b border-white/[0.06]">
-                            <h4 class="text-sm font-bold text-white">Notifications</h4>
+                    <div x-show="notifOpen" @click.outside="notifOpen = false" class="absolute right-0 mt-2 w-96 glass-strong rounded-xl shadow-xl border border-white/10 z-50" style="display: none;">
+                        <div class="p-3 border-b border-white/[0.06] flex items-center justify-between">
+                            <h4 class="text-sm font-bold text-white"><i class="fa-regular fa-bell mr-1.5 text-violet-400"></i>Notifications</h4>
+                            <?php if ($unread_notifications > 0): ?>
+                            <a href="mark_notifications_read.php" class="text-[10px] text-violet-400 hover:text-violet-300 font-semibold transition-colors">Mark all read</a>
+                            <?php endif; ?>
                         </div>
-                        <div class="max-h-64 overflow-y-auto">
+                        <div class="max-h-96 overflow-y-auto">
                             <?php if (empty($notifications)): ?>
                                 <p class="p-4 text-xs text-zinc-500 text-center">No notifications</p>
                             <?php else: ?>
                                 <?php foreach ($notifications as $noti): ?>
-                                    <a href="<?php echo $noti['link'] ?: '#'; ?>" class="block px-4 py-3 border-b border-white/[0.06] hover:bg-white/5 transition <?php echo !$noti['is_read'] ? 'bg-blue-500/10' : ''; ?>">
+                                    <a href="<?php echo $noti['link'] ?: '#'; ?>" class="block px-4 py-3 border-b border-white/[0.04] hover:bg-white/[0.02] transition <?php echo !$noti['is_read'] ? 'bg-violet-500/5' : ''; ?>">
                                         <p class="text-xs text-zinc-300"><?php echo htmlspecialchars($noti['message']); ?></p>
-                                        <p class="text-[10px] text-zinc-500 mt-1"><?php echo format_mmt($noti['created_at'], 'M d, h:i A'); ?></p>
+                                        <p class="text-[10px] text-zinc-500 mt-1"><?php echo htmlspecialchars($employee_name) . ' - '; ?><?php echo date('M d, h:i A', strtotime($noti['created_at'])); ?></p>
                                     </a>
                                 <?php endforeach; ?>
                             <?php endif; ?>
@@ -212,6 +253,7 @@ $notifications = get_notifications($conn, $employee_id, 5);
                 <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-5">
                     <h3 class="font-bold text-white mb-4">New Leave Request</h3>
                     <form method="POST" class="space-y-4 text-zinc-300">
+                    <?php echo csrf_field(); ?>
                         <div>
                             <label class="text-xs font-semibold text-zinc-400 block mb-1">Leave Type</label>
                             <select name="leave_type" required class="w-full text-sm px-3 py-3 border border-white/10 rounded-lg focus:outline-blue-500 bg-white/[0.06] text-white">
@@ -315,17 +357,6 @@ $notifications = get_notifications($conn, $employee_id, 5);
         </main>
     </div>
 <script>
-function toggleTheme() {
-    var html = document.documentElement;
-    var isDark = html.classList.contains('dark');
-    if (isDark) {
-        html.classList.remove('dark');
-        localStorage.setItem('aura-theme', 'light');
-    } else {
-        html.classList.add('dark');
-        localStorage.setItem('aura-theme', 'dark');
-    }
-}
 // Initialize flatpickr on calendar inputs
 document.addEventListener('DOMContentLoaded', function() {
     flatpickr('.calendar-picker', {

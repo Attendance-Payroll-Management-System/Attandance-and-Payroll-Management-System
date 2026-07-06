@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once "../config/db.php";
+require_once "../config/helpers.php";
 
 $message = '';
 $message_type = '';
@@ -11,13 +12,13 @@ $email = isset($_GET['email']) ? trim($_GET['email']) : '';
 if (isset($_GET['token']) && !empty($_GET['token'])) {
     $token = trim($_GET['token']);
 
-    $stmt = $conn->prepare("SELECT pr.id, pr.employee_id, pr.expires_at, pr.used, e.email FROM password_resets pr JOIN employee e ON pr.employee_id = e.id WHERE pr.token = ? AND e.email = ?");
+    $stmt = $conn->prepare("SELECT pr.id, pr.employee_id, e.email FROM password_resets pr JOIN employee e ON pr.employee_id = e.id WHERE pr.token = ? AND e.email = ? AND pr.used = 0 AND pr.expires_at > NOW()");
     $stmt->bind_param("ss", $token, $email);
     $stmt->execute();
     $result = $stmt->get_result()->fetch_assoc();
     $stmt->close();
 
-    if ($result && !$result['used'] && strtotime($result['expires_at']) > time()) {
+    if ($result) {
         $valid_token = true;
         $employee_id = $result['employee_id'];
     } else {
@@ -113,6 +114,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['reset'])) {
 
             <?php if ($valid_token): ?>
             <form method="POST" class="space-y-5">
+            <?php echo csrf_field(); ?>
                 <input type="hidden" name="token" value="<?php echo htmlspecialchars($_GET['token'] ?? ''); ?>">
                 <input type="hidden" name="email" value="<?php echo htmlspecialchars($email); ?>">
                 <div class="space-y-1.5">

@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once "../config/db.php";
+require_once "../config/helpers.php";
 
 if (!isset($_SESSION['logged_in'])) {
     header('Location: login.php');
@@ -13,6 +14,7 @@ $message = '';
 $message_type = '';
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    if (!validate_csrf_token()) { $message = "Invalid request."; $message_type = "error"; } else {
     $current_password = $_POST['current_password'] ?? '';
     $new_password = $_POST['new_password'] ?? '';
     $confirm_password = $_POST['confirm_password'] ?? '';
@@ -38,16 +40,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $stored = $user['password'];
             $is_hashed = strlen($stored) === 60 && strpos($stored, '$2y$') === 0;
 
-            if ($is_hashed) {
-                $valid = password_verify($current_password, $stored);
-            } else {
-                $valid = $current_password === $stored;
-            }
-
-            if (!$valid) {
+            if (!$is_hashed) {
                 $message = 'Current password is incorrect.';
                 $message_type = 'error';
             } else {
+                $valid = password_verify($current_password, $stored);
+
+                if (!$valid) {
+                    $message = 'Current password is incorrect.';
+                    $message_type = 'error';
+                } else {
                 $hashed = password_hash($new_password, PASSWORD_DEFAULT);
                 $update = $conn->prepare("UPDATE employee SET password = ? WHERE id = ?");
                 $update->bind_param("si", $hashed, $employee_id);
@@ -61,6 +63,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $update->close();
             }
         }
+    }
+    }
     }
 }
 ?>
@@ -110,6 +114,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         <h3 class="font-bold text-white"><i class="fa-solid fa-lock mr-2 text-blue-400"></i>Update Your Password</h3>
                     </div>
                     <form method="POST" class="p-6 space-y-5">
+                    <?php echo csrf_field(); ?>
                         <div>
                             <label class="block text-xs font-semibold text-zinc-400 mb-2">Current Password</label>
                             <input type="password" name="current_password" required
@@ -134,19 +139,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             </div>
         </main>
     </div>
-<script>
-function toggleTheme() {
-    var html = document.documentElement;
-    var isDark = html.classList.contains('dark');
-    if (isDark) {
-        html.classList.remove('dark');
-        localStorage.setItem('aura-theme', 'light');
-    } else {
-        html.classList.add('dark');
-        localStorage.setItem('aura-theme', 'dark');
-    }
-}
-</script>
 </body>
 
 </html>

@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once "../config/db.php";
+require_once "../config/helpers.php";
 if (!isset($_SESSION['logged_in'])) { header('Location: login.php'); exit; }
 
 $employee_id = $_SESSION['employee_id'];
@@ -22,14 +23,26 @@ $emp->close();
 
 if (!$employee) { header('Location: dashboard.php'); exit; }
 
+// Parse existing NRC for pre-filling dropdowns
+[$nrc_state_val, $nrc_township_val, $nrc_citizenship_val, $nrc_number_val] = parse_nrc($employee['nrc'] ?? '');
+if (empty($nrc_state_val)) { $nrc_state_val = ''; }
+if (empty($nrc_township_val)) { $nrc_township_val = ''; }
+if (empty($nrc_citizenship_val)) { $nrc_citizenship_val = 'N'; }
+if (empty($nrc_number_val)) { $nrc_number_val = ''; }
+
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    if (!validate_csrf_token()) { $message = "Invalid request."; $message_type = "error"; } else {
     $name = trim($_POST['name']);
     $phone = trim($_POST['phone']);
     $gender = trim($_POST['gender']);
     $dob = trim($_POST['dob']);
 
     $father_name = trim($_POST['father_name']);
-    $nrc = trim($_POST['nrc']);
+    $nrc_state = $_POST['nrc_state'] ?? '';
+    $nrc_township = $_POST['nrc_township'] ?? '';
+    $nrc_citizenship = $_POST['nrc_citizenship'] ?? 'N';
+    $nrc_number = $_POST['nrc_number'] ?? '';
+    $nrc = build_nrc($nrc_state, $nrc_township, $nrc_citizenship, $nrc_number);
     $married_status = trim($_POST['married_status']);
     $ethnicity = trim($_POST['ethnicity']);
     $religion = trim($_POST['religion']);
@@ -62,6 +75,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $emp->execute();
         $employee = $emp->get_result()->fetch_assoc();
         $emp->close();
+
+        // Re-parse NRC after re-fetch
+        [$nrc_state_val, $nrc_township_val, $nrc_citizenship_val, $nrc_number_val] = parse_nrc($employee['nrc'] ?? '');
+        if (empty($nrc_state_val)) { $nrc_state_val = ''; }
+        if (empty($nrc_township_val)) { $nrc_township_val = ''; }
+        if (empty($nrc_citizenship_val)) { $nrc_citizenship_val = 'N'; }
+        if (empty($nrc_number_val)) { $nrc_number_val = ''; }
+    }
     }
 }
 ?>
@@ -77,12 +98,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 <body x-data="{ sidebarOpen: false }" class="bg-slate-50 dark:bg-[#09090b] text-slate-900 dark:text-white font-sans antialiased min-h-screen flex">
     <?php $sidebar_role = 'employee'; include "../includes/sidebar.php"; ?>
     <div class="flex-1 flex flex-col min-w-0 main-wrapper">
-        <?php $page_title = "My Profile"; include "../includes/topbar.php"; ?>
+        <?php $page_title = "My Profile"; $page_subtitle = "Manage your personal information and account details."; include "../includes/topbar.php"; ?>
         <main class="flex-1 p-6 lg:p-8 overflow-y-auto page-content w-full">
-            <div class="animate-fade-in-up mb-8">
-                <h1 class="text-2xl font-bold text-body tracking-tight">My Profile</h1>
-                <p class="text-sm text-body-secondary mt-1">Manage your personal information and account details.</p>
-            </div>
 
             <?php if ($message): ?>
                 <div class="mb-6 rounded-2xl px-6 py-4 shadow-sm border <?php echo $message_type == 'success' ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400' : 'bg-red-500/20 border-red-500/30 text-red-400'; ?> animate-fade-in-up">
@@ -142,6 +159,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
                 <div class="xl:col-span-2">
                     <form method="POST" class="glass-strong rounded-2xl p-6 card-hover animate-fade-in-up stagger-2">
+                    <?php echo csrf_field(); ?>
                         <h3 class="font-bold text-white text-base mb-6 border-b border-white/[0.06] pb-4"><i class="fa-solid fa-user-pen text-violet-400 mr-2"></i>Personal Information</h3>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
                             <div class="space-y-1.5">
@@ -171,9 +189,37 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                 <label class="text-sm font-medium text-zinc-300">Father's Name</label>
                                 <input type="text" name="father_name" value="<?php echo htmlspecialchars($employee['father_name'] ?? ''); ?>" class="w-full px-4 py-2.5 rounded-xl bg-white/[0.06] border border-white/10 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50 transition-all">
                             </div>
-                            <div class="space-y-1.5">
+                            <div class="md:col-span-2 space-y-1.5">
                                 <label class="text-sm font-medium text-zinc-300">NRC / ID</label>
-                                <input type="text" name="nrc" value="<?php echo htmlspecialchars($employee['nrc'] ?? ''); ?>" class="w-full px-4 py-2.5 rounded-xl bg-white/[0.06] border border-white/10 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50 transition-all">
+                                <div class="grid grid-cols-12 gap-2" id="nrc-container">
+                                    <div class="col-span-3">
+                                        <select name="nrc_state" id="nrc_state" class="w-full px-2 py-2.5 rounded-xl bg-white/[0.06] border border-white/10 text-white text-sm outline-none focus:ring-2 focus:ring-violet-500/50 transition-all">
+                                            <option value="">State</option>
+                                            <?php foreach (get_nrc_state_codes() as $val => $label): ?>
+                                                <option value="<?php echo $val; ?>" <?php echo ($nrc_state_val === $val) ? 'selected' : ''; ?>><?php echo $val; ?></option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
+                                    <span class="col-span-1 flex items-center justify-center text-zinc-500 text-lg font-bold">/</span>
+                                    <div class="col-span-4">
+                                        <select name="nrc_township" id="nrc_township" class="w-full px-2 py-2.5 rounded-xl bg-white/[0.06] border border-white/10 text-white text-sm outline-none focus:ring-2 focus:ring-violet-500/50 transition-all">
+                                            <option value="">Township</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-span-2">
+                                        <select name="nrc_citizenship" id="nrc_citizenship" class="w-full px-2 py-2.5 rounded-xl bg-white/[0.06] border border-white/10 text-white text-sm outline-none focus:ring-2 focus:ring-violet-500/50 transition-all">
+                                            <?php foreach (get_nrc_citizenship_types() as $val => $label): ?>
+                                                <option value="<?php echo $val; ?>" <?php echo ($nrc_citizenship_val === $val) ? 'selected' : ''; ?>><?php echo $val; ?></option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
+                                    <div class="col-span-2">
+                                        <input type="text" name="nrc_number" id="nrc_number" value="<?php echo htmlspecialchars($nrc_number_val); ?>" maxlength="6" placeholder="123456" class="w-full px-2 py-2.5 rounded-xl bg-white/[0.06] border border-white/10 text-white text-sm placeholder-zinc-500 outline-none focus:ring-2 focus:ring-violet-500/50 transition-all">
+                                    </div>
+                                </div>
+                                <div id="nrc-preview" class="mt-1 text-xs text-zinc-400 <?php echo $nrc_state_val ? '' : 'hidden'; ?>">
+                                    NRC: <span id="nrc-preview-value" class="text-violet-400 font-mono font-semibold"><?php echo htmlspecialchars($employee['nrc'] ?? ''); ?></span>
+                                </div>
                             </div>
                             <div class="space-y-1.5">
                                 <label class="text-sm font-medium text-zinc-300">Marital Status</label>
@@ -190,7 +236,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                             </div>
                             <div class="space-y-1.5">
                                 <label class="text-sm font-medium text-zinc-300">Religion</label>
-                                <input type="text" name="religion" value="<?php echo htmlspecialchars($employee['religion'] ?? ''); ?>" class="w-full px-4 py-2.5 rounded-xl bg-white/[0.06] border border-white/10 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50 transition-all">
+                                <select name="religion" class="w-full px-4 py-2.5 rounded-xl bg-white/[0.06] border border-white/10 text-white outline-none focus:ring-2 focus:ring-violet-500/50 transition-all">
+                                    <option value="">Select Religion</option>
+                                    <?php foreach (get_nrc_religion_options() as $val => $label): ?>
+                                        <option value="<?php echo $val; ?>" <?php echo (($employee['religion'] ?? '') === $val) ? 'selected' : ''; ?>><?php echo $label; ?></option>
+                                    <?php endforeach; ?>
+                                </select>
                             </div>
                             <div class="md:col-span-2 space-y-1.5">
                                 <label class="text-sm font-medium text-zinc-300">Permanent Address</label>
@@ -215,5 +266,59 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             </span>
         </footer>
     </div>
+<script>
+const nrcTownships = <?php echo json_encode(get_nrc_township_codes()); ?>;
+
+function populateTownship(state) {
+    const sel = document.getElementById('nrc_township');
+    sel.innerHTML = '<option value="">Township</option>';
+    if (state && nrcTownships[state]) {
+        nrcTownships[state].forEach(function(code) {
+            const opt = document.createElement('option');
+            opt.value = code; opt.textContent = code;
+            sel.appendChild(opt);
+        });
+    }
+}
+
+function updateNrcPreview() {
+    const state = document.getElementById('nrc_state').value;
+    const township = document.getElementById('nrc_township').value;
+    const citizenship = document.getElementById('nrc_citizenship').value;
+    const number = document.getElementById('nrc_number').value;
+    const preview = document.getElementById('nrc-preview');
+    const previewVal = document.getElementById('nrc-preview-value');
+    if (state && township && citizenship && number) {
+        preview.classList.remove('hidden');
+        previewVal.textContent = state + '/' + township + '(' + citizenship + ')' + number.padStart(6, '0');
+    } else {
+        preview.classList.add('hidden');
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const stateSel = document.getElementById('nrc_state');
+    const townshipSel = document.getElementById('nrc_township');
+    const citizenshipSel = document.getElementById('nrc_citizenship');
+    const numberInp = document.getElementById('nrc_number');
+
+    stateSel.addEventListener('change', function() {
+        populateTownship(this.value);
+        updateNrcPreview();
+    });
+    townshipSel.addEventListener('change', updateNrcPreview);
+    citizenshipSel.addEventListener('change', updateNrcPreview);
+    numberInp.addEventListener('input', function() {
+        this.value = this.value.replace(/\D/g, '').slice(0, 6);
+        updateNrcPreview();
+    });
+
+    <?php if ($nrc_state_val): ?>
+    populateTownship('<?php echo $nrc_state_val; ?>');
+    townshipSel.value = '<?php echo $nrc_township_val; ?>';
+    updateNrcPreview();
+    <?php endif; ?>
+});
+</script>
 </body>
 </html>

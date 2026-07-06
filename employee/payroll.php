@@ -56,21 +56,20 @@ $employee->close();
 <body x-data="{ sidebarOpen: false }" class="bg-slate-50 dark:bg-[#09090b] text-slate-900 dark:text-white font-sans antialiased min-h-screen flex">
     <?php $sidebar_role = 'employee'; include "../includes/sidebar.php"; ?>
     <div class="flex-1 flex flex-col min-w-0 main-wrapper">
-        <?php $page_title = "My Payroll"; include "../includes/topbar.php"; ?>
+        <?php
+            $page_title = "My Payroll";
+            $page_subtitle = "View salary breakdowns and payslip history.";
+            ob_start();
+        ?>
+        <form method="GET" class="flex items-center gap-2">
+            <select name="year" class="bg-white/[0.06] border-white/10 text-white text-sm rounded-lg p-2.5" onchange="this.form.submit()">
+                <?php for ($y = date('Y') - 3; $y <= date('Y'); $y++): ?>
+                <option value="<?php echo $y; ?>" <?php echo $y == $selected_year ? 'selected' : ''; ?>><?php echo $y; ?></option>
+                <?php endfor; ?>
+            </select>
+        </form>
+        <?php $page_actions = ob_get_clean(); include "../includes/topbar.php"; ?>
         <main class="flex-1 p-6 lg:p-8 overflow-y-auto page-content w-full">
-            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8 animate-fade-in-up">
-                <div>
-                    <h1 class="text-2xl font-bold text-body tracking-tight">My Payroll</h1>
-                    <p class="text-sm text-body-secondary mt-1">View salary breakdowns and payslip history.</p>
-                </div>
-                <form method="GET" class="flex items-center gap-3 glass-strong rounded-xl p-3">
-                    <select name="year" class="bg-white/[0.06] border-white/10 text-white text-sm rounded-lg p-2.5" onchange="this.form.submit()">
-                        <?php for ($y = date('Y') - 3; $y <= date('Y'); $y++): ?>
-                        <option value="<?php echo $y; ?>" <?php echo $y == $selected_year ? 'selected' : ''; ?>><?php echo $y; ?></option>
-                        <?php endfor; ?>
-                    </select>
-                </form>
-            </div>
 
             <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                 <div class="glass-strong rounded-2xl p-5 card-hover animate-fade-in-up stagger-1">

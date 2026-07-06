@@ -1,0 +1,5 @@
+config/.env.php
+storage/emails/*.html
+storage/emails/*.pdf
+vendor/
+.mimocode/

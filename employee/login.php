@@ -29,29 +29,22 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $stored = $user['password'];
             $is_hashed = strlen($stored) === 60 && strpos($stored, '$2y$') === 0;
 
-            if ($is_hashed) {
-                $valid = password_verify($password, $stored);
-            } else {
-                $valid = $password === $stored;
-                if ($valid) {
-                    $hashed = password_hash($password, PASSWORD_DEFAULT);
-                    $update = $conn->prepare("UPDATE employee SET password = ? WHERE id = ?");
-                    $update->bind_param("si", $hashed, $user['id']);
-                    $update->execute();
-                    $update->close();
-                }
-            }
-
-            if ($valid) {
-                session_regenerate_id(true);
-                $_SESSION['logged_in'] = true;
-                $_SESSION['employee_id'] = $user['id'];
-                $_SESSION['employee_name'] = $user['name'];
-                $_SESSION['email'] = $user['email'];
-                header('Location: attendance.php');
-                exit;
-            } else {
+            if (!$is_hashed) {
                 $error = "Invalid email or password";
+            } else {
+                $valid = password_verify($password, $stored);
+
+                if ($valid) {
+                    session_regenerate_id(true);
+                    $_SESSION['logged_in'] = true;
+                    $_SESSION['employee_id'] = $user['id'];
+                    $_SESSION['employee_name'] = $user['name'];
+                    $_SESSION['email'] = $user['email'];
+                    header('Location: attendance.php');
+                    exit;
+                } else {
+                    $error = "Invalid email or password";
+                }
             }
         } else {
             $error = "Invalid email or password";
@@ -185,11 +178,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
         <div class="flex items-center justify-center gap-3 animate-fade-in-up stagger-2">
             <span class="h-px w-12 bg-body-secondary"></span>
-            <p class="text-sm text-body-muted">New employee?</p>
+            <p class="text-sm text-body-muted">Need help?</p>
             <span class="h-px w-12 bg-body-secondary"></span>
         </div>
         <p class="text-center text-sm animate-fade-in-up stagger-3">
-            <a href="../home/home.php" class="text-violet-400 hover:text-violet-300 font-semibold transition-colors"><i class="fa-solid fa-user-plus mr-1"></i> Register here</a>
+            <a href="../home/home.php" class="text-violet-400 hover:text-violet-300 font-semibold transition-colors"><i class="fa-solid fa-arrow-left mr-1"></i> Back to Home</a>
         </p>
 
         <p class="text-center text-[10px] text-body-muted animate-fade-in-up stagger-4">

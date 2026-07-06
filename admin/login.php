@@ -28,29 +28,22 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $stored = $user['password'];
             $is_hashed = strlen($stored) === 60 && strpos($stored, '$2y$') === 0;
 
-            if ($is_hashed) {
-                $valid = password_verify($password, $stored);
-            } else {
-                $valid = $password === $stored;
-                if ($valid) {
-                    $hashed = password_hash($password, PASSWORD_DEFAULT);
-                    $update = $conn->prepare("UPDATE employee SET password = ? WHERE id = ?");
-                    $update->bind_param("si", $hashed, $user['id']);
-                    $update->execute();
-                    $update->close();
-                }
-            }
-
-            if ($valid) {
-                session_regenerate_id(true);
-                $_SESSION['admin_logged_in'] = true;
-                $_SESSION['admin_id'] = $user['id'];
-                $_SESSION['admin_name'] = $user['name'];
-                $_SESSION['admin_email'] = $user['email'];
-                header('Location: dashboard.php');
-                exit;
-            } else {
+            if (!$is_hashed) {
                 $error = "Invalid credentials";
+            } else {
+                $valid = password_verify($password, $stored);
+
+                if ($valid) {
+                    session_regenerate_id(true);
+                    $_SESSION['admin_logged_in'] = true;
+                    $_SESSION['admin_id'] = $user['id'];
+                    $_SESSION['admin_name'] = $user['name'];
+                    $_SESSION['admin_email'] = $user['email'];
+                    header('Location: dashboard.php');
+                    exit;
+                } else {
+                    $error = "Invalid credentials";
+                }
             }
         } else {
             $error = "Invalid credentials";
@@ -64,6 +57,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AURA HR · Admin Login</title>
+    <link rel="icon" type="image/svg+xml" href="../favicon.svg">
     <link rel="stylesheet" href="../assets/css/app.css">
     <script>
     (function() {

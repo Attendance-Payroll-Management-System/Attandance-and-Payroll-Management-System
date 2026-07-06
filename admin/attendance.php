@@ -3,6 +3,7 @@ session_start();
 require_once '../config/auth.php';
 require_admin_login();
 require_once '../config/db.php';
+require_once '../config/helpers.php';
 
 $selected_month = isset($_GET['month']) ? (int)$_GET['month'] : (int)date('m');
 $selected_year = isset($_GET['year']) ? (int)$_GET['year'] : (int)date('Y');
@@ -88,7 +89,7 @@ foreach ($att_rows as $row) {
 
 // Summary calculations
 $total_employees = count($employees);
-$status_counts = ['present' => 0, 'absent' => 0, 'late' => 0, 'leave' => 0];
+$status_counts = ['present' => 0, 'absent' => 0, 'late' => 0, 'leave' => 0, 'half_absent' => 0, 'full_absent' => 0, 'awol' => 0, 'public_holiday' => 0, 'weekend' => 0];
 $total_records = 0;
 foreach ($att_map as $eid => $days) {
     foreach ($days as $date => $status) {
@@ -98,7 +99,8 @@ foreach ($att_map as $eid => $days) {
         $total_records++;
     }
 }
-$attendance_rate = $total_records > 0 ? round(($status_counts['present'] / $total_records) * 100, 1) : 0;
+$effective_present = $status_counts['present'] + $status_counts['late'];
+$attendance_rate = $total_records > 0 ? round(($effective_present / $total_records) * 100, 1) : 0;
 
 function status_badge($status) {
     return match($status) {
@@ -106,6 +108,11 @@ function status_badge($status) {
         'absent' => 'bg-red-500',
         'late' => 'bg-amber-400',
         'leave' => 'bg-blue-500',
+        'half_absent' => 'bg-orange-500',
+        'full_absent' => 'bg-rose-600',
+        'awol' => 'bg-red-700',
+        'public_holiday' => 'bg-pink-500',
+        'weekend' => 'bg-purple-500',
         default => 'bg-gray-200',
     };
 }
@@ -122,29 +129,28 @@ function status_badge($status) {
 <body x-data="{ sidebarOpen: false }" class="bg-slate-50 dark:bg-[#09090b] text-slate-900 dark:text-white font-sans antialiased min-h-screen flex">
     <?php include "../includes/sidebar.php"; ?>
     <div class="flex-1 flex flex-col min-w-0 main-wrapper">
-        <?php $page_title = "Monthly Attendance"; include "../includes/topbar.php"; ?>
+        <?php
+            $page_title = "Monthly Attendance";
+            $page_subtitle = "Weekly attendance grid for " . $month_name . ' ' . $selected_year;
+            ob_start();
+        ?>
+        <form method="GET" class="flex flex-wrap items-center gap-3 glass-strong rounded-xl p-3">
+            <select name="month" class="bg-white/[0.06] border-white/10 text-white placeholder-zinc-500 text-sm rounded-lg p-2.5">
+                <?php for ($m = 1; $m <= 12; $m++): ?>
+                <option value="<?php echo $m; ?>" <?php echo $m == $selected_month ? 'selected' : ''; ?>><?php echo date('F', mktime(0,0,0,$m,1)); ?></option>
+                <?php endfor; ?>
+            </select>
+            <select name="year" class="bg-white/[0.06] border-white/10 text-white placeholder-zinc-500 text-sm rounded-lg p-2.5">
+                <?php for ($y = date('Y') - 2; $y <= date('Y'); $y++): ?>
+                <option value="<?php echo $y; ?>" <?php echo $y == $selected_year ? 'selected' : ''; ?>><?php echo $y; ?></option>
+                <?php endfor; ?>
+            </select>
+            <button type="submit" class="rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700 text-white font-semibold text-sm px-5 py-2.5 shadow-sm transition flex items-center gap-2">
+                <i class="fa-solid fa-magnifying-glass"></i> View
+            </button>
+        </form>
+        <?php $page_actions = ob_get_clean(); include "../includes/topbar.php"; ?>
         <main class="flex-1 p-8 overflow-y-auto">
-            <header class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
-                <div class="animate-fade-in-up">
-                    <h1 class="text-2xl font-bold text-body tracking-tight">Monthly Attendance</h1>
-                    <p class="text-sm text-body-secondary mt-1">Weekly attendance grid for <?php echo $month_name . ' ' . $selected_year; ?></p>
-                </div>
-                <form method="GET" class="flex flex-wrap items-center gap-3 glass-strong rounded-xl p-3">
-                    <select name="month" class="bg-white/[0.06] border-white/10 text-white placeholder-zinc-500 text-sm rounded-lg p-2.5">
-                        <?php for ($m = 1; $m <= 12; $m++): ?>
-                        <option value="<?php echo $m; ?>" <?php echo $m == $selected_month ? 'selected' : ''; ?>><?php echo date('F', mktime(0,0,0,$m,1)); ?></option>
-                        <?php endfor; ?>
-                    </select>
-                    <select name="year" class="bg-white/[0.06] border-white/10 text-white placeholder-zinc-500 text-sm rounded-lg p-2.5">
-                        <?php for ($y = date('Y') - 2; $y <= date('Y'); $y++): ?>
-                        <option value="<?php echo $y; ?>" <?php echo $y == $selected_year ? 'selected' : ''; ?>><?php echo $y; ?></option>
-                        <?php endfor; ?>
-                    </select>
-                    <button type="submit" class="rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700 text-white font-semibold text-sm px-5 py-2.5 shadow-sm transition flex items-center gap-2">
-                        <i class="fa-solid fa-magnifying-glass"></i> View
-                    </button>
-                </form>
-            </header>
 
             <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
                 <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-5">
@@ -166,16 +172,48 @@ function status_badge($status) {
                     <p class="text-2xl font-bold text-white"><?php echo $status_counts['late']; ?></p>
                 </div>
                 <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-5">
-                    <div class="flex gap-3 text-xs font-bold uppercase tracking-wider">
-                        <span class="text-red-400"><i class="fa-solid fa-circle text-[8px] mr-1"></i>Absent <?php echo $status_counts['absent']; ?></span>
-                        <span class="text-blue-400"><i class="fa-solid fa-circle text-[8px] mr-1"></i>Leave <?php echo $status_counts['leave']; ?></span>
-                    </div>
-                    <div class="w-full bg-white/[0.06] h-3 rounded-full overflow-hidden mt-3">
-                        <div class="bg-emerald-500 h-full rounded-full" style="width: <?php echo $attendance_rate; ?>%"></div>
-                    </div>
+                    <span class="text-xs font-bold uppercase tracking-wider text-blue-400"><i class="fa-solid fa-circle text-[8px] mr-1"></i>Leave</span>
+                    <p class="text-2xl font-bold text-white"><?php echo $status_counts['leave']; ?></p>
+                </div>
+                <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-5">
+                    <span class="text-xs font-bold uppercase tracking-wider text-red-500"><i class="fa-solid fa-circle text-[8px] mr-1"></i>AWOL</span>
+                    <p class="text-2xl font-bold text-white"><?php echo $status_counts['awol']; ?></p>
+                </div>
+                <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-5">
+                    <span class="text-xs font-bold uppercase tracking-wider text-rose-400"><i class="fa-solid fa-circle text-[8px] mr-1"></i>Full-Day Absent</span>
+                    <p class="text-2xl font-bold text-white"><?php echo $status_counts['full_absent']; ?></p>
+                </div>
+                <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-5">
+                    <span class="text-xs font-bold uppercase tracking-wider text-orange-400"><i class="fa-solid fa-circle text-[8px] mr-1"></i>Half-Day Absent</span>
+                    <p class="text-2xl font-bold text-white"><?php echo $status_counts['half_absent']; ?></p>
+                </div>
+                <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-5">
+                    <span class="text-xs font-bold uppercase tracking-wider text-pink-400"><i class="fa-solid fa-circle text-[8px] mr-1"></i>Public Holiday</span>
+                    <p class="text-2xl font-bold text-white"><?php echo $status_counts['public_holiday']; ?></p>
+                </div>
+                <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-5">
+                    <span class="text-xs font-bold uppercase tracking-wider text-purple-400"><i class="fa-solid fa-circle text-[8px] mr-1"></i>Weekend</span>
+                    <p class="text-2xl font-bold text-white"><?php echo $status_counts['weekend']; ?></p>
                 </div>
             </section>
 
+            <?php if (empty($employees)): ?>
+            <div class="empty-state glass-strong rounded-2xl p-12">
+                <svg class="w-24 h-24 mx-auto mb-6 text-zinc-600 dark:text-zinc-700" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="15" y="20" width="70" height="55" rx="6" stroke="currentColor" stroke-width="2" opacity="0.2"/>
+                    <line x1="25" y1="32" x2="45" y2="32" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" opacity="0.15"/>
+                    <line x1="25" y1="40" x2="55" y2="40" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" opacity="0.15"/>
+                    <line x1="25" y1="48" x2="40" y2="48" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" opacity="0.1"/>
+                    <rect x="58" y="28" width="18" height="18" rx="3" stroke="currentColor" stroke-width="1.5" opacity="0.15"/>
+                    <circle cx="67" cy="37" r="3" fill="currentColor" opacity="0.15"/>
+                    <path d="M78 20l6-6 12 12" stroke="url(#grad)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.6"/>
+                    <circle cx="85" cy="14" r="14" stroke="currentColor" stroke-width="2" opacity="0.15"/>
+                    <defs><linearGradient id="grad" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#a78bfa"/><stop offset="100%" stop-color="#e879f9"/></linearGradient></defs>
+                </svg>
+                <h3 class="text-xl font-bold text-white">No attendance data</h3>
+                <p class="text-zinc-400 mt-2 max-w-md mx-auto">Attendance records for <?php echo $month_name . ' ' . $selected_year; ?> will appear here once employees start checking in.</p>
+            </div>
+            <?php else: ?>
             <section class="card-hover glass-strong rounded-2xl overflow-hidden">
                 <div class="p-6 border-b border-white/[0.06] flex items-center justify-between">
                     <h2 class="font-bold text-white text-lg"><i class="fa-solid fa-calendar-days text-violet-400 mr-2"></i>Weekly Attendance Matrix</h2>
@@ -223,23 +261,18 @@ function status_badge($status) {
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-white/[0.06]">
-                            <?php if (empty($employees)): ?>
-                            <tr>
-                                <td colspan="<?php echo 2 + $days_in_month + 1; ?>" class="px-6 py-12 text-center text-zinc-500">
-                                    <p class="text-lg mb-2">No attendance data for <?php echo $month_name . ' ' . $selected_year; ?></p>
-                                </td>
-                            </tr>
-                            <?php else: ?>
                                 <?php foreach ($employees as $eid => $emp): ?>
-                                <?php
+                                    <?php
                                     $worked = 0;
+                                    $total_work_days = 0;
                                     foreach ($weeks as $week) {
                                         foreach ($week as $day_ymd) {
                                             $s = $att_map[$eid][$day_ymd] ?? '';
                                             if ($s === 'present' || $s === 'late') $worked++;
+                                            if (!empty($s)) $total_work_days++;
                                         }
                                     }
-                                    $emp_rate = $days_in_month > 0 ? round(($worked / $days_in_month) * 100, 1) : 0;
+                                    $emp_rate = $total_work_days > 0 ? round(($worked / $total_work_days) * 100, 1) : 0;
                                     $rate_color = $emp_rate >= 90 ? 'text-emerald-400' : ($emp_rate >= 75 ? 'text-amber-400' : 'text-red-400');
                                 ?>
                                 <tr class="hover:bg-white/[0.02] transition">
@@ -267,24 +300,27 @@ function status_badge($status) {
                                     <td class="px-3 py-2.5 text-center font-bold <?php echo $rate_color; ?>"><?php echo $emp_rate; ?>%</td>
                                 </tr>
                                 <?php endforeach; ?>
-                            <?php endif; ?>
                         </tbody>
                     </table>
                 </div>
             </section>
 
-            <section class="mt-4 flex items-center gap-6 text-xs text-zinc-400">
+            <section class="mt-4 flex flex-wrap items-center gap-6 text-xs text-zinc-400">
                 <span><span class="inline-block w-3 h-3 rounded-full bg-emerald-500 align-middle mr-1"></span> Present</span>
                 <span><span class="inline-block w-3 h-3 rounded-full bg-amber-400 align-middle mr-1"></span> Late</span>
-                <span><span class="inline-block w-3 h-3 rounded-full bg-red-500 align-middle mr-1"></span> Absent</span>
                 <span><span class="inline-block w-3 h-3 rounded-full bg-blue-500 align-middle mr-1"></span> Leave</span>
+                <span><span class="inline-block w-3 h-3 rounded-full bg-red-700 align-middle mr-1"></span> AWOL</span>
+                <span><span class="inline-block w-3 h-3 rounded-full bg-rose-600 align-middle mr-1"></span> Full-Day Absent</span>
+                <span><span class="inline-block w-3 h-3 rounded-full bg-orange-500 align-middle mr-1"></span> Half-Day Absent</span>
+                <span><span class="inline-block w-3 h-3 rounded-full bg-pink-500 align-middle mr-1"></span> Public Holiday</span>
+                <span><span class="inline-block w-3 h-3 rounded-full bg-purple-500 align-middle mr-1"></span> Weekend</span>
                 <span><span class="inline-block w-3 h-3 rounded-full bg-white/10 border border-white/10 align-middle mr-1"></span> No Record</span>
-                <span><span class="inline-block w-3 h-3 rounded-full bg-pink-300 border border-pink-400 align-middle mr-1 text-pink-600 text-[10px]"><i class="fa-solid fa-star"></i></span> Holiday</span>
             </section>
+            <?php endif; ?>
         </main>
 
         <footer class="glass-strong border-t border-white/[0.06] px-8 py-3 text-xs text-zinc-500 flex justify-between items-center mt-auto">
-            <span>&copy; <?php echo date('Y'); ?> ENTERPRISE HR PLATFORMS</span>
+            <span>&copy; <?php echo date('Y'); ?> AURA HR PLATFORMS</span>
             <span class="flex items-center space-x-1.5 font-medium text-emerald-400">
                 <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
                 <span>System Secure</span>

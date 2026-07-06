@@ -3,6 +3,7 @@ session_start();
 require_once '../config/auth.php';
 require_admin_login();
 require_once '../config/db.php';
+require_once '../config/helpers.php';
 
 $selected_date = $_GET['date'] ?? date('Y-m-d');
 $status_filter = $_GET['status'] ?? '';
@@ -40,13 +41,23 @@ $total_present = 0;
 $total_absent = 0;
 $total_late = 0;
 $total_leave = 0;
+$total_awol = 0;
+$total_half_absent = 0;
+$total_full_absent = 0;
+$total_holiday = 0;
+$total_weekend = 0;
 foreach ($summary as $s) {
     if ($s['status'] == 'present') $total_present = $s['cnt'];
     if ($s['status'] == 'absent') $total_absent = $s['cnt'];
     if ($s['status'] == 'late') $total_late = $s['cnt'];
     if ($s['status'] == 'leave') $total_leave = $s['cnt'];
+    if ($s['status'] == 'awol') $total_awol = $s['cnt'];
+    if ($s['status'] == 'half_absent') $total_half_absent = $s['cnt'];
+    if ($s['status'] == 'full_absent') $total_full_absent = $s['cnt'];
+    if ($s['status'] == 'public_holiday') $total_holiday = $s['cnt'];
+    if ($s['status'] == 'weekend') $total_weekend = $s['cnt'];
 }
-$total_emp = $total_present + $total_absent + $total_late + $total_leave;
+$total_emp = $total_present + $total_absent + $total_late + $total_leave + $total_awol + $total_half_absent + $total_full_absent + $total_holiday + $total_weekend;
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -62,27 +73,31 @@ $total_emp = $total_present + $total_absent + $total_late + $total_leave;
 <body x-data="{ sidebarOpen: false }" class="bg-slate-50 dark:bg-[#09090b] text-slate-900 dark:text-white font-sans antialiased min-h-screen flex">
     <?php include "../includes/sidebar.php"; ?>
     <div class="flex-1 flex flex-col min-w-0 main-wrapper">
-        <?php $page_title = "Daily Attendance"; include "../includes/topbar.php"; ?>
+        <?php
+            $page_title = "Daily Attendance";
+            $page_subtitle = "View attendance records grouped by employee and status.";
+            ob_start();
+        ?>
+        <form method="GET" class="flex flex-wrap items-center gap-3 glass-strong rounded-xl p-3">
+            <input type="date" name="date" value="<?php echo $selected_date; ?>" class="bg-white/[0.06] border-white/10 text-white placeholder-zinc-500 text-sm rounded-lg p-2.5">
+            <select name="status" class="bg-white/[0.06] border-white/10 text-white placeholder-zinc-500 text-sm rounded-lg p-2.5">
+                <option value="">All Status</option>
+                <option value="present" <?php echo $status_filter == 'present' ? 'selected' : ''; ?>>Present</option>
+                <option value="late" <?php echo $status_filter == 'late' ? 'selected' : ''; ?>>Late</option>
+                <option value="leave" <?php echo $status_filter == 'leave' ? 'selected' : ''; ?>>Approved Leave</option>
+                <option value="half_absent" <?php echo $status_filter == 'half_absent' ? 'selected' : ''; ?>>Half-Day Absent</option>
+                <option value="full_absent" <?php echo $status_filter == 'full_absent' ? 'selected' : ''; ?>>Full-Day Absent</option>
+                <option value="awol" <?php echo $status_filter == 'awol' ? 'selected' : ''; ?>>AWOL</option>
+                <option value="absent" <?php echo $status_filter == 'absent' ? 'selected' : ''; ?>>Absent</option>
+                <option value="public_holiday" <?php echo $status_filter == 'public_holiday' ? 'selected' : ''; ?>>Public Holiday</option>
+                <option value="weekend" <?php echo $status_filter == 'weekend' ? 'selected' : ''; ?>>Weekend</option>
+            </select>
+            <button type="submit" class="rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700 text-white font-semibold text-sm px-5 py-2.5 shadow-sm transition flex items-center gap-2">
+                <i class="fa-solid fa-magnifying-glass"></i> View
+            </button>
+        </form>
+        <?php $page_actions = ob_get_clean(); include "../includes/topbar.php"; ?>
         <main class="flex-1 p-8 overflow-y-auto">
-            <header class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
-                <div class="animate-fade-in-up">
-                    <h1 class="text-2xl font-bold text-body tracking-tight">Daily Attendance</h1>
-                    <p class="text-sm text-body-secondary mt-1">View attendance records grouped by employee and status.</p>
-                </div>
-                <form method="GET" class="flex flex-wrap items-center gap-3 glass-strong rounded-xl p-3">
-                    <input type="date" name="date" value="<?php echo $selected_date; ?>" class="bg-white/[0.06] border-white/10 text-white placeholder-zinc-500 text-sm rounded-lg p-2.5">
-                    <select name="status" class="bg-white/[0.06] border-white/10 text-white placeholder-zinc-500 text-sm rounded-lg p-2.5">
-                        <option value="">All Status</option>
-                        <option value="present" <?php echo $status_filter == 'present' ? 'selected' : ''; ?>>Present</option>
-                        <option value="absent" <?php echo $status_filter == 'absent' ? 'selected' : ''; ?>>Absent</option>
-                        <option value="late" <?php echo $status_filter == 'late' ? 'selected' : ''; ?>>Late</option>
-                        <option value="leave" <?php echo $status_filter == 'leave' ? 'selected' : ''; ?>>Leave</option>
-                    </select>
-                    <button type="submit" class="rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700 text-white font-semibold text-sm px-5 py-2.5 shadow-sm transition flex items-center gap-2">
-                        <i class="fa-solid fa-magnifying-glass"></i> View
-                    </button>
-                </form>
-            </header>
 
             <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
                 <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-5">
@@ -94,16 +109,32 @@ $total_emp = $total_present + $total_absent + $total_late + $total_leave;
                     <p class="text-2xl font-bold text-white"><?php echo $total_present; ?></p>
                 </div>
                 <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-5">
-                    <span class="text-xs font-bold uppercase tracking-wider text-red-400">Absent</span>
-                    <p class="text-2xl font-bold text-white"><?php echo $total_absent; ?></p>
-                </div>
-                <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-5">
                     <span class="text-xs font-bold uppercase tracking-wider text-amber-400">Late</span>
                     <p class="text-2xl font-bold text-white"><?php echo $total_late; ?></p>
                 </div>
                 <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-5">
                     <span class="text-xs font-bold uppercase tracking-wider text-blue-400">On Leave</span>
                     <p class="text-2xl font-bold text-white"><?php echo $total_leave; ?></p>
+                </div>
+                <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-5">
+                    <span class="text-xs font-bold uppercase tracking-wider text-red-500">AWOL</span>
+                    <p class="text-2xl font-bold text-white"><?php echo $total_awol; ?></p>
+                </div>
+                <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-5">
+                    <span class="text-xs font-bold uppercase tracking-wider text-rose-400">Full-Day Absent</span>
+                    <p class="text-2xl font-bold text-white"><?php echo $total_full_absent; ?></p>
+                </div>
+                <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-5">
+                    <span class="text-xs font-bold uppercase tracking-wider text-orange-400">Half-Day Absent</span>
+                    <p class="text-2xl font-bold text-white"><?php echo $total_half_absent; ?></p>
+                </div>
+                <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-5">
+                    <span class="text-xs font-bold uppercase tracking-wider text-pink-400">Public Holiday</span>
+                    <p class="text-2xl font-bold text-white"><?php echo $total_holiday; ?></p>
+                </div>
+                <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-5">
+                    <span class="text-xs font-bold uppercase tracking-wider text-purple-400">Weekend</span>
+                    <p class="text-2xl font-bold text-white"><?php echo $total_weekend; ?></p>
                 </div>
             </section>
 
@@ -140,16 +171,7 @@ $total_emp = $total_present + $total_absent + $total_late + $total_leave;
                                         <td class="px-6 py-4 font-mono text-sm"><?php echo $r['check_in'] ? date('h:i A', strtotime($r['check_in'])) : '-'; ?></td>
                                         <td class="px-6 py-4 font-mono text-sm"><?php echo $r['check_out'] ? date('h:i A', strtotime($r['check_out'])) : '-'; ?></td>
                                         <td class="px-6 py-4">
-                                            <?php
-                                            $badge = match ($r['status']) {
-                                                'present' => 'bg-emerald-500/20 text-emerald-400',
-                                                'absent' => 'bg-red-500/20 text-red-400',
-                                                'late' => 'bg-amber-500/20 text-amber-400',
-                                                'leave' => 'bg-blue-500/20 text-blue-400',
-                                                default => 'bg-white/10 text-zinc-300'
-                                            };
-                                            ?>
-                                            <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold <?php echo $badge; ?>"><?php echo ucfirst($r['status']); ?></span>
+                                            <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold <?php echo get_attendance_status_badge_class($r['status']); ?>"><?php echo get_attendance_status_label($r['status']); ?></span>
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>
@@ -161,7 +183,7 @@ $total_emp = $total_present + $total_absent + $total_late + $total_leave;
         </main>
 
         <footer class="glass-strong border-t border-white/[0.06] px-8 py-3 text-xs text-zinc-500 flex justify-between items-center mt-auto">
-            <span>&copy; <?php echo date('Y'); ?> ENTERPRISE HR PLATFORMS</span>
+            <span>&copy; <?php echo date('Y'); ?> AURA HR PLATFORMS</span>
             <span class="flex items-center space-x-1.5 font-medium text-emerald-400">
                 <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
                 <span>System Secure</span>

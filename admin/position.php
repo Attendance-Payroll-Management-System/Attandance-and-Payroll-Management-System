@@ -3,6 +3,7 @@ session_start();
 require_once '../config/auth.php';
 require_admin_login();
 require_once '../config/db.php';
+require_once '../config/helpers.php';
 
 $message = '';
 $message_type = '';
@@ -52,19 +53,10 @@ $positions = $conn->query("SELECT * FROM positions ORDER BY position_name");
 <body x-data="{ sidebarOpen: false }" class="bg-slate-50 dark:bg-[#09090b] text-slate-900 dark:text-white font-sans antialiased min-h-screen flex">
     <?php include "../includes/sidebar.php"; ?>
     <div class="flex-1 flex flex-col min-w-0 main-wrapper">
-        <?php $page_title = "Positions";
+        <?php $page_title = "Positions"; $page_subtitle = "Manage employee positions";
         include "../includes/topbar.php"; ?>
         <main class="flex-1 p-8 overflow-y-auto">
             <div class="max-w-6xl mx-auto">
-                <div class="flex items-center gap-3 mb-8 animate-fade-in-up">
-                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 flex items-center justify-center">
-                        <i class="fas fa-briefcase text-violet-400"></i>
-                    </div>
-                    <div>
-                        <h1 class="text-2xl font-bold text-body">Positions</h1>
-                        <p class="text-sm text-body-secondary">Manage employee positions</p>
-                    </div>
-                </div>
 
                 <?php if ($message): ?>
                     <div class="mb-6 rounded-2xl px-6 py-4 border <?php echo $message_type === 'success' ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400' : 'bg-red-500/20 border-red-500/30 text-red-400'; ?> animate-fade-in-up">
@@ -80,6 +72,7 @@ $positions = $conn->query("SELECT * FROM positions ORDER BY position_name");
                         <div class="glass-strong rounded-2xl p-6 card-hover">
                             <h2 class="text-lg font-bold text-white mb-4"><i class="fas fa-plus text-violet-400 mr-2"></i>Add Position</h2>
                             <form method="POST" class="space-y-4">
+                            <?php echo csrf_field(); ?>
                                 <div>
                                     <label class="block text-sm font-medium text-zinc-400 mb-1">Position Name</label>
                                     <input type="text" name="position_name" required placeholder="e.g. Software Engineer" class="w-full px-4 py-2.5 rounded-xl border border-white/10 bg-white/[0.06] text-white placeholder-zinc-500 focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all duration-200">
@@ -91,6 +84,23 @@ $positions = $conn->query("SELECT * FROM positions ORDER BY position_name");
                         </div>
                     </div>
 
+                    <?php if (!$positions || $positions->num_rows === 0): ?>
+                    <div class="glass-strong rounded-2xl p-12 text-center">
+                        <svg class="w-24 h-24 mx-auto mb-6 text-zinc-600 dark:text-zinc-700" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <rect x="25" y="22" width="50" height="40" rx="6" stroke="currentColor" stroke-width="2" opacity="0.2"/>
+                            <rect x="25" y="52" width="50" height="28" rx="6" stroke="currentColor" stroke-width="2" opacity="0.15"/>
+                            <line x1="35" y1="35" x2="55" y2="35" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.2"/>
+                            <line x1="35" y1="42" x2="50" y2="42" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.15"/>
+                            <line x1="35" y1="62" x2="58" y2="62" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.2"/>
+                            <line x1="35" y1="69" x2="52" y2="69" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.15"/>
+                            <path d="M75 18l6-6 12 12" stroke="url(#grad)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.6"/>
+                            <circle cx="82" cy="12" r="14" stroke="currentColor" stroke-width="2" opacity="0.15"/>
+                            <defs><linearGradient id="grad" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#a78bfa"/><stop offset="100%" stop-color="#e879f9"/></linearGradient></defs>
+                        </svg>
+                        <h3 class="text-xl font-bold text-white">No positions created</h3>
+                        <p class="text-zinc-400 mt-2 max-w-md mx-auto">Positions help define roles within your organization. Create your first position to get started.</p>
+                    </div>
+                    <?php else: ?>
                     <div class="lg:col-span-2 animate-fade-in-up stagger-2">
                         <div class="glass-strong rounded-2xl overflow-hidden card-hover">
                             <div class="px-6 py-4 border-b border-white/[0.06]">
@@ -106,32 +116,25 @@ $positions = $conn->query("SELECT * FROM positions ORDER BY position_name");
                                         </tr>
                                     </thead>
                                     <tbody class="divide-y divide-white/[0.06]">
-                                        <?php if ($positions && $positions->num_rows > 0): ?>
                                             <?php while ($row = $positions->fetch_assoc()): ?>
                                                 <tr class="hover:bg-white/[0.02] transition-colors">
                                                     <td class="px-6 py-4 text-zinc-500">#<?php echo $row['id']; ?></td>
                                                     <td class="px-6 py-4 font-medium text-white"><?php echo htmlspecialchars($row['position_name']); ?></td>
                                                     <td class="px-6 py-4 text-right">
                                                         <form method="POST" onsubmit="return confirm('Delete this position?')" class="inline">
+                                                        <?php echo csrf_field(); ?>
                                                             <input type="hidden" name="delete_id" value="<?php echo $row['id']; ?>">
                                                             <button type="submit" class="text-red-400 hover:text-red-300 transition-colors text-sm"><i class="fas fa-trash-alt"></i></button>
                                                         </form>
                                                     </td>
                                                 </tr>
                                             <?php endwhile; ?>
-                                        <?php else: ?>
-                                            <tr>
-                                                <td colspan="3" class="px-6 py-12 text-center text-zinc-500">
-                                                    <i class="fas fa-briefcase text-3xl mb-2 block opacity-50"></i>
-                                                    No positions found. Add your first position.
-                                                </td>
-                                            </tr>
-                                        <?php endif; ?>
                                     </tbody>
                                 </table>
                             </div>
                         </div>
                     </div>
+                    <?php endif; ?>
                 </div>
             </div>
         </main>

@@ -37,6 +37,9 @@ if (isset($_POST['run_payroll'])) {
         $absent_days = (int)($att_summary['absent_days'] ?? 0);
         $late_days = (int)($att_summary['late_days'] ?? 0);
         $leave_days = (int)($att_summary['leave_days'] ?? 0);
+        // Include new statuses in absent count
+        $absent_days += (int)($att_summary['absent_days_total'] ?? 0);
+        $effective_present = (int)($att_summary['effective_present_days'] ?? 0);
 
         // Calculate salary based on present days
         $daily_rate = $working_days > 0 ? $basic / $working_days : 0;
@@ -151,32 +154,32 @@ foreach ($payroll_data as $p) {
 <body x-data="{ sidebarOpen: false }" class="bg-slate-50 dark:bg-[#09090b] text-slate-900 dark:text-white font-sans antialiased min-h-screen flex">
     <?php include "../includes/sidebar.php"; ?>
     <div class="flex-1 flex flex-col min-w-0 main-wrapper">
-        <?php $page_title = "Payroll Processing"; include "../includes/topbar.php"; ?>
+        <?php
+            $page_title = "Payroll Processing";
+            $page_subtitle = "Integrated with Attendance, Leave, and Overtime data. Uses MMT timezone.";
+            ob_start();
+        ?>
+        <form method="POST" class="flex flex-wrap items-center gap-3 glass-strong rounded-xl p-3">
+        <?php echo csrf_field(); ?>
+            <select name="pay_month" class="bg-white/[0.06] border-white/10 text-white placeholder-zinc-500 text-sm rounded-lg p-2.5">
+                <?php for ($m = 1; $m <= 12; $m++): ?>
+                <option value="<?php echo $m; ?>" <?php echo $m == $selected_month ? 'selected' : ''; ?>><?php echo date('F', mktime(0,0,0,$m,1)); ?></option>
+                <?php endfor; ?>
+            </select>
+            <select name="pay_year" class="bg-white/[0.06] border-white/10 text-white placeholder-zinc-500 text-sm rounded-lg p-2.5">
+                <?php for ($y = date('Y') - 1; $y <= date('Y') + 1; $y++): ?>
+                <option value="<?php echo $y; ?>" <?php echo $y == $selected_year ? 'selected' : ''; ?>><?php echo $y; ?></option>
+                <?php endfor; ?>
+            </select>
+            <button type="submit" class="rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700 text-white font-semibold text-sm px-5 py-2.5 shadow-sm transition flex items-center gap-2">
+                <i class="fa-solid fa-magnifying-glass"></i> View
+            </button>
+            <button type="submit" name="run_payroll" value="1" class="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm px-5 py-2.5 shadow-sm transition flex items-center gap-2">
+                <i class="fa-solid fa-bolt"></i> Run Payroll
+            </button>
+        </form>
+        <?php $page_actions = ob_get_clean(); include "../includes/topbar.php"; ?>
         <main class="flex-1 p-8 overflow-y-auto">
-            <header class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
-                <div class="animate-fade-in-up">
-                    <h1 class="text-2xl font-bold text-body tracking-tight">Payroll Processing</h1>
-                    <p class="text-sm text-body-secondary mt-1">Integrated with Attendance, Leave, and Overtime data. Uses MMT timezone.</p>
-                </div>
-                <form method="POST" class="flex flex-wrap items-center gap-3 glass-strong rounded-xl p-3">
-                    <select name="pay_month" class="bg-white/[0.06] border-white/10 text-white placeholder-zinc-500 text-sm rounded-lg p-2.5">
-                        <?php for ($m = 1; $m <= 12; $m++): ?>
-                        <option value="<?php echo $m; ?>" <?php echo $m == $selected_month ? 'selected' : ''; ?>><?php echo date('F', mktime(0,0,0,$m,1)); ?></option>
-                        <?php endfor; ?>
-                    </select>
-                    <select name="pay_year" class="bg-white/[0.06] border-white/10 text-white placeholder-zinc-500 text-sm rounded-lg p-2.5">
-                        <?php for ($y = date('Y') - 1; $y <= date('Y') + 1; $y++): ?>
-                        <option value="<?php echo $y; ?>" <?php echo $y == $selected_year ? 'selected' : ''; ?>><?php echo $y; ?></option>
-                        <?php endfor; ?>
-                    </select>
-                    <button type="submit" class="rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700 text-white font-semibold text-sm px-5 py-2.5 shadow-sm transition flex items-center gap-2">
-                        <i class="fa-solid fa-magnifying-glass"></i> View
-                    </button>
-                    <button type="submit" name="run_payroll" value="1" class="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm px-5 py-2.5 shadow-sm transition flex items-center gap-2">
-                        <i class="fa-solid fa-bolt"></i> Run Payroll
-                    </button>
-                </form>
-            </header>
 
             <?php if ($message): ?>
                 <div class="mb-6 rounded-2xl px-6 py-4 shadow-sm border <?php echo $message_type == 'success' ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400' : 'bg-red-500/20 border-red-500/30 text-red-400'; ?>">
@@ -273,7 +276,7 @@ foreach ($payroll_data as $p) {
         </main>
 
         <footer class="glass-strong border-t border-white/[0.06] px-8 py-3 text-xs text-zinc-500 flex justify-between items-center mt-auto">
-            <span>&copy; <?php echo date('Y'); ?> ENTERPRISE HR PLATFORMS</span>
+            <span>&copy; <?php echo date('Y'); ?> AURA HR PLATFORMS</span>
             <span class="flex items-center space-x-1.5 font-medium text-emerald-400">
                 <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
                 <span>System Secure</span>

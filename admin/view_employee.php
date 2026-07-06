@@ -3,6 +3,7 @@ session_start();
 require_once '../config/auth.php';
 require_admin_login();
 require_once '../config/db.php';
+require_once '../config/helpers.php';
 
 $employee_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 
@@ -63,24 +64,9 @@ if (!$emp) {
 <body x-data="{ sidebarOpen: false }" class="bg-slate-50 dark:bg-[#09090b] text-slate-900 dark:text-white font-sans antialiased min-h-screen flex">
     <?php include "../includes/sidebar.php"; ?>
     <div class="flex-1 flex flex-col min-w-0 main-wrapper">
-        <?php $page_title = "Employee Profile"; include "../includes/topbar.php"; ?>
+        <?php $page_title = "Employee Profile"; $page_subtitle = "Detailed information about " . htmlspecialchars($emp['name']); $page_actions = '<a href="edit_employee.php?id=' . $emp['id'] . '" class="rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700 text-white font-semibold text-sm px-5 py-2.5 shadow-sm transition flex items-center gap-2"><i class="fa-solid fa-pen"></i> Edit Profile</a><a href="employee.php" class="rounded-xl border border-white/10 glass-strong hover:bg-white/[0.06] text-zinc-300 font-semibold text-sm px-5 py-2.5 shadow-sm transition flex items-center gap-2"><i class="fa-solid fa-arrow-left"></i> Back to List</a>'; include "../includes/topbar.php"; ?>
 
         <main class="flex-1 p-8">
-            <div class="flex items-center justify-between mb-8">
-                <div class="animate-fade-in-up">
-                    <h1 class="text-2xl font-bold text-body tracking-tight">Employee Profile</h1>
-                    <p class="text-sm text-body-secondary mt-1">Detailed information about <?php echo htmlspecialchars($emp['name']); ?></p>
-                </div>
-                <div class="flex items-center gap-3">
-                    <a href="edit_employee.php?id=<?php echo $emp['id']; ?>" class="rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700 text-white font-semibold text-sm px-5 py-2.5 shadow-sm transition flex items-center gap-2">
-                        <i class="fa-solid fa-pen"></i> Edit Profile
-                    </a>
-                    <a href="employee.php" class="rounded-xl border border-white/10 glass-strong hover:bg-white/[0.06] text-zinc-300 font-semibold text-sm px-5 py-2.5 shadow-sm transition flex items-center gap-2">
-                        <i class="fa-solid fa-arrow-left"></i> Back to List
-                    </a>
-                </div>
-            </div>
-
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
                 <!-- Left Column: Basic Info -->
@@ -217,7 +203,7 @@ if (!$emp) {
         </main>
 
         <footer class="glass-strong border-t border-white/[0.06] px-8 py-3 text-xs text-zinc-500 flex justify-between items-center mt-auto">
-            <span>&copy; <?php echo date('Y'); ?> ENTERPRISE HR PLATFORMS</span>
+            <span>&copy; <?php echo date('Y'); ?> AURA HR PLATFORMS</span>
             <span class="flex items-center space-x-1.5 font-medium text-emerald-400">
                 <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
                 <span>System Secure</span>

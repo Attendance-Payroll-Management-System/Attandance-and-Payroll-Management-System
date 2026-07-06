@@ -3,6 +3,7 @@ session_start();
 require_once '../config/auth.php';
 require_admin_login();
 require_once '../config/db.php';
+require_once '../config/helpers.php';
 
 $message = '';
 $message_type = '';
@@ -53,14 +54,8 @@ $departments = $conn->query("SELECT d.*, (SELECT COUNT(*) FROM employee e WHERE 
 <body x-data="{ sidebarOpen: false }" class="bg-slate-50 dark:bg-[#09090b] text-slate-900 dark:text-white font-sans antialiased min-h-screen flex">
     <?php include "../includes/sidebar.php"; ?>
     <div class="flex-1 flex flex-col min-w-0 main-wrapper">
-        <?php $page_title = "Departments"; include "../includes/topbar.php"; ?>
+        <?php $page_title = "Departments"; $page_subtitle = "Manage company departments and employee distribution."; include "../includes/topbar.php"; ?>
         <main class="flex-1 p-8 overflow-y-auto">
-            <header class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
-                <div class="animate-fade-in-up">
-                    <h1 class="text-2xl font-bold text-body tracking-tight">Departments</h1>
-                    <p class="text-sm text-body-secondary mt-1">Manage company departments and employee distribution.</p>
-                </div>
-            </header>
 
             <?php if ($message): ?>
                 <div class="mb-6 rounded-2xl px-6 py-4 shadow-sm border <?php echo $message_type == 'success' ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400' : 'bg-red-500/20 border-red-500/30 text-red-400'; ?>">
@@ -73,6 +68,22 @@ $departments = $conn->query("SELECT d.*, (SELECT COUNT(*) FROM employee e WHERE 
 
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <div class="lg:col-span-2">
+                    <?php if (empty($departments)): ?>
+                    <section class="glass-strong rounded-2xl p-12 text-center">
+                        <svg class="w-24 h-24 mx-auto mb-6 text-zinc-600 dark:text-zinc-700" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <rect x="20" y="15" width="60" height="45" rx="6" stroke="currentColor" stroke-width="2" opacity="0.3"/>
+                            <rect x="26" y="21" width="48" height="12" rx="3" stroke="currentColor" stroke-width="2" opacity="0.15"/>
+                            <line x1="30" y1="40" x2="50" y2="40" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.2"/>
+                            <line x1="30" y1="47" x2="45" y2="47" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.15"/>
+                            <path d="M68 68l6-6 10 10" stroke="url(#grad)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.6"/>
+                            <circle cx="60" cy="75" r="14" stroke="currentColor" stroke-width="2" opacity="0.2"/>
+                            <circle cx="60" cy="75" r="4" fill="currentColor" opacity="0.15"/>
+                            <defs><linearGradient id="grad" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#a78bfa"/><stop offset="100%" stop-color="#e879f9"/></linearGradient></defs>
+                        </svg>
+                        <h3 class="text-xl font-bold text-white">No departments created</h3>
+                        <p class="text-zinc-400 mt-2 max-w-md mx-auto">Departments help you organize your team. Create your first department to get started.</p>
+                    </section>
+                    <?php else: ?>
                     <section class="card-hover glass-strong rounded-2xl overflow-hidden">
                         <div class="p-6 border-b border-white/[0.06] flex items-center justify-between">
                             <h2 class="font-bold text-white text-lg"><i class="fa-solid fa-building text-violet-400 mr-2"></i>Department List</h2>
@@ -88,10 +99,7 @@ $departments = $conn->query("SELECT d.*, (SELECT COUNT(*) FROM employee e WHERE 
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-white/[0.06]">
-                                    <?php if (empty($departments)): ?>
-                                    <tr><td colspan="3" class="px-6 py-12 text-center text-zinc-500">No departments found.</td></tr>
-                                    <?php else: ?>
-                                        <?php foreach ($departments as $dept): ?>
+                                    <?php foreach ($departments as $dept): ?>
                                         <tr class="hover:bg-white/[0.02] transition">
                                             <td class="px-6 py-4 font-medium text-white"><?php echo htmlspecialchars($dept['department_name']); ?></td>
                                             <td class="px-6 py-4">
@@ -101,21 +109,22 @@ $departments = $conn->query("SELECT d.*, (SELECT COUNT(*) FROM employee e WHERE 
                                                 <a href="?delete=<?php echo $dept['id']; ?>" onclick="return confirm('Delete this department?')" class="text-red-400 hover:text-red-300 text-xs font-medium"><i class="fa-solid fa-trash"></i></a>
                                             </td>
                                         </tr>
-                                        <?php endforeach; ?>
-                                    <?php endif; ?>
+                                    <?php endforeach; ?>
                                 </tbody>
                             </table>
                         </div>
                     </section>
+                    <?php endif; ?>
                 </div>
 
                 <div>
                     <section class="group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-6">
                         <h2 class="font-bold text-white text-lg mb-6"><i class="fa-solid fa-plus text-violet-400 mr-2"></i>Add Department</h2>
                         <form method="POST" class="space-y-4 text-sm">
-                            <div>
-                                <label class="text-xs font-semibold text-zinc-400 block mb-1.5">Department Name</label>
-                                <input type="text" name="department_name" required class="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white placeholder-zinc-500 shadow-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-500/30" placeholder="e.g. Human Resources">
+                        <?php echo csrf_field(); ?>
+                            <div class="floating-group">
+                                <input type="text" name="department_name" id="dept_name" required placeholder=" " class="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 pt-6 pb-2 text-sm text-white shadow-sm outline-none transition">
+                                <label for="dept_name" class="absolute left-4 top-3.5 text-sm text-zinc-500 pointer-events-none transition-all duration-200">Department Name</label>
                             </div>
                             <button type="submit" name="add_department" class="w-full rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700 text-white font-semibold text-sm px-5 py-3 shadow-sm transition flex items-center justify-center gap-2">
                                 <i class="fa-solid fa-building"></i> Add Department
@@ -127,7 +136,7 @@ $departments = $conn->query("SELECT d.*, (SELECT COUNT(*) FROM employee e WHERE 
         </main>
 
         <footer class="glass-strong border-t border-white/[0.06] px-8 py-3 text-xs text-zinc-500 flex justify-between items-center mt-auto">
-            <span>&copy; <?php echo date('Y'); ?> ENTERPRISE HR PLATFORMS</span>
+            <span>&copy; <?php echo date('Y'); ?> AURA HR PLATFORMS</span>
             <span class="flex items-center space-x-1.5 font-medium text-emerald-400">
                 <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
                 <span>System Secure</span>

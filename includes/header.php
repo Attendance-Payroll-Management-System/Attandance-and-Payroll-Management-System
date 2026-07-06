@@ -1,3 +1,6 @@
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/svg+xml" href="../favicon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://cdn.tailwindcss.com">
@@ -5,6 +8,7 @@
 <link rel="dns-prefetch" href="https://cdn.tailwindcss.com">
 <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
 <link rel="stylesheet" href="../assets/css/app.css">
+<script src="../assets/js/app.js"></script>
 <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
 <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"></noscript>
 <script>
@@ -28,6 +32,21 @@ tailwind.config = { darkMode: 'class' }
         }
     }
 })();
+</script>
+<script>
+// Chart.js global defaults for theme awareness
+Chart.defaults.font.family = "'Inter', sans-serif";
+Chart.defaults.plugins.legend.labels.usePointStyle = true;
+function getChartColors() {
+    var isDark = document.documentElement.classList.contains('dark');
+    return {
+        grid: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.06)',
+        text: isDark ? '#a1a1aa' : '#64748b',
+        tooltipBg: isDark ? 'rgba(24,24,27,0.95)' : 'rgba(255,255,255,0.95)',
+        tooltipBorder: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
+        tooltipText: isDark ? '#ffffff' : '#0f172a'
+    };
+}
 </script>
 <style>
 :root:not(.dark) .glass-strong.text-white,

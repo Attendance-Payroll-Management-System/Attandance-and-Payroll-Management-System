@@ -3,6 +3,7 @@ session_start();
 require_once '../config/auth.php';
 require_admin_login();
 require_once '../config/db.php';
+require_once '../config/helpers.php';
 
 $mailDir = __DIR__ . '/../storage/emails';
 $emails = [];
@@ -55,20 +56,10 @@ if (is_dir($mailDir)) {
 <body x-data="{ sidebarOpen: false }" class="bg-slate-50 dark:bg-[#09090b] text-slate-900 dark:text-white font-sans antialiased min-h-screen flex">
     <?php include "../includes/sidebar.php"; ?>
     <div class="flex-1 flex flex-col min-w-0 main-wrapper">
-        <?php $page_title = "Email Log";
+        <?php $page_title = "Email Log"; $page_subtitle = "View all sent salary slip emails and their PDF attachments";
         include "../includes/topbar.php"; ?>
         <main class="flex-1 p-8 overflow-y-auto">
             <div class="max-w-7xl mx-auto" x-data="{ search: '' }">
-                <!-- Header -->
-                <div class="flex items-center gap-3 mb-8 animate-fade-in-up">
-                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 flex items-center justify-center">
-                        <i class="fas fa-envelope-open-text text-violet-400"></i>
-                    </div>
-                    <div>
-                        <h1 class="text-2xl font-bold text-body">Email Log</h1>
-                        <p class="text-sm text-body-secondary">View all sent salary slip emails and their PDF attachments</p>
-                    </div>
-                </div>
 
                 <!-- Summary -->
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8 animate-fade-in-up stagger-1">

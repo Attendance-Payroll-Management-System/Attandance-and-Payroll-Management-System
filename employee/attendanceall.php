@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once "../config/db.php";
+require_once "../config/helpers.php";
 require_once "../config/notifications.php";
 
 if (!isset($_SESSION['logged_in'])) {
@@ -17,11 +18,14 @@ $current_month = date('Y-m');
 $month_start = $current_month . '-01';
 $month_end = date('Y-m-t');
 
-// Attendance summary
+// Attendance summary with new statuses
 $summary = $conn->prepare("SELECT
     COUNT(*) as total_days,
     SUM(CASE WHEN check_in IS NOT NULL THEN 1 ELSE 0 END) as present_days,
-    SUM(CASE WHEN status = 'leave' THEN 1 ELSE 0 END) as leave_days
+    SUM(CASE WHEN status = 'leave' THEN 1 ELSE 0 END) as leave_days,
+    SUM(CASE WHEN status IN ('present', 'late') THEN 1 ELSE 0 END) as effective_present,
+    SUM(CASE WHEN status IN ('awol', 'absent', 'full_absent', 'half_absent') THEN 1 ELSE 0 END) as absent_days,
+    SUM(CASE WHEN status = 'late' THEN 1 ELSE 0 END) as late_days
 FROM attendance WHERE employee_id = ? AND attendance_date BETWEEN ? AND ?");
 $summary->bind_param('iss', $employee_id, $month_start, $month_end);
 $summary->execute();
@@ -30,7 +34,11 @@ $summary->close();
 
 $present_days = $stats['present_days'] ?? 0;
 $total_days = $stats['total_days'] ?? 0;
-$present_rate = $total_days > 0 ? round(($present_days / $total_days) * 100, 1) . '%' : '0%';
+$effective_present = $stats['effective_present'] ?? 0;
+$absent_days = $stats['absent_days'] ?? 0;
+$late_days = $stats['late_days'] ?? 0;
+$present_rate = $total_days > 0 ? round(($effective_present / $total_days) * 100, 1) . '%' : '0%';
+$absent_rate = $total_days > 0 ? round(($absent_days / $total_days) * 100, 1) . '%' : '0%';
 
 // OT hours (approved)
 $ot = $conn->prepare("SELECT COALESCE(SUM(total_hours), 0) as ot_hours FROM overtime_requests WHERE employee_id = ? AND ot_date BETWEEN ? AND ? AND status = 'Approved'");
@@ -66,9 +74,28 @@ $cal_query->execute();
 $cal_result = $cal_query->get_result();
 while ($row = $cal_result->fetch_assoc()) {
     $d = (int)date('j', strtotime($row['attendance_date']));
-    if ($row['status'] == 'leave') {
+    $status = $row['status'];
+    if ($status == 'leave') {
         $calendar_data[$d]['type'] = 'leave';
         $calendar_data[$d]['meta'] = 'Leave';
+    } elseif ($status == 'late') {
+        $calendar_data[$d]['type'] = 'late';
+        $calendar_data[$d]['meta'] = ($row['check_in'] ? date('h:i', strtotime($row['check_in'])) : '') . ($row['check_out'] ? ' - ' . date('h:i', strtotime($row['check_out'])) : '') . ' (Late)';
+    } elseif ($status == 'awol') {
+        $calendar_data[$d]['type'] = 'awol';
+        $calendar_data[$d]['meta'] = 'AWOL';
+    } elseif ($status == 'public_holiday') {
+        $calendar_data[$d]['type'] = 'public_holiday';
+        $calendar_data[$d]['meta'] = 'Holiday';
+    } elseif ($status == 'weekend') {
+        $calendar_data[$d]['type'] = 'weekend';
+        $calendar_data[$d]['meta'] = 'Weekend';
+    } elseif ($status == 'half_absent') {
+        $calendar_data[$d]['type'] = 'active';
+        $calendar_data[$d]['meta'] = 'Half-Day';
+    } elseif ($status == 'full_absent') {
+        $calendar_data[$d]['type'] = 'active';
+        $calendar_data[$d]['meta'] = 'Full-Day';
     } elseif ($row['check_in'] && $row['check_out']) {
         $calendar_data[$d]['type'] = 'present';
         $calendar_data[$d]['meta'] = date('h:i', strtotime($row['check_in'])) . ' - ' . date('h:i', strtotime($row['check_out']));
@@ -91,32 +118,35 @@ $cal_query->close();
 <body class="bg-slate-50 dark:bg-[#09090b] text-slate-900 dark:text-white font-sans antialiased flex h-screen overflow-hidden" x-data="{ sidebarOpen: false }">
     <?php include "../includes/sidebar.php"; ?>
     <div class="flex-1 flex flex-col h-full overflow-y-auto lg:ml-64">
-        <header class="glass-strong px-8 py-4 flex items-center justify-between shrink-0">
+        <header class="glass-strong px-8 py-4 flex items-center justify-between shrink-0 sticky top-0 z-20">
             <div class="animate-fade-in-up">
                 <h2 class="text-xl font-bold text-white">Attendance Records</h2>
                 <p class="text-xs text-zinc-400"><?php echo date('l, F j, Y'); ?></p>
             </div>
             <div class="flex items-center gap-4">
-                <div class="relative" x-data="{ open: false }">
-                    <button @click="open = !open" class="relative p-2 text-zinc-400 hover:text-white bg-white/10 rounded-full">
+                <div class="relative" x-data="{ notifOpen: false }">
+                    <button @click="notifOpen = !notifOpen" class="relative p-2 text-zinc-400 hover:text-white glass rounded-full transition">
                         <i class="fa-solid fa-bell text-lg"></i>
                         <?php if ($unread_notifications > 0): ?>
-                        <span class="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center"><?php echo $unread_notifications; ?></span>
+                            <span class="absolute -top-1 -right-1 w-5 h-5 bg-rose-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-lg shadow-rose-500/30 animate-scale-in"><?php echo $unread_notifications; ?></span>
                         <?php endif; ?>
                     </button>
-                    <div x-show="open" @click.outside="open = false" class="absolute right-0 mt-2 w-80 glass-strong rounded-xl shadow-xl z-50" style="display: none;">
-                        <div class="p-3 border-b border-white/[0.06]">
-                            <h4 class="text-sm font-bold text-white">Notifications</h4>
+                    <div x-show="notifOpen" @click.outside="notifOpen = false" class="absolute right-0 mt-2 w-96 glass-strong rounded-xl shadow-xl border border-white/10 z-50" style="display: none;">
+                        <div class="p-3 border-b border-white/[0.06] flex items-center justify-between">
+                            <h4 class="text-sm font-bold text-white"><i class="fa-regular fa-bell mr-1.5 text-violet-400"></i>Notifications</h4>
+                            <?php if ($unread_notifications > 0): ?>
+                            <a href="mark_notifications_read.php" class="text-[10px] text-violet-400 hover:text-violet-300 font-semibold transition-colors">Mark all read</a>
+                            <?php endif; ?>
                         </div>
-                        <div class="max-h-64 overflow-y-auto">
+                        <div class="max-h-96 overflow-y-auto">
                             <?php if (empty($notifications)): ?>
                                 <p class="p-4 text-xs text-zinc-500 text-center">No notifications</p>
                             <?php else: ?>
                                 <?php foreach ($notifications as $noti): ?>
-                                <a href="<?php echo $noti['link'] ?: '#'; ?>" class="block px-4 py-3 border-b border-white/[0.06] hover:bg-white/5 transition <?php echo !$noti['is_read'] ? 'bg-blue-500/10' : ''; ?>">
-                                    <p class="text-xs text-zinc-300"><?php echo htmlspecialchars($noti['message']); ?></p>
-                                    <p class="text-[10px] text-zinc-500 mt-1"><?php echo date('M d, h:i A', strtotime($noti['created_at'])); ?></p>
-                                </a>
+                                    <a href="<?php echo $noti['link'] ?: '#'; ?>" class="block px-4 py-3 border-b border-white/[0.04] hover:bg-white/[0.02] transition <?php echo !$noti['is_read'] ? 'bg-violet-500/5' : ''; ?>">
+                                        <p class="text-xs text-zinc-300"><?php echo htmlspecialchars($noti['message']); ?></p>
+                                        <p class="text-[10px] text-zinc-500 mt-1"><?php echo htmlspecialchars($employee_name) . ' - '; ?><?php echo date('M d, h:i A', strtotime($noti['created_at'])); ?></p>
+                                    </a>
                                 <?php endforeach; ?>
                             <?php endif; ?>
                         </div>
@@ -142,8 +172,9 @@ $cal_query->close();
                         <div class="flex items-center gap-3">
                             <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-500/20 to-cyan-500/20 text-blue-400 flex items-center justify-center text-lg group-hover:scale-110 transition-transform"><i class="fa-solid fa-calendar-check"></i></div>
                             <div>
-                                <span class="text-xs font-semibold uppercase tracking-wider text-zinc-400">Total Working Days</span>
-                                <div class="text-2xl font-bold text-white mt-0.5"><?= $present_days ?><span class="text-sm font-medium text-zinc-400">/ <?= date('t') ?> Days</span></div>
+                                <span class="text-xs font-semibold uppercase tracking-wider text-zinc-400">Present Days</span>
+                                <div class="text-2xl font-bold text-white mt-0.5"><?= $effective_present ?><span class="text-sm font-medium text-zinc-400">/ <?= date('t') ?> Days</span></div>
+                                <span class="text-xs text-blue-400 font-medium">Includes Late</span>
                             </div>
                         </div>
                     </div>
@@ -222,13 +253,8 @@ $cal_query->close();
                                         <td class="py-3 font-mono text-zinc-400"><?= $log['check_out'] ? date('h:i:s A', strtotime($log['check_out'])) : '-' ?></td>
                                         <td class="py-3"><?= $total ?: '-' ?></td>
                                         <td class="py-3 text-right">
-                                            <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold 
-                                                <?= $log['status'] === 'present' ? 'bg-emerald-500/20 text-emerald-400' : '' ?>
-                                                <?= $log['status'] === 'late' ? 'bg-yellow-500/20 text-yellow-400' : '' ?>
-                                                <?= $log['status'] === 'leave' ? 'bg-blue-500/20 text-blue-400' : '' ?>
-                                                <?= $log['status'] === 'absent' ? 'bg-red-500/20 text-red-400' : '' ?>
-                                            ">
-                                                <?= ucfirst($log['status']) ?>
+                                            <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold <?= get_attendance_status_badge_class($log['status']) ?>">
+                                                <?= get_attendance_status_label($log['status']) ?>
                                             </span>
                                         </td>
                                     </tr>
@@ -266,6 +292,9 @@ $cal_query->close();
                                 <?= $day['type'] === 'leave' ? 'bg-rose-500/20 border-rose-500/30 text-rose-300' : '' ?>
                                 <?= $day['type'] === 'active' ? 'bg-blue-600/20 border-blue-400/40 text-blue-300 font-semibold shadow-sm shadow-blue-500/10' : '' ?>
                                 <?= $day['type'] === 'weekend' ? 'bg-white/[0.04] border-white/[0.06] text-zinc-500' : '' ?>
+                                <?= $day['type'] === 'late' ? 'bg-amber-500/20 border-amber-500/30 text-amber-300' : '' ?>
+                                <?= $day['type'] === 'awol' ? 'bg-red-700/20 border-red-700/30 text-red-400' : '' ?>
+                                <?= $day['type'] === 'public_holiday' ? 'bg-pink-500/20 border-pink-500/30 text-pink-300' : '' ?>
                                 <?= $day['type'] === 'none' ? 'glass-strong text-zinc-400' : '' ?>
                             ">
                                 <span class="block text-base font-bold"><?= $day['day'] ?></span>
@@ -279,18 +308,5 @@ $cal_query->close();
             </div>
         </main>
     </div>
-<script>
-function toggleTheme() {
-    var html = document.documentElement;
-    var isDark = html.classList.contains('dark');
-    if (isDark) {
-        html.classList.remove('dark');
-        localStorage.setItem('aura-theme', 'light');
-    } else {
-        html.classList.add('dark');
-        localStorage.setItem('aura-theme', 'dark');
-    }
-}
-</script>
 </body>
 </html>

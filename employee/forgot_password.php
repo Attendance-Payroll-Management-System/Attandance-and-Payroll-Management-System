@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once "../config/db.php";
+require_once "../config/helpers.php";
 
 $message = '';
 $message_type = '';
@@ -21,14 +22,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
         if ($user) {
             $token = bin2hex(random_bytes(32));
-            $expires = date('Y-m-d H:i:s', strtotime('+1 hour'));
 
-            $stmt = $conn->prepare("INSERT INTO password_resets (employee_id, token, expires_at) VALUES (?, ?, ?)");
-            $stmt->bind_param("iss", $user['id'], $token, $expires);
+            $stmt = $conn->prepare("INSERT INTO password_resets (employee_id, token, expires_at) VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 1 HOUR))");
+            $stmt->bind_param("is", $user['id'], $token);
             $stmt->execute();
             $stmt->close();
 
-            $reset_link = "http://{$_SERVER['HTTP_HOST']}/employee/reset_password.php?token=$token&email=" . urlencode($email);
+            $base = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/');
+            $reset_link = "http://{$_SERVER['HTTP_HOST']}{$base}/reset_password.php?token=$token&email=" . urlencode($email);
             $message = "Password reset link sent to your email. <br><small class='text-zinc-400'>(Demo: <a href='" . htmlspecialchars($reset_link) . "' class='text-violet-400 underline'>Click here to reset</a>)</small>";
             $message_type = "success";
             $email_sent = true;
@@ -85,6 +86,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
             <?php if (!$email_sent): ?>
             <form method="POST" class="space-y-5">
+            <?php echo csrf_field(); ?>
                 <div class="space-y-1.5">
                     <label class="text-sm font-medium text-zinc-300"><i class="fa-regular fa-envelope mr-1.5 text-violet-400"></i>Email Address</label>
                     <input type="email" name="email" placeholder="you@company.com" required class="w-full px-4 py-3 rounded-xl bg-white/[0.06] border border-white/10 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50 transition-all">

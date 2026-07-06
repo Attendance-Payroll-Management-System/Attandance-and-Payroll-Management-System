@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once "../config/db.php";
+require_once '../config/helpers.php';
 if (!isset($_SESSION['admin_logged_in'])) { header('Location: login.php'); exit; }
 
 $message = '';
@@ -13,6 +14,7 @@ while ($row = $result->fetch_assoc()) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    if (!validate_csrf_token()) { http_response_code(403); exit('CSRF validation failed.'); }
     foreach ($_POST as $key => $value) {
         if (array_key_exists($key, $settings)) {
             $stmt = $conn->prepare("UPDATE system_settings SET setting_value = ? WHERE setting_key = ?");
@@ -39,12 +41,8 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin';
 <body x-data="{ sidebarOpen: false }" class="bg-slate-50 dark:bg-[#09090b] text-slate-900 dark:text-white font-sans antialiased min-h-screen flex">
     <?php include "../includes/sidebar.php"; ?>
     <div class="flex-1 flex flex-col min-w-0 main-wrapper">
-        <?php $page_title = "System Settings"; include "../includes/topbar.php"; ?>
-        <main class="flex-1 p-6 lg:p-8 overflow-y-auto page-content w-full">
-            <div class="animate-fade-in-up mb-8">
-                <h1 class="text-2xl font-bold text-body tracking-tight">System Settings</h1>
-                <p class="text-sm text-body-secondary mt-1">Configure company information, payroll rules, and system preferences.</p>
-            </div>
+        <?php $page_title = "System Settings"; $page_subtitle = "Configure company information, payroll rules, and system preferences."; include "../includes/topbar.php"; ?>
+        <main class="flex-1 p-8">
 
             <?php if ($message): ?>
                 <div class="mb-6 rounded-2xl px-6 py-4 shadow-sm border <?php echo $message_type == 'success' ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400' : 'bg-red-500/20 border-red-500/30 text-red-400'; ?> animate-fade-in-up">
@@ -53,6 +51,7 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin';
             <?php endif; ?>
 
             <form method="POST">
+            <?php echo csrf_field(); ?>
                 <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
                     <div class="glass-strong rounded-2xl p-6 card-hover animate-fade-in-up stagger-1">
                         <h3 class="font-bold text-white text-base mb-5 border-b border-white/[0.06] pb-4"><i class="fa-solid fa-building text-violet-400 mr-2"></i>Company Information</h3>

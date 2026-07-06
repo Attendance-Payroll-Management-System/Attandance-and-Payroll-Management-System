@@ -1,13 +1,15 @@
 <?php
 session_start();
 require_once "../config/db.php";
+require_once "../config/helpers.php";
 if (!isset($_SESSION['logged_in'])) { header('Location: login.php'); exit; }
 $employee_id = $_SESSION['employee_id'];
 $employee_name = $_SESSION['employee_name'];
-$today = date('Y-m-d');
+set_mmt_timezone();
+$today = mmt_date();
 $month_start = date('Y-m-01');
 $month_end = date('Y-m-t');
-$att = $conn->prepare("SELECT COUNT(*) as total_days, SUM(CASE WHEN check_in IS NOT NULL THEN 1 ELSE 0 END) as present_days, SUM(CASE WHEN status = 'late' THEN 1 ELSE 0 END) as late_days FROM attendance WHERE employee_id = ? AND attendance_date BETWEEN ? AND ?");
+$att = $conn->prepare("SELECT COUNT(*) as total_days, SUM(CASE WHEN check_in IS NOT NULL THEN 1 ELSE 0 END) as present_days, SUM(CASE WHEN status = 'late' THEN 1 ELSE 0 END) as late_days, SUM(CASE WHEN status IN ('present', 'late') THEN 1 ELSE 0 END) as effective_present FROM attendance WHERE employee_id = ? AND attendance_date BETWEEN ? AND ?");
 $att->bind_param("iss", $employee_id, $month_start, $month_end);
 $att->execute();
 $att_data = $att->get_result()->fetch_assoc();
@@ -15,7 +17,8 @@ $att->close();
 $total_days = $att_data['total_days'] ?? 0;
 $present_days = $att_data['present_days'] ?? 0;
 $late_days = $att_data['late_days'] ?? 0;
-$attendance_rate = $total_days > 0 ? round(($present_days / $total_days) * 100, 1) : 0;
+$effective_present = $att_data['effective_present'] ?? 0;
+$attendance_rate = $total_days > 0 ? round(($effective_present / $total_days) * 100, 1) : 0;
 $leave = $conn->prepare("SELECT COUNT(*) as total, SUM(CASE WHEN status = 'Approved' THEN 1 ELSE 0 END) as approved, SUM(CASE WHEN status = 'Pending' THEN 1 ELSE 0 END) as pending FROM leave_requests WHERE employee_id = ? AND created_at BETWEEN ? AND ?");
 $leave->bind_param("iss", $employee_id, $month_start, $month_end);
 $leave->execute();
@@ -275,18 +278,5 @@ elseif ($hour < 17) $greeting = "Good Afternoon";
             </div>
         </main>
     </div>
-<script>
-function toggleTheme() {
-    var html = document.documentElement;
-    var isDark = html.classList.contains('dark');
-    if (isDark) {
-        html.classList.remove('dark');
-        localStorage.setItem('aura-theme', 'light');
-    } else {
-        html.classList.add('dark');
-        localStorage.setItem('aura-theme', 'dark');
-    }
-}
-</script>
 </body>
 </html>

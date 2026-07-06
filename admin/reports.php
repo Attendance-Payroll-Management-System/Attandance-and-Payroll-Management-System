@@ -3,6 +3,7 @@ session_start();
 if (!isset($_SESSION['admin_logged_in'])) { header('Location: login.php'); exit; }
 $admin_name = $_SESSION['admin_name'] ?? 'Admin';
 require_once '../config/db.php';
+require_once '../config/helpers.php';
 
 $selected_year = isset($_GET['year']) ? (int)$_GET['year'] : (int)date('Y');
 $message = '';
@@ -78,65 +79,62 @@ foreach ($annual_data as $r) {
 <body x-data="{ sidebarOpen: false }" class="bg-slate-50 dark:bg-[#09090b] text-slate-900 dark:text-white font-sans antialiased min-h-screen flex">
     <?php include "../includes/sidebar.php"; ?>
     <div class="flex-1 flex flex-col min-w-0 main-wrapper">
-        <?php $page_title = "Annual Payroll Report"; include "../includes/topbar.php"; ?>
-        <main class="flex-1 p-8 overflow-y-auto">
-            <header class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
-                <div class="animate-fade-in-up">
-                    <h1 class="text-2xl font-bold text-body tracking-tight">Annual Payroll Report</h1>
-                    <p class="text-sm text-body-secondary mt-1">Yearly salary summary aggregated from monthly payrolls.</p>
-                </div>
-                <div class="flex flex-wrap items-center gap-3">
-                    <form method="GET" class="flex items-center gap-3 glass-strong rounded-xl p-3">
-                        <select name="year" class="bg-white/[0.06] border-white/10 text-white placeholder-zinc-500 text-sm rounded-lg p-2.5">
-                            <?php for ($y = date('Y') - 3; $y <= date('Y'); $y++): ?>
-                            <option value="<?php echo $y; ?>" <?php echo $y == $selected_year ? 'selected' : ''; ?>><?php echo $y; ?></option>
-                            <?php endfor; ?>
-                        </select>
-                        <button type="submit" class="rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700 text-white font-semibold text-sm px-5 py-2.5 shadow-sm transition flex items-center gap-2">
-                            <i class="fa-solid fa-magnifying-glass"></i> View
-                        </button>
-                    </form>
-                    <form method="POST">
-                        <button type="submit" name="generate_annual" class="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm px-5 py-2.5 shadow-sm transition flex items-center gap-2">
-                            <i class="fa-solid fa-bolt"></i> Generate Annual Payroll
-                        </button>
-                    </form>
-                    <div class="flex items-center gap-2">
-                        <button onclick="window.print()" class="rounded-xl bg-white/[0.06] hover:bg-white/10 text-zinc-300 font-semibold text-sm px-4 py-2.5 shadow-sm transition flex items-center gap-2 border border-white/10">
-                            <i class="fa-solid fa-print"></i> Print
-                        </button>
-                        <button onclick="exportCSV()" class="rounded-xl bg-white/[0.06] hover:bg-white/10 text-zinc-300 font-semibold text-sm px-4 py-2.5 shadow-sm transition flex items-center gap-2 border border-white/10">
-                            <i class="fa-solid fa-file-excel"></i> CSV
-                        </button>
-                    </div>
-                </div>
-
-                <script>
-                function exportCSV() {
-                    const rows = document.querySelectorAll('#reportTable tbody tr');
-                    if (!rows.length) return;
-                    let csv = 'Employee,Code,Department,Total Salary,Overtime,Bonuses,Deductions,Net Annual\n';
-                    rows.forEach(row => {
-                        const cells = row.querySelectorAll('td');
-                        const data = [];
-                        cells.forEach((c, i) => {
-                            if (i < cells.length - 1 || true) {
-                                let val = c.innerText.trim().replace(/,/g, '');
-                                data.push(val);
-                            }
-                        });
-                        csv += data.join(',') + '\n';
-                    });
-                    const blob = new Blob([csv], { type: 'text/csv' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = 'annual_payroll_<?php echo $selected_year; ?>.csv';
-                    a.click();
-                    URL.revokeObjectURL(url);
-                }
-                </script>
-            </header>
+        <?php
+            $page_title = "Annual Payroll Report";
+            $page_subtitle = "Yearly salary summary aggregated from monthly payrolls.";
+            ob_start();
+        ?>
+        <form method="GET" class="flex items-center gap-3 glass-strong rounded-xl p-3">
+            <select name="year" class="bg-white/[0.06] border-white/10 text-white placeholder-zinc-500 text-sm rounded-lg p-2.5">
+                <?php for ($y = date('Y') - 3; $y <= date('Y'); $y++): ?>
+                <option value="<?php echo $y; ?>" <?php echo $y == $selected_year ? 'selected' : ''; ?>><?php echo $y; ?></option>
+                <?php endfor; ?>
+            </select>
+            <button type="submit" class="rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700 text-white font-semibold text-sm px-5 py-2.5 shadow-sm transition flex items-center gap-2">
+                <i class="fa-solid fa-magnifying-glass"></i> View
+            </button>
+        </form>
+        <form method="POST">
+        <?php echo csrf_field(); ?>
+            <button type="submit" name="generate_annual" class="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm px-5 py-2.5 shadow-sm transition flex items-center gap-2">
+                <i class="fa-solid fa-bolt"></i> Generate Annual Payroll
+            </button>
+        </form>
+        <div class="flex items-center gap-2">
+            <button onclick="window.print()" class="rounded-xl bg-white/[0.06] hover:bg-white/10 text-zinc-300 font-semibold text-sm px-4 py-2.5 shadow-sm transition flex items-center gap-2 border border-white/10">
+                <i class="fa-solid fa-print"></i> Print
+            </button>
+            <button onclick="exportCSV()" class="rounded-xl bg-white/[0.06] hover:bg-white/10 text-zinc-300 font-semibold text-sm px-4 py-2.5 shadow-sm transition flex items-center gap-2 border border-white/10">
+                <i class="fa-solid fa-file-excel"></i> CSV
+            </button>
+        </div>
+        <?php $page_actions = ob_get_clean(); ?>
+        <script>
+        function exportCSV() {
+            const rows = document.querySelectorAll('#reportTable tbody tr');
+            if (!rows.length) return;
+            let csv = 'Employee,Code,Department,Total Salary,Overtime,Bonuses,Deductions,Net Annual\n';
+            rows.forEach(row => {
+                const cells = row.querySelectorAll('td');
+                const data = [];
+                cells.forEach((c, i) => {
+                    if (i < cells.length - 1 || true) {
+                        let val = c.innerText.trim().replace(/,/g, '');
+                        data.push(val);
+                    }
+                });
+                csv += data.join(',') + '\n';
+            });
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'annual_payroll_<?php echo $selected_year; ?>.csv';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+        </script>
+        <?php include "../includes/topbar.php"; ?>
 
             <?php if ($message): ?>
                 <div class="mb-6 rounded-2xl px-6 py-4 shadow-sm border <?php echo $message_type == 'success' ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400' : 'bg-red-500/20 border-red-500/30 text-red-400'; ?>">
@@ -219,7 +217,7 @@ foreach ($annual_data as $r) {
         </main>
 
         <footer class="glass-strong border-t border-white/[0.06] px-8 py-3 text-xs text-zinc-500 flex justify-between items-center mt-auto">
-            <span>&copy; <?php echo date('Y'); ?> ENTERPRISE HR PLATFORMS</span>
+            <span>&copy; <?php echo date('Y'); ?> AURA HR PLATFORMS</span>
             <span class="flex items-center space-x-1.5 font-medium text-emerald-400">
                 <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
                 <span>System Secure</span>

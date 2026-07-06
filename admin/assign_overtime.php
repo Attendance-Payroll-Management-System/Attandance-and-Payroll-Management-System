@@ -3,6 +3,7 @@ session_start();
 require_once '../config/auth.php';
 require_admin_login();
 require_once '../config/db.php';
+require_once '../config/helpers.php';
 require_once '../config/notifications.php';
 
 $message = '';
@@ -68,14 +69,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['assign_ot'])) {
 <body x-data="{ sidebarOpen: false }" class="bg-slate-50 dark:bg-[#09090b] text-slate-900 dark:text-white font-sans antialiased min-h-screen flex">
     <?php include "../includes/sidebar.php"; ?>
     <div class="flex-1 flex flex-col min-w-0 main-wrapper">
-        <?php $page_title = "Assign Overtime"; include "../includes/topbar.php"; ?>
-        <main class="flex-1 p-8">
-            <header class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
-                <div class="animate-fade-in-up">
-                    <h1 class="text-2xl font-bold text-body tracking-tight">Assign Overtime</h1>
-                    <p class="text-sm text-body-secondary mt-1">Assign overtime work to employees.</p>
-                </div>
-            </header>
+        <?php $page_title = "Assign Overtime"; $page_subtitle = "Assign overtime work to employees."; include "../includes/topbar.php"; ?>
+        <main class="flex-1 p-8 overflow-y-auto">
 
             <?php if ($message): ?>
                 <div class="mb-6 rounded-2xl px-6 py-4 shadow-sm border <?php echo $message_type == 'success' ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400' : 'bg-red-500/20 border-red-500/30 text-red-400'; ?>">
@@ -97,6 +92,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['assign_ot'])) {
                 <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-6">
                     <h2 class="text-lg font-bold text-white mb-6"><i class="fa-solid fa-clock text-violet-400 mr-2"></i>New Overtime Assignment</h2>
                     <form method="POST" class="space-y-5 text-zinc-300">
+                    <?php echo csrf_field(); ?>
                         <div>
                             <label class="text-xs font-semibold text-zinc-400 block mb-1.5">Employee</label>
                             <select name="employee_id" required class="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white placeholder-zinc-500 shadow-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-500/30">
@@ -133,7 +129,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['assign_ot'])) {
         </main>
 
         <footer class="glass-strong border-t border-white/[0.06] px-8 py-3 text-xs text-zinc-500 flex justify-between items-center mt-auto">
-            <span>&copy; <?php echo date('Y'); ?> ENTERPRISE HR PLATFORMS</span>
+            <span>&copy; <?php echo date('Y'); ?> AURA HR PLATFORMS</span>
             <span class="flex items-center space-x-1.5 font-medium text-emerald-400">
                 <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
                 <span>System Secure</span>
