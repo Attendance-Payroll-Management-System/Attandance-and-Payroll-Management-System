@@ -442,6 +442,22 @@ function get_late_threshold(): string {
     return '09:00:00';
 }
 
+function get_work_start_time(): string {
+    return '09:00:00'; // MMT official work start
+}
+
+function get_work_end_time(): string {
+    return '17:00:00'; // MMT official work end (8-hour day)
+}
+
+function is_before_work_start(string $time): bool {
+    return strtotime($time) < strtotime(get_work_start_time());
+}
+
+function is_after_work_end(string $time): bool {
+    return strtotime($time) > strtotime(get_work_end_time());
+}
+
 // ─── Attendance Status Auto-Calculation ────────────────────────
 
 function calculate_attendance_status(mysqli $conn, int $employee_id, string $date, ?string $check_in, ?string $check_out, ?float $total_hours): string {

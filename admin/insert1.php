@@ -14,12 +14,15 @@ $message_type = '';
 $sql_dept = "SELECT id, department_name FROM departments";
 $result_dept = mysqli_query($conn, $sql_dept);
 
-$sql_dept = "SELECT id, position_name FROM positions";
-$result_opt = mysqli_query($conn, $sql_dept);
+$sql_opt = "SELECT id, position_name FROM positions";
+$result_opt = mysqli_query($conn, $sql_opt);
 
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    if (!validate_csrf_token()) { http_response_code(403); exit('CSRF validation failed.'); }
+    if (!validate_csrf_token()) {
+        http_response_code(403);
+        exit('CSRF validation failed.');
+    }
     // Get form data
     $name = isset($_POST['name']) ? htmlspecialchars(trim($_POST['name'])) : '';
     $father_name = isset($_POST['father_name']) ? htmlspecialchars(trim($_POST['father_name'])) : '';
@@ -67,7 +70,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $message_type = 'error';
         } else {
             // Generate employee code
-            $employee_code = 'EMP-' . date('Ymd') . '-' . rand(1000, 9999);
+            $employee_code = 'EMP-' . rand(1000, 9999);
 
             // Hash password
             $hashed_password = password_hash($password, PASSWORD_DEFAULT);
@@ -142,7 +145,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 <body x-data="{ sidebarOpen: false }" class="bg-slate-50 dark:bg-[#09090b] text-slate-900 dark:text-white font-sans antialiased min-h-screen flex">
     <?php include "../includes/sidebar.php"; ?>
     <div class="flex-1 flex flex-col min-w-0 main-wrapper">
-        <?php $page_title = "Add Employee"; $page_subtitle = "Create a new employee record with personal, company, and financial details."; $page_actions = '<span class="inline-flex items-center gap-2 rounded-full bg-card-custom px-3 py-1 border border-body text-sm text-body-secondary"><i class="fa-solid fa-calendar-days text-violet-400"></i> ' . date('d M Y') . '</span>'; include "../includes/topbar.php"; ?>
+        <?php $page_title = "Add Employee";
+        $page_subtitle = "Create a new employee record with personal, company, and financial details.";
+        $page_actions = '<span class="inline-flex items-center gap-2 rounded-full bg-card-custom px-3 py-1 border border-body text-sm text-body-secondary"><i class="fa-solid fa-calendar-days text-violet-400"></i> ' . date('d M Y') . '</span>';
+        include "../includes/topbar.php"; ?>
         <main class="flex-1 p-8 overflow-y-auto">
             <?php if ($message): ?>
                 <div class="mb-6 rounded-2xl px-6 py-4 shadow-sm border <?php echo $message_type === 'success' ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400' : 'bg-red-500/20 border-red-500/30 text-red-400'; ?>">
@@ -155,7 +161,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
             <!-- FORM START -->
             <form action="insert1.php" method="POST" class="grid grid-cols-1 xl:grid-cols-[1.6fr_1fr] gap-6 items-stretch">
-            <?php echo csrf_field(); ?>
+                <?php echo csrf_field(); ?>
 
                 <!-- Left Column: Personal Details Card -->
                 <div class="group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200">
@@ -389,64 +395,65 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             </span>
         </footer>
     </div>
-<script>
-// NRC Township data
-const nrcTownships = <?php echo json_encode(get_nrc_township_codes()); ?>;
+    <script>
+        // NRC Township data
+        const nrcTownships = <?php echo json_encode(get_nrc_township_codes()); ?>;
 
-function populateTownship(state) {
-    const sel = document.getElementById('nrc_township');
-    sel.innerHTML = '<option value="">Township</option>';
-    if (state && nrcTownships[state]) {
-        nrcTownships[state].forEach(function(code) {
-            const opt = document.createElement('option');
-            opt.value = code; opt.textContent = code;
-            sel.appendChild(opt);
+        function populateTownship(state) {
+            const sel = document.getElementById('nrc_township');
+            sel.innerHTML = '<option value="">Township</option>';
+            if (state && nrcTownships[state]) {
+                nrcTownships[state].forEach(function(code) {
+                    const opt = document.createElement('option');
+                    opt.value = code;
+                    opt.textContent = code;
+                    sel.appendChild(opt);
+                });
+            }
+        }
+
+        function updateNrcPreview() {
+            const state = document.getElementById('nrc_state').value;
+            const township = document.getElementById('nrc_township').value;
+            const citizenship = document.getElementById('nrc_citizenship').value;
+            const number = document.getElementById('nrc_number').value;
+            const preview = document.getElementById('nrc-preview');
+            const previewVal = document.getElementById('nrc-preview-value');
+            if (state && township && citizenship && number) {
+                preview.classList.remove('hidden');
+                previewVal.textContent = state + '/' + township + '(' + citizenship + ')' + number.padStart(6, '0');
+            } else {
+                preview.classList.add('hidden');
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const stateSel = document.getElementById('nrc_state');
+            const townshipSel = document.getElementById('nrc_township');
+            const citizenshipSel = document.getElementById('nrc_citizenship');
+            const numberInp = document.getElementById('nrc_number');
+
+            stateSel.addEventListener('change', function() {
+                populateTownship(this.value);
+                updateNrcPreview();
+            });
+            townshipSel.addEventListener('change', updateNrcPreview);
+            citizenshipSel.addEventListener('change', updateNrcPreview);
+            numberInp.addEventListener('input', function() {
+                this.value = this.value.replace(/\D/g, '').slice(0, 6);
+                updateNrcPreview();
+            });
+
+            // Restore state on page reload (form validation)
+            <?php if (isset($_POST['nrc_state'])): ?>
+                populateTownship('<?php echo $_POST['nrc_state']; ?>');
+                <?php if (isset($_POST['nrc_township'])): ?>
+                    townshipSel.value = '<?php echo $_POST['nrc_township']; ?>';
+                <?php endif; ?>
+                updateNrcPreview();
+            <?php endif; ?>
         });
-    }
-}
-
-function updateNrcPreview() {
-    const state = document.getElementById('nrc_state').value;
-    const township = document.getElementById('nrc_township').value;
-    const citizenship = document.getElementById('nrc_citizenship').value;
-    const number = document.getElementById('nrc_number').value;
-    const preview = document.getElementById('nrc-preview');
-    const previewVal = document.getElementById('nrc-preview-value');
-    if (state && township && citizenship && number) {
-        preview.classList.remove('hidden');
-        previewVal.textContent = state + '/' + township + '(' + citizenship + ')' + number.padStart(6, '0');
-    } else {
-        preview.classList.add('hidden');
-    }
-}
-
-document.addEventListener('DOMContentLoaded', function() {
-    const stateSel = document.getElementById('nrc_state');
-    const townshipSel = document.getElementById('nrc_township');
-    const citizenshipSel = document.getElementById('nrc_citizenship');
-    const numberInp = document.getElementById('nrc_number');
-
-    stateSel.addEventListener('change', function() {
-        populateTownship(this.value);
-        updateNrcPreview();
-    });
-    townshipSel.addEventListener('change', updateNrcPreview);
-    citizenshipSel.addEventListener('change', updateNrcPreview);
-    numberInp.addEventListener('input', function() {
-        this.value = this.value.replace(/\D/g, '').slice(0, 6);
-        updateNrcPreview();
-    });
-
-    // Restore state on page reload (form validation)
-    <?php if (isset($_POST['nrc_state'])): ?>
-    populateTownship('<?php echo $_POST['nrc_state']; ?>');
-    <?php if (isset($_POST['nrc_township'])): ?>
-    townshipSel.value = '<?php echo $_POST['nrc_township']; ?>';
-    <?php endif; ?>
-    updateNrcPreview();
-    <?php endif; ?>
-});
-</script>
+    </script>
 </body>
 
 </html>

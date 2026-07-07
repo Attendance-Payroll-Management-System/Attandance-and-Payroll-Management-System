@@ -44,9 +44,10 @@ if (isset($_POST['run_payroll'])) {
         // Calculate salary based on present days
         $daily_rate = $working_days > 0 ? $basic / $working_days : 0;
 
-        // Late penalty: deduct 1 hour per late occurrence (configurable)
-        $late_hours_penalty = $late_days * 1; // 1 hour penalty per late
-        $late_deduction = $hourly_rate * $late_hours_penalty;
+        // Late penalty: deduct configurable % of basic salary per late occurrence
+        $late_deduction_percent = (float)get_company_policy($conn, 'late_deduction_percent', '1');
+        $late_deduction_rate = $late_deduction_percent / 100; // Convert % to decimal
+        $late_deduction = $basic * $late_deduction_rate * $late_days;
 
         // Absent deduction: full day salary per absent day
         $absent_deduction = $daily_rate * $absent_days;

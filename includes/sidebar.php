@@ -201,6 +201,7 @@ function nav_section($label, $icon, $children, $current_page, $badge = null, $co
             <?php echo nav_item('department.php', 'Departments', 'building', $current_page, null, null, 'purple'); ?>
             <?php echo nav_item('position.php', 'Positions', 'briefcase', $current_page, null, null, 'orange'); ?>
             <?php echo nav_item('holiday.php', 'Holidays', 'calendar-day', $current_page, null, null, 'cyan'); ?>
+            <?php echo nav_item('policy.php', 'Company Policy', 'file-contract', $current_page, null, null, 'purple'); ?>
 
             <?php echo nav_section('Reports', 'chart-column', [
                 ['page' => 'reports.php', 'href' => 'reports.php', 'label' => 'Annual Report'],
@@ -231,6 +232,7 @@ function nav_section($label, $icon, $children, $current_page, $badge = null, $co
             <?php echo nav_item('leaverequest.php', 'Leave Request', 'paper-plane', $current_page, null, null, 'amber'); ?>
             <?php echo nav_item('overtimerequest.php', 'Overtime Request', 'stopwatch', $current_page, null, null, 'orange'); ?>
             <?php echo nav_item('attendanceall.php', 'My Records', 'folder-open', $current_page, null, null, 'cyan'); ?>
+            <?php echo nav_item('company_policy.php', 'Company Policy', 'file-contract', $current_page, null, null, 'purple'); ?>
 
             <div class="px-4 pt-3 pb-1">
                 <p class="text-[10px] font-semibold text-slate-400 dark:text-zinc-500 tracking-[0.15em] uppercase">Account</p>

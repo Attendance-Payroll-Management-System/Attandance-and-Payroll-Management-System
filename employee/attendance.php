@@ -22,6 +22,36 @@ $message_type = '';
 $unread_notifications = get_unread_count($conn, $employee_id);
 $notifications = get_notifications($conn, $employee_id, 5);
 
+// ─── Working hours constants (MMT) ─────────────────────────────
+$WORK_START = '09:00:00';
+$WORK_END   = '17:00:00';
+
+// Check if employee has an approved OT request that extends checkout
+function has_approved_overtime_after($conn, int $employee_id, string $date, string $after_time): bool {
+    $stmt = $conn->prepare(
+        "SELECT COUNT(*) as cnt FROM overtime_requests 
+         WHERE employee_id = ? AND ot_date = ? AND status = 'Approved' AND end_time > ?"
+    );
+    $stmt->bind_param('iss', $employee_id, $date, $after_time);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    return ($row['cnt'] ?? 0) > 0;
+}
+
+function get_approved_ot_end_time($conn, int $employee_id, string $date): ?string {
+    $stmt = $conn->prepare(
+        "SELECT end_time FROM overtime_requests 
+         WHERE employee_id = ? AND ot_date = ? AND status = 'Approved'
+         ORDER BY end_time DESC LIMIT 1"
+    );
+    $stmt->bind_param('is', $employee_id, $date);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    return $row ? $row['end_time'] : null;
+}
+
 $status_error = validate_employee_active($conn, $employee_id);
 $is_inactive = $status_error !== null;
 
@@ -43,6 +73,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['check_in']) && !$is_in
         $message_type = "error";
     } elseif (has_checked_in_today($conn, $employee_id, $today)) {
         $message = "You have already checked in today.";
+        $message_type = "error";
+    } elseif (strtotime($current_time) < strtotime($WORK_START)) {
+        $message = "Check-in is not allowed before " . date('h:i A', strtotime($WORK_START)) . " MMT. Official working hours start at " . date('h:i A', strtotime($WORK_START)) . ".";
         $message_type = "error";
     } else {
         $ip = $_SERVER['REMOTE_ADDR'] ?? null;
@@ -82,28 +115,48 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['check_out']) && !$is_i
 
         if ($att) {
             if ($att['check_out'] === null) {
-                $ip = $_SERVER['REMOTE_ADDR'] ?? null;
-                $check_in_ts = $att['check_in'] ? strtotime($att['check_in']) : 0;
-                $check_out_ts = strtotime($current_datetime);
-                $total_seconds = max(0, $check_out_ts - $check_in_ts);
-                $total_hours = round($total_seconds / 3600, 2);
+                // Block normal check-out after 5:00 PM unless approved overtime exists
+                $checkout_ts = strtotime($current_datetime);
+                $work_end_ts = strtotime($WORK_END);
+                $has_ot = has_approved_overtime_after($conn, $employee_id, $today, $WORK_END);
 
-                $stmt = $conn->prepare("UPDATE attendance SET check_out = ?, check_out_ip = ?, check_out_source = 'web', total_working_hours = ? WHERE id = ?");
-                $stmt->bind_param('ssdi', $current_datetime, $ip, $total_hours, $att['id']);
-                if ($stmt->execute()) {
-                    $stmt->close();
-
-                    // Recalculate and update status based on rules
-                    $new_status = recalculate_attendance_after_checkout($conn, $att['id'], $employee_id, $today, $att['check_in'], $current_datetime, $total_hours);
-
-                    $time_display = date('h:i:s A');
-                    $status_display = get_attendance_status_label($new_status);
-                    $message = "Check-out recorded at $time_display ($total_hours hours worked). Status: $status_display.";
-                    $message_type = "success";
-                } else {
-                    $message = "Error recording check-out.";
+                if ($checkout_ts > $work_end_ts && !$has_ot) {
+                    $message = "Normal check-out is not allowed after " . date('h:i A', strtotime($WORK_END)) . " MMT. If you have approved overtime, please wait for your overtime approval.";
                     $message_type = "error";
-                    $stmt->close();
+                } else {
+                    $ip = $_SERVER['REMOTE_ADDR'] ?? null;
+                    $check_in_ts = $att['check_in'] ? strtotime($att['check_in']) : 0;
+                    $check_out_ts = strtotime($current_datetime);
+                    $total_seconds = max(0, $check_out_ts - $check_in_ts);
+                    $total_hours = round($total_seconds / 3600, 2);
+
+                    $stmt = $conn->prepare("UPDATE attendance SET check_out = ?, check_out_ip = ?, check_out_source = 'web', total_working_hours = ? WHERE id = ?");
+                    $stmt->bind_param('ssdi', $current_datetime, $ip, $total_hours, $att['id']);
+                    if ($stmt->execute()) {
+                        $stmt->close();
+
+                        // Recalculate and update status based on rules
+                        $new_status = recalculate_attendance_after_checkout($conn, $att['id'], $employee_id, $today, $att['check_in'], $current_datetime, $total_hours);
+
+                        $time_display = date('h:i:s A');
+                        $status_display = get_attendance_status_label($new_status);
+
+                        // Show OT note if applicable
+                        $ot_note = '';
+                        if ($has_ot) {
+                            $ot_end = get_approved_ot_end_time($conn, $employee_id, $today);
+                            if ($ot_end) {
+                                $ot_note = " (OT approved until " . date('h:i A', strtotime($ot_end)) . ")";
+                            }
+                        }
+
+                        $message = "Check-out recorded at $time_display ($total_hours hours worked). Status: $status_display.$ot_note";
+                        $message_type = "success";
+                    } else {
+                        $message = "Error recording check-out.";
+                        $message_type = "error";
+                        $stmt->close();
+                    }
                 }
             } else {
                 $message = "Already checked out today.";
@@ -381,8 +434,21 @@ $ot_conflict = check_overtime_attendance_conflict($conn, $employee_id, $today);
                                 </div>
                             <?php endif; ?>
                             <div class="text-xs text-zinc-500 mt-1">
-                                <i class="fa-solid fa-clock mr-1"></i> Late threshold: Check-in after <?php echo date('h:i A', strtotime(get_late_threshold())); ?> MMT is marked Late.
+                                <i class="fa-solid fa-clock mr-1"></i> Late threshold: Check-in after <?php echo date('h:i A', strtotime($WORK_START)); ?> MMT is marked Late.
                             </div>
+                            <div class="text-xs text-zinc-500 mt-1">
+                                <i class="fa-solid fa-business-time mr-1"></i> Working hours: <?php echo date('h:i A', strtotime($WORK_START)); ?> - <?php echo date('h:i A', strtotime($WORK_END)); ?> MMT (8 hours).
+                            </div>
+                            <?php if (!$today_att || !$today_att['check_out']): ?>
+                            <?php
+                            $ot_end = has_approved_overtime_after($conn, $employee_id, $today, $WORK_END) ? get_approved_ot_end_time($conn, $employee_id, $today) : null;
+                            ?>
+                            <?php if ($ot_end): ?>
+                            <div class="text-xs text-emerald-400 mt-1">
+                                <i class="fa-solid fa-clock mr-1"></i> Approved OT until <?php echo date('h:i A', strtotime($ot_end)); ?> MMT.
+                            </div>
+                            <?php endif; ?>
+                            <?php endif; ?>
                         </div>
                     </div>
                 </div>
