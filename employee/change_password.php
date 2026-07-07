@@ -117,18 +117,33 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     <?php echo csrf_field(); ?>
                         <div>
                             <label class="block text-xs font-semibold text-zinc-400 mb-2">Current Password</label>
-                            <input type="password" name="current_password" required
-                                class="w-full rounded-lg border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white shadow-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/20">
+                            <div class="relative">
+                                <input type="password" name="current_password" id="emp-chpw-current" required
+                                    class="w-full rounded-lg border border-white/10 bg-white/[0.06] px-4 py-3 pr-11 text-sm text-white shadow-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/20">
+                                <span class="pw-eye-toggle absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-blue-400 cursor-pointer select-none z-10" role="button" tabindex="0" data-target="emp-chpw-current">
+                                    <i class="fa-solid fa-eye text-base"></i>
+                                </span>
+                            </div>
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-zinc-400 mb-2">New Password</label>
-                            <input type="password" name="new_password" required
-                                class="w-full rounded-lg border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white shadow-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/20">
+                            <div class="relative">
+                                <input type="password" name="new_password" id="emp-chpw-new" required
+                                    class="w-full rounded-lg border border-white/10 bg-white/[0.06] px-4 py-3 pr-11 text-sm text-white shadow-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/20">
+                                <span class="pw-eye-toggle absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-blue-400 cursor-pointer select-none z-10" role="button" tabindex="0" data-target="emp-chpw-new">
+                                    <i class="fa-solid fa-eye text-base"></i>
+                                </span>
+                            </div>
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-zinc-400 mb-2">Confirm New Password</label>
-                            <input type="password" name="confirm_password" required
-                                class="w-full rounded-lg border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white shadow-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/20">
+                            <div class="relative">
+                                <input type="password" name="confirm_password" id="emp-chpw-confirm" required
+                                    class="w-full rounded-lg border border-white/10 bg-white/[0.06] px-4 py-3 pr-11 text-sm text-white shadow-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/20">
+                                <span class="pw-eye-toggle absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-blue-400 cursor-pointer select-none z-10" role="button" tabindex="0" data-target="emp-chpw-confirm">
+                                    <i class="fa-solid fa-eye text-base"></i>
+                                </span>
+                            </div>
                         </div>
                         <button type="submit"
                             class="w-full rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm px-4 py-3 transition flex items-center justify-center gap-2">

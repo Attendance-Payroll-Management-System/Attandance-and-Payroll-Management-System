@@ -279,7 +279,12 @@ if (empty($nrc_number_val)) { $nrc_number_val = ''; }
                             </div>
                             <div>
                                 <label class="block text-xs font-semibold text-zinc-400 mb-2">New Password <span class="text-slate-400">(leave blank to keep current)</span></label>
-                                <input type="password" name="password" class="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white placeholder-zinc-500 shadow-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-500/30">
+                                <div class="relative">
+                                    <input type="password" name="password" id="edit-emp-pw" class="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 pr-11 text-sm text-white placeholder-zinc-500 shadow-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-500/30">
+                                    <span class="pw-eye-toggle absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-violet-400 cursor-pointer select-none z-10" role="button" tabindex="0" data-target="edit-emp-pw">
+                                        <i class="fa-solid fa-eye text-base"></i>
+                                    </span>
+                                </div>
                             </div>
                         </div>
                     </div>

@@ -374,10 +374,9 @@ select option {
 .hover-bg-body-secondary:hover { background-color: var(--bg-secondary) !important; }
 
 /* Table overrides for theme */
-.dark table thead { color: #a1a1aa; }
-table thead { color: #475569; }
-.dark table tbody tr:hover { background-color: rgba(255,255,255,0.02); }
-table tbody tr:hover { background-color: #f8fafc; }
+.dark table thead { color: #ffffff; background: linear-gradient(135deg, rgba(139,92,246,0.25), rgba(217,70,239,0.15)); font-weight: 600; }
+table thead { color: #ffffff; background: linear-gradient(135deg, #8B5CF6, #D946EF); font-weight: 600; }
+.dark table tbody tr:hover, table tbody tr:hover { background-color: transparent !important; }
 
 /* -- Custom Scrollbar -- */
 ::-webkit-scrollbar { width: 5px; height: 5px; }
@@ -694,4 +693,32 @@ html.theme-transitioning *::after { transition: background-color 0.4s ease, bord
 
 .sidebar-logo {
   animation: logoPulse 3s ease-in-out infinite;
+}
+
+/* Sidebar Scrollbar */
+.sidebar-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(139, 92, 246, 0.3) transparent;
+}
+.sidebar-scrollbar::-webkit-scrollbar {
+  width: 5px;
+}
+.sidebar-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.sidebar-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(139, 92, 246, 0.3);
+  border-radius: 10px;
+}
+.sidebar-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(139, 92, 246, 0.5);
+}
+:root:not(.dark) .sidebar-scrollbar {
+  scrollbar-color: rgba(139, 92, 246, 0.25) transparent;
+}
+:root:not(.dark) .sidebar-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(139, 92, 246, 0.25);
+}
+:root:not(.dark) .sidebar-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(139, 92, 246, 0.4);
 }

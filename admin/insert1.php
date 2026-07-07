@@ -275,11 +275,21 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                             </div>
                             <div>
                                 <label class="block text-xs font-semibold text-zinc-400 mb-1.5">Password <span class="text-rose-500">*</span></label>
-                                <input type="password" name="password" id="emp_password" required class="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white placeholder-zinc-500 shadow-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-500/30" placeholder="Enter password">
+                                <div class="relative">
+                                    <input type="password" name="password" id="emp_password" required class="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 pr-11 text-sm text-white placeholder-zinc-500 shadow-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-500/30" placeholder="Enter password">
+                                    <span class="pw-eye-toggle absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-violet-400 cursor-pointer select-none z-10" role="button" tabindex="0" data-target="emp_password">
+                                        <i class="fa-solid fa-eye text-base"></i>
+                                    </span>
+                                </div>
                             </div>
                             <div>
                                 <label class="block text-xs font-semibold text-zinc-400 mb-1.5">Confirm Password <span class="text-rose-500">*</span></label>
-                                <input type="password" name="confirm_password" id="confirm_password" required class="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white placeholder-zinc-500 shadow-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-500/30" placeholder="Confirm password">
+                                <div class="relative">
+                                    <input type="password" name="confirm_password" id="confirm_password" required class="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 pr-11 text-sm text-white placeholder-zinc-500 shadow-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-500/30" placeholder="Confirm password">
+                                    <span class="pw-eye-toggle absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-violet-400 cursor-pointer select-none z-10" role="button" tabindex="0" data-target="confirm_password">
+                                        <i class="fa-solid fa-eye text-base"></i>
+                                    </span>
+                                </div>
                             </div>
                         </div>
                     </div>

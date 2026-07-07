@@ -155,7 +155,7 @@ function nav_section($label, $icon, $children, $current_page, $badge = null, $co
         </div>
     </div>
 
-    <nav class="flex-1 overflow-y-auto px-3 py-4 space-y-0.5 scrollbar-thin" style="scrollbar-width: none; -ms-overflow-style: none;">
+    <nav class="flex-1 overflow-y-auto px-3 py-4 space-y-0.5 sidebar-scrollbar">
 
         <?php if ($sidebar_role === 'admin'): ?>
 
@@ -167,7 +167,7 @@ function nav_section($label, $icon, $children, $current_page, $badge = null, $co
             <div class="px-4 pt-3 pb-1">
                 <p class="text-[10px] font-semibold text-slate-400 dark:text-zinc-500 tracking-[0.15em] uppercase">Management</p>
             </div>
-            <?php echo nav_section('Employee', 'users-gear', [
+            <?php echo nav_section('Employees', 'users-gear', [
                 ['page' => 'employee.php', 'href' => 'employee.php', 'label' => 'Employee List'],
                 ['page' => 'insert1.php', 'href' => 'insert1.php', 'label' => 'Add Employee'],
                 ['page' => 'edit_employee.php', 'href' => 'edit_employee.php', 'label' => 'Edit Employee'],
@@ -178,7 +178,7 @@ function nav_section($label, $icon, $children, $current_page, $badge = null, $co
                 ['page' => 'dailyattendance.php', 'href' => 'dailyattendance.php', 'label' => 'Daily Attendance'],
                 ['page' => 'process_daily_attendance.php', 'href' => 'process_daily_attendance.php', 'label' => 'Process Attendance'],
             ], $current_page, null, 'emerald'); ?>
-            <?php echo nav_section('Leave', 'paper-plane', [
+            <?php echo nav_section('Leave Management', 'paper-plane', [
                 ['page' => 'leaveApproval.php', 'href' => 'leaveApproval.php', 'label' => 'Leave Approvals'],
                 ['page' => 'leavereport.php', 'href' => 'leavereport.php', 'label' => 'Leave Report'],
             ], $current_page, $pending_leaves, 'amber'); ?>
@@ -195,11 +195,12 @@ function nav_section($label, $icon, $children, $current_page, $badge = null, $co
                 ['page' => 'bonous.php', 'href' => 'bonous.php', 'label' => 'Bonuses'],
                 ['page' => 'deduction.php', 'href' => 'deduction.php', 'label' => 'Deductions'],
             ], $current_page, null, 'cyan'); ?>
-            <?php echo nav_section('Company', 'building-columns', [
-                ['page' => 'department.php', 'href' => 'department.php', 'label' => 'Departments'],
-                ['page' => 'position.php', 'href' => 'position.php', 'label' => 'Positions'],
-                ['page' => 'holiday.php', 'href' => 'holiday.php', 'label' => 'Holidays'],
-            ], $current_page, null, 'purple'); ?>
+            <div class="px-4 pt-3 pb-1">
+                <p class="text-[10px] font-semibold text-slate-400 dark:text-zinc-500 tracking-[0.15em] uppercase">Organization</p>
+            </div>
+            <?php echo nav_item('department.php', 'Departments', 'building', $current_page, null, null, 'purple'); ?>
+            <?php echo nav_item('position.php', 'Positions', 'briefcase', $current_page, null, null, 'orange'); ?>
+            <?php echo nav_item('holiday.php', 'Holidays', 'calendar-day', $current_page, null, null, 'cyan'); ?>
 
             <?php echo nav_section('Reports', 'chart-column', [
                 ['page' => 'reports.php', 'href' => 'reports.php', 'label' => 'Annual Report'],

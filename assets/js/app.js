@@ -33,6 +33,30 @@ function showToast(message, type) {
     setTimeout(function() { toast.classList.add('toast-out'); setTimeout(function() { toast.remove(); }, 300); }, 4000);
 }
 
+function initPasswordToggles() {
+    document.querySelectorAll('.pw-eye-toggle').forEach(function(toggle) {
+        toggle.addEventListener('click', function(e) {
+            e.preventDefault();
+            var targetId = toggle.getAttribute('data-target');
+            var input = document.getElementById(targetId);
+            var icon = toggle.querySelector('i');
+            if (!input || !icon) return;
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.classList.remove('fa-eye');
+                icon.classList.add('fa-eye-slash');
+            } else {
+                input.type = 'password';
+                icon.classList.remove('fa-eye-slash');
+                icon.classList.add('fa-eye');
+            }
+        });
+        toggle.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle.click(); }
+        });
+    });
+}
+
 function initCounters() {
     document.querySelectorAll('[data-counter]').forEach(function(el) {
         var target = parseInt(el.getAttribute('data-counter')) || 0;
@@ -59,6 +83,7 @@ function initSkeletonLoader() {
 }
 
 document.addEventListener('DOMContentLoaded', function () {
+    initPasswordToggles();
     var alertMessages = document.querySelectorAll('[data-auto-dismiss]');
     alertMessages.forEach(function(el) {
         setTimeout(function() { el.style.opacity = '0'; el.style.transition = 'opacity 0.3s'; setTimeout(function() { el.remove(); }, 300); }, 5000);

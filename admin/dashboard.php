@@ -50,9 +50,6 @@ $recent_att = $conn->query("SELECT e.name, e.employee_code, a.attendance_date, a
 // ── Recent Leave Requests ──
 $recent_leaves = $conn->query("SELECT lr.*, e.name as employee_name, e.employee_code FROM leave_requests lr JOIN employee e ON lr.employee_id = e.id ORDER BY lr.created_at DESC LIMIT 8")->fetch_all(MYSQLI_ASSOC);
 
-// ── Notifications ──
-$notifications = $conn->query("SELECT n.*, e.name as emp_name FROM notifications n LEFT JOIN employee e ON n.employee_id = e.id WHERE n.employee_id IS NULL ORDER BY n.created_at DESC LIMIT 5")->fetch_all(MYSQLI_ASSOC);
-
 // ── Attendance Rate ──
 $monthly_att = $conn->query("SELECT COUNT(*) as total_records, SUM(CASE WHEN check_in IS NOT NULL THEN 1 ELSE 0 END) as present_count FROM attendance WHERE attendance_date BETWEEN '$month_start' AND '$month_end'")->fetch_assoc();
 $attendance_rate = $monthly_att['total_records'] > 0 ? round(($monthly_att['present_count'] / $monthly_att['total_records']) * 100, 1) : 0;
@@ -66,56 +63,10 @@ $attendance_rate = $monthly_att['total_records'] > 0 ? round(($monthly_att['pres
     <link rel="icon" type="image/svg+xml" href="../favicon.svg">
     <?php include "../includes/header.php"; ?>
 </head>
-<body x-data="{ sidebarOpen: false, notifOpen: false }" class="bg-slate-50 dark:bg-[#09090b] text-slate-900 dark:text-white font-sans antialiased min-h-screen">
+<body x-data="{ sidebarOpen: false }" class="bg-slate-50 dark:bg-[#09090b] text-slate-900 dark:text-white font-sans antialiased min-h-screen">
     <?php include "../includes/sidebar.php"; ?>
     <div class="main-wrapper flex flex-col min-h-screen">
-        <header class="glass-strong px-6 lg:px-8 py-4 flex items-center justify-between shrink-0 sticky top-0 z-10">
-            <div>
-                <h1 class="text-lg font-bold text-white">Admin Dashboard</h1>
-                <p class="text-xs text-zinc-500"><?php echo date('l, F j, Y'); ?></p>
-            </div>
-            <div class="flex items-center space-x-4">
-                <button onclick="toggleTheme()" class="theme-toggle-btn">
-                    <i class="fa-solid fa-sun icon-sun text-base"></i>
-                    <i class="fa-solid fa-moon icon-moon text-base"></i>
-                </button>
-                <div class="relative">
-                    <button @click="notifOpen = !notifOpen" class="relative p-2 text-zinc-400 hover:text-white glass rounded-full transition">
-                        <i class="fa-solid fa-bell text-lg"></i>
-                        <?php if ($pending_actions > 0): ?>
-                        <span class="absolute -top-1 -right-1 w-5 h-5 bg-rose-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-lg shadow-rose-500/30 animate-scale-in"><?php echo $pending_actions; ?></span>
-                        <?php endif; ?>
-                    </button>
-                    <div x-show="notifOpen" @click.outside="notifOpen = false" class="absolute right-0 mt-2 w-96 glass-strong rounded-xl shadow-xl border border-white/10 z-50" style="display: none;">
-                        <div class="p-3 border-b border-white/[0.06] flex items-center justify-between">
-                            <h4 class="text-sm font-bold text-white"><i class="fa-regular fa-bell mr-1.5 text-violet-400"></i>Notifications</h4>
-                            <?php if ($pending_actions > 0): ?>
-                            <a href="mark_notifications_read.php" class="text-[10px] text-violet-400 hover:text-violet-300 font-semibold transition-colors">Mark all read</a>
-                            <?php endif; ?>
-                        </div>
-                        <div class="max-h-96 overflow-y-auto">
-                            <?php if (empty($notifications)): ?>
-                                <p class="p-4 text-xs text-zinc-500 text-center">No notifications</p>
-                            <?php else: ?>
-                                <?php foreach ($notifications as $n): ?>
-                                <div class="px-4 py-3 border-b border-white/[0.04] hover:bg-white/[0.02] transition">
-                                    <p class="text-xs text-zinc-300"><?php echo htmlspecialchars($n['message']); ?></p>
-                                    <p class="text-[10px] text-zinc-500 mt-1"><?php echo $n['emp_name'] ? htmlspecialchars($n['emp_name']) . ' - ' : ''; ?><?php echo date('M d, h:i A', strtotime($n['created_at'])); ?></p>
-                                </div>
-                                <?php endforeach; ?>
-                            <?php endif; ?>
-                        </div>
-                        <div class="p-2 border-t border-white/[0.06] text-center">
-                            <a href="leaveApproval.php" class="text-xs text-violet-400 font-semibold hover:text-violet-300 transition-colors">View all requests</a>
-                        </div>
-                    </div>
-                </div>
-                <div class="flex items-center gap-3 glass rounded-full px-4 py-1.5">
-                    <div class="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white flex items-center justify-center text-xs font-bold shadow-lg"><?php echo strtoupper(substr($admin_name, 0, 2)); ?></div>
-                    <div class="text-sm font-semibold text-white"><?php echo htmlspecialchars($admin_name); ?></div>
-                </div>
-            </div>
-        </header>
+        <?php include "../includes/topbar.php"; ?>
 
         <main class="p-6 lg:p-8 space-y-6 flex-1 page-content w-full page-enter">
 
@@ -483,13 +434,7 @@ $attendance_rate = $monthly_att['total_records'] > 0 ? round(($monthly_att['pres
             </script>
         </main>
 
-        <footer class="glass-strong border-t border-white/[0.06] px-6 lg:px-8 py-3 text-xs text-zinc-500 flex justify-between items-center mt-auto">
-            <span>&copy; <?php echo date('Y'); ?> HNIN AKARI NWE</span>
-            <span class="flex items-center space-x-1.5 font-medium text-emerald-400">
-                <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
-                <span>System Secure</span>
-            </span>
-        </footer>
+        <?php include "../includes/footer.php"; ?>
     </div>
 </body>
 </html>

@@ -318,18 +318,33 @@ if ($admin['position_id']) {
                     <div class="max-w-md space-y-5">
                         <div>
                             <label class="block text-xs font-semibold text-slate-500 dark:text-zinc-400 mb-2">Current Password</label>
-                            <input type="password" name="current_password" required
-                                class="w-full rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/[0.06] px-4 py-2.5 text-sm text-slate-900 dark:text-white outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20">
+                            <div class="relative">
+                                <input type="password" name="current_password" id="admin-profile-current-pw" required
+                                    class="w-full rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/[0.06] px-4 py-2.5 pr-11 text-sm text-slate-900 dark:text-white outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20">
+                                <span class="pw-eye-toggle absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-zinc-400 hover:text-violet-500 dark:hover:text-violet-400 cursor-pointer select-none z-10" role="button" tabindex="0" data-target="admin-profile-current-pw">
+                                    <i class="fa-solid fa-eye text-base"></i>
+                                </span>
+                            </div>
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-slate-500 dark:text-zinc-400 mb-2">New Password</label>
-                            <input type="password" name="new_password" required minlength="6"
-                                class="w-full rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/[0.06] px-4 py-2.5 text-sm text-slate-900 dark:text-white outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20">
+                            <div class="relative">
+                                <input type="password" name="new_password" id="admin-profile-new-pw" required minlength="6"
+                                    class="w-full rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/[0.06] px-4 py-2.5 pr-11 text-sm text-slate-900 dark:text-white outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20">
+                                <span class="pw-eye-toggle absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-zinc-400 hover:text-violet-500 dark:hover:text-violet-400 cursor-pointer select-none z-10" role="button" tabindex="0" data-target="admin-profile-new-pw">
+                                    <i class="fa-solid fa-eye text-base"></i>
+                                </span>
+                            </div>
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-slate-500 dark:text-zinc-400 mb-2">Confirm New Password</label>
-                            <input type="password" name="confirm_password" required minlength="6"
-                                class="w-full rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/[0.06] px-4 py-2.5 text-sm text-slate-900 dark:text-white outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20">
+                            <div class="relative">
+                                <input type="password" name="confirm_password" id="admin-profile-confirm-pw" required minlength="6"
+                                    class="w-full rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/[0.06] px-4 py-2.5 pr-11 text-sm text-slate-900 dark:text-white outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20">
+                                <span class="pw-eye-toggle absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-zinc-400 hover:text-violet-500 dark:hover:text-violet-400 cursor-pointer select-none z-10" role="button" tabindex="0" data-target="admin-profile-confirm-pw">
+                                    <i class="fa-solid fa-eye text-base"></i>
+                                </span>
+                            </div>
                         </div>
                     </div>
                     <div class="mt-6 flex justify-end">

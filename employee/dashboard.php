@@ -72,35 +72,7 @@ elseif ($hour < 17) $greeting = "Good Afternoon";
 <body x-data="{ sidebarOpen: false }" class="bg-slate-50 dark:bg-[#09090b] text-slate-900 dark:text-white font-sans antialiased">
     <?php include "../includes/sidebar.php"; ?>
     <div class="main-wrapper min-h-screen flex flex-col">
-        <header class="glass-strong px-6 lg:px-8 py-4 flex items-center justify-between shrink-0 sticky top-0 z-10">
-            <div>
-                <h2 class="text-xl font-bold text-white"><?php echo $greeting; ?>, <?php echo htmlspecialchars($employee_name); ?>!</h2>
-                <p class="text-xs text-zinc-500"><?php echo date('l, F j, Y'); ?></p>
-            </div>
-            <div class="flex items-center gap-4">
-                <div class="flex items-center gap-3 glass rounded-full px-4 py-1.5">
-                    <span class="w-2 h-2 rounded-full <?php echo $today_status ? 'bg-emerald-500 animate-pulse' : 'bg-zinc-500'; ?>"></span>
-                    <span class="text-xs font-semibold <?php echo $today_status ? 'text-emerald-400' : 'text-zinc-400'; ?>">
-                        <?php
-                        if ($today_status && $today_status['check_in'] && $today_status['check_out']) echo 'Completed';
-                        elseif ($today_status && $today_status['check_in']) echo 'Checked In';
-                        else echo 'Not Checked In';
-                        ?>
-                    </span>
-                </div>
-                <button onclick="toggleTheme()" class="theme-toggle-btn">
-                    <i class="fa-solid fa-sun icon-sun text-base"></i>
-                    <i class="fa-solid fa-moon icon-moon text-base"></i>
-                </button>
-                <div class="flex items-center gap-3 border-l border-white/10 pl-4">
-                    <div class="w-9 h-9 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white flex items-center justify-center text-sm font-bold shadow-lg"><?php echo strtoupper(substr($employee_name, 0, 2)); ?></div>
-                    <div class="text-right">
-                        <h4 class="text-sm font-semibold text-white"><?php echo htmlspecialchars($employee_name); ?></h4>
-                        <span class="text-xs text-zinc-500">Employee</span>
-                    </div>
-                </div>
-            </div>
-        </header>
+        <?php $page_title = "Dashboard"; $page_subtitle = $greeting . ', ' . htmlspecialchars($employee_name) . ' · ' . date('l, F j, Y'); include "../includes/topbar.php"; ?>
         <main class="p-6 lg:p-8 space-y-8 flex-1 page-content w-full">
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
                 <div class="group glass-strong rounded-2xl hover:-translate-y-1 transition-all duration-300 p-5 card-hover animate-fade-in-up stagger-1">

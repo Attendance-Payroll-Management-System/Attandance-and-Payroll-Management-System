@@ -161,7 +161,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 </div>
                 <div class="space-y-1.5">
                     <label for="password" class="text-sm font-medium text-zinc-300"><i class="fa-solid fa-lock mr-1.5 text-violet-400"></i>Password</label>
-                    <input type="password" id="password" name="password" placeholder="Enter your password" class="w-full px-4 py-3 rounded-xl bg-white/[0.06] border border-white/10 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50 transition-all duration-200" />
+                    <div class="relative">
+                        <input type="password" id="password" name="password" placeholder="Enter your password" class="w-full px-4 py-3 pr-11 rounded-xl bg-white/[0.06] border border-white/10 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50 transition-all duration-200">
+                        <span class="pw-eye-toggle absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-violet-400 cursor-pointer select-none z-10" role="button" tabindex="0" data-target="password">
+                            <i class="fa-solid fa-eye text-base"></i>
+                        </span>
+                    </div>
                 </div>
 
                 <button type="submit" class="w-full bg-gradient-to-r from-violet-600 via-fuchsia-600 to-amber-600 hover:from-violet-500 hover:via-fuchsia-500 hover:to-amber-500 text-white font-semibold px-4 py-3.5 rounded-xl shadow-lg shadow-violet-600/20 hover:shadow-xl hover:shadow-violet-500/30 transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 animate-gradient btn-hover-lift relative overflow-hidden">
@@ -201,6 +206,21 @@ function toggleTheme() {
         localStorage.setItem('aura-theme', 'dark');
     }
 }
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.pw-eye-toggle').forEach(function(toggle) {
+        toggle.addEventListener('click', function(e) {
+            e.preventDefault();
+            var input = document.getElementById(toggle.getAttribute('data-target'));
+            var icon = toggle.querySelector('i');
+            if (!input || !icon) return;
+            if (input.type === 'password') {
+                input.type = 'text'; icon.classList.remove('fa-eye'); icon.classList.add('fa-eye-slash');
+            } else {
+                input.type = 'password'; icon.classList.remove('fa-eye-slash'); icon.classList.add('fa-eye');
+            }
+        });
+    });
+});
 </script>
 </body>
 
