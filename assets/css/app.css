@@ -567,3 +567,131 @@ html.theme-transitioning *::after { transition: background-color 0.4s ease, bord
 .glass-holo:hover::after {
   left: 150%;
 }
+
+/* ─── Colorful Sidebar Icons ─── */
+@keyframes iconPulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(139,92,246,0.4); }
+  50% { transform: scale(1.05); box-shadow: 0 0 20px 5px rgba(139,92,246,0.2); }
+}
+
+@keyframes iconGlow {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.2); }
+}
+
+@keyframes iconFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
+}
+
+@keyframes rainbowBorder {
+  0% { border-color: #8B5CF6; }
+  25% { border-color: #EC4899; }
+  50% { border-color: #F59E0B; }
+  75% { border-color: #10B981; }
+  100% { border-color: #8B5CF6; }
+}
+
+.sidebar-icon-blue {
+  background: linear-gradient(135deg, #3B82F6, #06B6D4) !important;
+  box-shadow: 0 4px 15px rgba(59,130,246,0.4);
+}
+.sidebar-icon-blue:hover {
+  box-shadow: 0 6px 25px rgba(59,130,246,0.5);
+  animation: iconGlow 1.5s ease-in-out infinite;
+}
+
+.sidebar-icon-violet {
+  background: linear-gradient(135deg, #8B5CF6, #D946EF) !important;
+  box-shadow: 0 4px 15px rgba(139,92,246,0.4);
+}
+.sidebar-icon-violet:hover {
+  box-shadow: 0 6px 25px rgba(139,92,246,0.5);
+  animation: iconGlow 1.5s ease-in-out infinite;
+}
+
+.sidebar-icon-emerald {
+  background: linear-gradient(135deg, #10B981, #14B8A6) !important;
+  box-shadow: 0 4px 15px rgba(16,185,129,0.4);
+}
+.sidebar-icon-emerald:hover {
+  box-shadow: 0 6px 25px rgba(16,185,129,0.5);
+  animation: iconGlow 1.5s ease-in-out infinite;
+}
+
+.sidebar-icon-amber {
+  background: linear-gradient(135deg, #F59E0B, #F97316) !important;
+  box-shadow: 0 4px 15px rgba(245,158,11,0.4);
+}
+.sidebar-icon-amber:hover {
+  box-shadow: 0 6px 25px rgba(245,158,11,0.5);
+  animation: iconGlow 1.5s ease-in-out infinite;
+}
+
+.sidebar-icon-orange {
+  background: linear-gradient(135deg, #F97316, #EF4444) !important;
+  box-shadow: 0 4px 15px rgba(249,115,22,0.4);
+}
+.sidebar-icon-orange:hover {
+  box-shadow: 0 6px 25px rgba(249,115,22,0.5);
+  animation: iconGlow 1.5s ease-in-out infinite;
+}
+
+.sidebar-icon-cyan {
+  background: linear-gradient(135deg, #06B6D4, #3B82F6) !important;
+  box-shadow: 0 4px 15px rgba(6,182,212,0.4);
+}
+.sidebar-icon-cyan:hover {
+  box-shadow: 0 6px 25px rgba(6,182,212,0.5);
+  animation: iconGlow 1.5s ease-in-out infinite;
+}
+
+.sidebar-icon-purple {
+  background: linear-gradient(135deg, #A855F7, #6366F1) !important;
+  box-shadow: 0 4px 15px rgba(168,85,247,0.4);
+}
+.sidebar-icon-purple:hover {
+  box-shadow: 0 6px 25px rgba(168,85,247,0.5);
+  animation: iconGlow 1.5s ease-in-out infinite;
+}
+
+.sidebar-icon-rose {
+  background: linear-gradient(135deg, #F43F5E, #EC4899) !important;
+  box-shadow: 0 4px 15px rgba(244,63,94,0.4);
+}
+.sidebar-icon-rose:hover {
+  box-shadow: 0 6px 25px rgba(244,63,94,0.5);
+  animation: iconGlow 1.5s ease-in-out infinite;
+}
+
+.sidebar-icon-slate {
+  background: linear-gradient(135deg, #64748B, #475569) !important;
+  box-shadow: 0 4px 15px rgba(100,116,139,0.3);
+}
+.sidebar-icon-slate:hover {
+  box-shadow: 0 6px 25px rgba(100,116,139,0.4);
+  animation: iconGlow 1.5s ease-in-out infinite;
+}
+
+/* Active sidebar icon animation */
+.nav-item:hover .sidebar-icon-blue,
+.nav-item:hover .sidebar-icon-violet,
+.nav-item:hover .sidebar-icon-emerald,
+.nav-item:hover .sidebar-icon-amber,
+.nav-item:hover .sidebar-icon-orange,
+.nav-item:hover .sidebar-icon-cyan,
+.nav-item:hover .sidebar-icon-purple,
+.nav-item:hover .sidebar-icon-rose,
+.nav-item:hover .sidebar-icon-slate {
+  animation: iconFloat 0.6s ease-in-out;
+}
+
+/* Sidebar logo animation */
+@keyframes logoPulse {
+  0%, 100% { box-shadow: 0 0 20px rgba(139,92,246,0.3), 0 0 40px rgba(217,70,239,0.2); }
+  50% { box-shadow: 0 0 30px rgba(139,92,246,0.5), 0 0 60px rgba(217,70,239,0.3); }
+}
+
+.sidebar-logo {
+  animation: logoPulse 3s ease-in-out infinite;
+}

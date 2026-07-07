@@ -4,6 +4,6 @@ return [
     'port'     => 2525,
     'username' => '',
     'password' => '',
-    'from'     => 'noreply@aura-hr.com',
-    'fromName' => 'AURA HR',
+    'from'     => 'noreply@hnin-akari-nwe.com',
+    'fromName' => 'HNIN AKARI NWE',
 ];

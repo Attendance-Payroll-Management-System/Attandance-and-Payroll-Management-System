@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AURA · Modern Payroll & HR Solutions</title>
+    <title>HNIN AKARI NWE · Modern Payroll & HR Solutions</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -262,11 +262,11 @@
 
     <header class="landing-header">
         <div class="nav-wrap">
-            <div class="nav-logo">AURA</div>
+            <div class="nav-logo">HNIN AKARI NWE</div>
             <button class="mobile-btn" onclick="document.getElementById('nav-links').classList.toggle('open')">☰</button>
             <div class="nav-links" id="nav-links">
                 <a href="#features">Features</a>
-                <a href="#cta">Why AURA</a>
+                <a href="#cta">Why HNIN AKARI NWE</a>
                 <a href="../employee/login.php" class="nav-cta"><i class="fa-regular fa-user mr-1"></i>Employee Portal</a>
                 <a href="../admin/login.php"><i class="fa-solid fa-shield-halved mr-1"></i>Admin</a>
                 <button onclick="toggleTheme()" class="nav-toggle-btn">
@@ -314,7 +314,7 @@
         <div style="text-align: center; margin-bottom: 48px;">
             <div class="section-label"><i class="fa-solid fa-cog mr-1"></i>Platform Capabilities</div>
             <h2 class="section-heading">Everything you need to<br>run your workforce</h2>
-            <p class="section-sub" style="margin: 0 auto;">From time tracking to tax-ready payroll — AURA brings enterprise-grade tools to your fingertips.</p>
+            <p class="section-sub" style="margin: 0 auto;">From time tracking to tax-ready payroll — HNIN AKARI NWE brings enterprise-grade tools to your fingertips.</p>
         </div>
         <div class="features-grid">
             <div class="feature-card">
@@ -365,7 +365,7 @@
             <a href="#">Terms of Service</a>
             <a href="#">Contact Support</a>
         </div>
-        <p>&copy; 2026 AURA HR Management Systems. All rights reserved. Built with precision for scale.</p>
+        <p>&copy; 2026 HNIN AKARI NWE Management Systems. All rights reserved. Built with precision for scale.</p>
     </footer>
 
 <script>

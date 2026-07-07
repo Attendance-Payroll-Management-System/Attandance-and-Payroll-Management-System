@@ -22,7 +22,7 @@ function smtp_mail($to, $subject, $htmlBody, $config, $attachments = []) {
         $mailer->SMTPAuth   = true;
         $mailer->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
         $mailer->CharSet    = 'UTF-8';
-        $mailer->setFrom($config['from'] ?? 'noreply@aura-hr.com', $config['fromName'] ?? 'AURA HR');
+        $mailer->setFrom($config['from'] ?? 'noreply@hnin-akari-nwe.com', $config['fromName'] ?? 'HNIN AKARI NWE');
         $mailer->addAddress($to);
         $mailer->isHTML(true);
         $mailer->Subject = $subject;

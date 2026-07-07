@@ -161,7 +161,7 @@ $ot_conflict = check_overtime_attendance_conflict($conn, $employee_id, $today);
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AURA HR · Attendance</title>
+    <title>HNIN AKARI NWE · Attendance</title>
     <link rel="icon" type="image/svg+xml" href="../favicon.svg">
     <?php include "../includes/header.php"; ?>
 </head>

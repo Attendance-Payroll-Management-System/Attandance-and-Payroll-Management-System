@@ -796,3 +796,90 @@ function parse_nrc(string $nrc): array {
     }
     return [$state, $township, $citizenship, $number];
 }
+
+// ─── Activity Log ───────────────────────────────────────────────
+/**
+ * Log user activity for audit trail
+ *
+ * @param mysqli $conn    Database connection
+ * @param int    $emp_id  Employee ID (null for system actions)
+ * @param string $action  Action performed (e.g., 'login', 'update_profile', 'approve_leave')
+ * @param string $description  Human-readable description
+ * @return bool  True on success
+ *
+ * Usage examples:
+ *   log_activity($conn, $admin_id, 'login', 'Admin logged in');
+ *   log_activity($conn, $emp_id, 'update_profile', 'Profile updated by user');
+ *   log_activity($conn, null, 'system_backup', 'Daily backup completed');
+ */
+function log_activity($conn, $emp_id, $action, $description = '') {
+    // Check if table exists
+    $res = $conn->query("SHOW TABLES LIKE 'activity_logs'");
+    if (!$res || $res->num_rows === 0) {
+        return false;
+    }
+
+    $ip = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
+    $ua = $_SERVER['HTTP_USER_AGENT'] ?? '';
+
+    $stmt = $conn->prepare("INSERT INTO activity_logs (employee_id, action, description, ip_address, user_agent) VALUES (?, ?, ?, ?, ?)");
+    $stmt->bind_param("issss", $emp_id, $action, $description, $ip, $ua);
+    $result = $stmt->execute();
+    $stmt->close();
+    return $result;
+}
+
+/**
+ * Get activity logs with optional filters
+ *
+ * @param mysqli $conn     Database connection
+ * @param int    $limit    Number of records to return (default 50)
+ * @param int    $emp_id   Filter by employee ID (null for all)
+ * @param string $action   Filter by action type (null for all)
+ * @return array  Activity logs
+ */
+function get_activity_logs($conn, $limit = 50, $emp_id = null, $action = null) {
+    $res = $conn->query("SHOW TABLES LIKE 'activity_logs'");
+    if (!$res || $res->num_rows === 0) {
+        return [];
+    }
+
+    $where = [];
+    $params = [];
+    $types = '';
+
+    if ($emp_id !== null) {
+        $where[] = "al.employee_id = ?";
+        $params[] = $emp_id;
+        $types .= 'i';
+    }
+    if ($action !== null) {
+        $where[] = "al.action = ?";
+        $params[] = $action;
+        $types .= 's';
+    }
+
+    $sql = "SELECT al.*, e.name as employee_name
+            FROM activity_logs al
+            LEFT JOIN employee e ON al.employee_id = e.id";
+
+    if (!empty($where)) {
+        $sql .= " WHERE " . implode(' AND ', $where);
+    }
+
+    $sql .= " ORDER BY al.created_at DESC LIMIT " . (int)$limit;
+
+    if (!empty($params)) {
+        $stmt = $conn->prepare($sql);
+        $stmt->bind_param($types, ...$params);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $logs = $result->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
+    } else {
+        $result = $conn->query($sql);
+        $logs = $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
+    }
+
+    return $logs;
+}
