@@ -48,6 +48,22 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $status = isset($_POST['status']) ? $_POST['status'] : 'active';
     $basic_salary = isset($_POST['basic_salary']) ? $_POST['basic_salary'] : 0;
 
+    // Handle profile photo upload
+    $profile_photo = '';
+    if (isset($_FILES['profile_photo']) && $_FILES['profile_photo']['error'] === UPLOAD_ERR_OK) {
+        $file = $_FILES['profile_photo'];
+        $allowed_types = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+        if (in_array($file['type'], $allowed_types) && $file['size'] <= 5 * 1024 * 1024) {
+            $upload_dir = '../assets/uploads/profile/';
+            if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
+            $ext = pathinfo($file['name'], PATHINFO_EXTENSION);
+            $filename = 'emp_' . time() . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
+            if (move_uploaded_file($file['tmp_name'], $upload_dir . $filename)) {
+                $profile_photo = 'assets/uploads/profile/' . $filename;
+            }
+        }
+    }
+
     // Validation
     if (empty($name) || empty($email) || empty($password) || empty($dob) || empty($department_id)) {
         $message = 'Please fill in all required fields!';
@@ -75,13 +91,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             // Hash password
             $hashed_password = password_hash($password, PASSWORD_DEFAULT);
 
-            $sql = "INSERT INTO employee (department_id, position_id, employee_code, name, gender, dob, phone, email, password, hire_date, basic_salary, status, role) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            $sql = "INSERT INTO employee (department_id, position_id, employee_code, name, gender, dob, phone, email, password, hire_date, basic_salary, status, role, profile_photo) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
             $stmt = $conn->prepare($sql);
             $role = $designation ?: 'Employee';
             $stmt->bind_param(
-                "sssssssssssss",
+                "ssssssssssssss",
                 $department_id,
                 $position_id,
                 $employee_code,
@@ -94,7 +110,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $doj,
                 $basic_salary,
                 $status,
-                $role
+                $role,
+                $profile_photo
             );
 
             if ($stmt->execute()) {
@@ -160,7 +177,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             <?php endif; ?>
 
             <!-- FORM START -->
-            <form action="insert1.php" method="POST" class="grid grid-cols-1 xl:grid-cols-[1.6fr_1fr] gap-6 items-stretch">
+            <form action="insert1.php" method="POST" enctype="multipart/form-data" class="grid grid-cols-1 xl:grid-cols-[1.6fr_1fr] gap-6 items-stretch">
                 <?php echo csrf_field(); ?>
 
                 <!-- Left Column: Personal Details Card -->
@@ -169,10 +186,26 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         <i class="fa-solid fa-user text-violet-400 mr-2"></i>Personal Details
                     </div>
                     <div class="p-6 space-y-5">
+                        <div class="flex items-center gap-4">
+                            <div class="relative">
+                                <div class="w-20 h-20 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-2xl font-bold text-white shadow-md overflow-hidden" id="photo-preview">
+                                    <i class="fa-solid fa-camera text-lg opacity-60"></i>
+                                </div>
+                                <label for="profile_photo" class="absolute bottom-0 right-0 w-6 h-6 bg-violet-500 rounded-full flex items-center justify-center cursor-pointer shadow-md hover:bg-violet-400 transition">
+                                    <i class="fa-solid fa-pen text-[10px] text-white"></i>
+                                </label>
+                                <input type="file" name="profile_photo" id="profile_photo" accept="image/*" class="hidden" onchange="previewPhoto(this)">
+                            </div>  
+                            <div>
+                                <label class="block text-xs font-semibold text-zinc-400 mb-1">Profile Photo</label>
+                                <p class="text-xs text-zinc-500">JPG, PNG, GIF or WEBP. Max 5MB.</p>
+                            </div>
+                        </div>
                         <div>
                             <label class="block text-xs font-semibold text-zinc-400 mb-1.5">Full Name <span class="text-rose-500">*</span></label>
                             <input type="text" name="name" id="emp_name" value="<?php echo isset($_POST['name']) ? htmlspecialchars($_POST['name']) : ''; ?>" required class="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white placeholder-zinc-500 shadow-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-500/30" placeholder="Enter employee name">
                         </div>
+
                         <div>
                             <label class="block text-xs font-semibold text-zinc-400 mb-1.5">Father Name</label>
                             <input type="text" name="father_name" id="father_name" value="<?php echo isset($_POST['father_name']) ? htmlspecialchars($_POST['father_name']) : ''; ?>" class="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white placeholder-zinc-500 shadow-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-500/30" placeholder="Enter father name">
@@ -396,6 +429,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         </footer>
     </div>
     <script>
+        function previewPhoto(input) {
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const preview = document.getElementById('photo-preview');
+                    preview.innerHTML = '<img src="' + e.target.result + '" class="w-full h-full object-cover">';
+                };
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
         // NRC Township data
         const nrcTownships = <?php echo json_encode(get_nrc_township_codes()); ?>;
 

@@ -11,6 +11,7 @@ $result = $conn->query("SELECT
     e.employee_code,
     e.name,
     e.email,
+    e.profile_photo,
     d.department_name,
     p.position_name,
     e.basic_salary,
@@ -93,6 +94,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                             <thead class="text-zinc-500 text-xs font-bold uppercase tracking-wider border-b border-white/[0.06]">
                                 <tr>
                                     <th class="px-4 py-4">#</th>
+                                    <th class="px-4 py-4">Photo</th>
                                     <th class="px-4 py-4">EMP Code</th>
                                     <th class="px-4 py-4">Name</th>
                                     <th class="px-4 py-4">Email</th>
@@ -107,6 +109,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                 <?php foreach ($allemployee as $index => $emp): ?>
                                     <tr class="hover:bg-white/[0.02] transition">
                                         <td class="px-4 py-4"><?php echo $index + 1; ?></td>
+                                        <td class="px-4 py-4">
+                                            <div class="w-8 h-8 rounded-full overflow-hidden <?php echo empty($emp['profile_photo']) ? 'bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-xs font-bold text-white' : ''; ?>">
+                                                <?php if (!empty($emp['profile_photo'])): ?>
+                                                    <img src="../<?php echo htmlspecialchars($emp['profile_photo']); ?>" class="w-full h-full object-cover">
+                                                <?php else: ?>
+                                                    <?php echo htmlspecialchars(substr($emp['name'], 0, 2)); ?>
+                                                <?php endif; ?>
+                                            </div>
+                                        </td>
                                         <td class="px-4 py-4 font-mono text-xs text-zinc-400"><?php echo $emp['employee_code']; ?></td>
                                         <td class="w-full text-zinc-400"><?php echo $emp['name']; ?></td>
                                         <td class="px-4 py-4 text-zinc-400"><?php echo $emp['email']; ?></td>

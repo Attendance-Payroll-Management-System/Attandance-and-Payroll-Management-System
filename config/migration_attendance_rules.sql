@@ -8,10 +8,14 @@
 ALTER TABLE attendance
   MODIFY COLUMN status ENUM('present','absent','leave','late','half_absent','full_absent','awol','public_holiday','weekend') DEFAULT 'present';
 
--- 2. Add columns for attendance rule support
+-- 2a. Ensure profile_photo column exists on employee table
+ALTER TABLE employee
+  ADD COLUMN profile_photo VARCHAR(255) DEFAULT NULL AFTER status;
+
+-- 2b. Add columns for attendance rule support
 -- Use individual ALTER TABLE statements per column (MySQL 8.4 doesn't support IF NOT EXISTS)
 ALTER TABLE attendance
-  ADD COLUMN check_out_reason TEXT DEFAULT NULL AFTER total_working_hours;
+  ADD COLUMN check_out_reason TEXT DEFAULT NULL AFTER status;
 ALTER TABLE attendance
   ADD COLUMN is_late TINYINT(1) DEFAULT 0 AFTER check_out_reason;
 ALTER TABLE attendance

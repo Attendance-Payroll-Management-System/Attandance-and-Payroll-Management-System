@@ -24,6 +24,7 @@ $stmt = $conn->prepare("SELECT
     e.hire_date,
     e.basic_salary,
     e.status,
+    e.profile_photo,
     d.department_name,
     p.position_name,
     epi.father_name,
@@ -72,8 +73,12 @@ if (!$emp) {
                 <!-- Left Column: Basic Info -->
                 <div class="space-y-6 lg:col-span-1">
                     <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-6 text-center lg:text-left">
-                        <div class="w-24 h-24 bg-gradient-to-br from-indigo-500 to-purple-600 text-white rounded-full mx-auto lg:mx-0 flex items-center justify-center text-3xl font-bold mb-4 shadow-md">
-                            <?php echo htmlspecialchars(substr($emp['name'], 0, 2)); ?>
+                        <div class="w-24 h-24 rounded-full mx-auto lg:mx-0 flex items-center justify-center text-3xl font-bold mb-4 shadow-md overflow-hidden <?php echo empty($emp['profile_photo']) ? 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white' : ''; ?>">
+                            <?php if (!empty($emp['profile_photo'])): ?>
+                                <img src="../<?php echo htmlspecialchars($emp['profile_photo']); ?>" class="w-full h-full object-cover">
+                            <?php else: ?>
+                                <?php echo htmlspecialchars(substr($emp['name'], 0, 2)); ?>
+                            <?php endif; ?>
                         </div>
                         <h1 class="text-2xl font-bold text-white leading-tight"><?php echo htmlspecialchars($emp['name']); ?></h1>
                         <p class="text-sm font-medium text-violet-400 mt-1"><?php echo htmlspecialchars($emp['role'] ?: $emp['position_name']); ?></p>

@@ -191,7 +191,6 @@ function nav_section($label, $icon, $children, $current_page, $badge = null, $co
                 ['page' => 'payroll.php', 'href' => 'payroll.php', 'label' => 'Generate Payroll'],
                 ['page' => 'salaryreport.php', 'href' => 'salaryreport.php', 'label' => 'Salary Report'],
                 ['page' => 'salary_slip.php', 'href' => 'salary_slip.php', 'label' => 'Salary Slips'],
-                ['page' => 'email_log.php', 'href' => 'email_log.php', 'label' => 'Email Log'],
                 ['page' => 'bonous.php', 'href' => 'bonous.php', 'label' => 'Bonuses'],
                 ['page' => 'deduction.php', 'href' => 'deduction.php', 'label' => 'Deductions'],
             ], $current_page, null, 'cyan'); ?>

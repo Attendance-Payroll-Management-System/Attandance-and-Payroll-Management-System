@@ -16,7 +16,10 @@ $employee_id = 0;
 
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    if (!validate_csrf_token()) { http_response_code(403); exit('CSRF validation failed.'); }
+    if (!validate_csrf_token()) {
+        http_response_code(403);
+        exit('CSRF validation failed.');
+    }
     $employee_id = isset($_POST['employee_id']) ? intval($_POST['employee_id']) : 0;
 
     $name = isset($_POST['name']) ? htmlspecialchars(trim($_POST['name'])) : '';
@@ -43,6 +46,34 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $allowance = isset($_POST['allowance']) ? $_POST['allowance'] : 0;
     $password = isset($_POST['password']) ? $_POST['password'] : '';
 
+    // Handle profile photo upload
+    $profile_photo = '';
+    $old_photo = '';
+    if ($employee_id > 0) {
+        $pstmt = $conn->prepare("SELECT profile_photo FROM employee WHERE id = ?");
+        $pstmt->bind_param("i", $employee_id);
+        $pstmt->execute();
+        $pstmt->bind_result($old_photo);
+        $pstmt->fetch();
+        $pstmt->close();
+    }
+    if (isset($_FILES['profile_photo']) && $_FILES['profile_photo']['error'] === UPLOAD_ERR_OK) {
+        $file = $_FILES['profile_photo'];
+        $allowed_types = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+        if (in_array($file['type'], $allowed_types) && $file['size'] <= 5 * 1024 * 1024) {
+            $upload_dir = '../assets/uploads/profile/';
+            if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
+            $ext = pathinfo($file['name'], PATHINFO_EXTENSION);
+            $filename = 'emp_' . $employee_id . '_' . time() . '.' . $ext;
+            if (move_uploaded_file($file['tmp_name'], $upload_dir . $filename)) {
+                if (!empty($old_photo) && file_exists('../' . $old_photo)) {
+                    unlink('../' . $old_photo);
+                }
+                $profile_photo = 'assets/uploads/profile/' . $filename;
+            }
+        }
+    }
+
     if (empty($name) || empty($email) || empty($dob) || empty($department_id)) {
         $message = 'Please fill in all required fields!';
         $message_type = 'error';
@@ -63,15 +94,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             // Update employee table
             if (!empty($password)) {
                 $hashed_password = password_hash($password, PASSWORD_DEFAULT);
-                $sql = "UPDATE employee SET department_id = ?, position_id = ?, name = ?, gender = ?, dob = ?, phone = ?, email = ?, password = ?, hire_date = ?, basic_salary = ?, status = ?, role = ? WHERE id = ?";
+                $sql = "UPDATE employee SET department_id = ?, position_id = ?, name = ?, gender = ?, dob = ?, phone = ?, email = ?, password = ?, hire_date = ?, basic_salary = ?, status = ?, role = ?, profile_photo = ? WHERE id = ?";
                 $stmt = $conn->prepare($sql);
                 $role = $designation ?: 'Employee';
-                $stmt->bind_param("ssssssssssssi", $department_id, $position_id, $name, $gender, $dob, $phone, $email, $hashed_password, $doj, $basic_salary, $status, $role, $employee_id);
+                $stmt->bind_param("sssssssssssssi", $department_id, $position_id, $name, $gender, $dob, $phone, $email, $hashed_password, $doj, $basic_salary, $status, $role, $profile_photo, $employee_id);
             } else {
-                $sql = "UPDATE employee SET department_id = ?, position_id = ?, name = ?, gender = ?, dob = ?, phone = ?, email = ?, hire_date = ?, basic_salary = ?, status = ?, role = ? WHERE id = ?";
+                $sql = "UPDATE employee SET department_id = ?, position_id = ?, name = ?, gender = ?, dob = ?, phone = ?, email = ?, hire_date = ?, basic_salary = ?, status = ?, role = ?, profile_photo = ? WHERE id = ?";
                 $stmt = $conn->prepare($sql);
                 $role = $designation ?: 'Employee';
-                $stmt->bind_param("sssssssssssi", $department_id, $position_id, $name, $gender, $dob, $phone, $email, $doj, $basic_salary, $status, $role, $employee_id);
+                $stmt->bind_param("ssssssssssssi", $department_id, $position_id, $name, $gender, $dob, $phone, $email, $doj, $basic_salary, $status, $role, $profile_photo, $employee_id);
             }
 
             if ($stmt->execute()) {
@@ -142,10 +173,18 @@ if (!$emp) {
 
 // Parse existing NRC for pre-filling dropdowns
 [$nrc_state_val, $nrc_township_val, $nrc_citizenship_val, $nrc_number_val] = parse_nrc($emp['nrc'] ?? '');
-if (empty($nrc_state_val)) { $nrc_state_val = ''; }
-if (empty($nrc_township_val)) { $nrc_township_val = ''; }
-if (empty($nrc_citizenship_val)) { $nrc_citizenship_val = 'N'; }
-if (empty($nrc_number_val)) { $nrc_number_val = ''; }
+if (empty($nrc_state_val)) {
+    $nrc_state_val = '';
+}
+if (empty($nrc_township_val)) {
+    $nrc_township_val = '';
+}
+if (empty($nrc_citizenship_val)) {
+    $nrc_citizenship_val = 'N';
+}
+if (empty($nrc_number_val)) {
+    $nrc_number_val = '';
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -160,7 +199,10 @@ if (empty($nrc_number_val)) { $nrc_number_val = ''; }
 <body x-data="{ sidebarOpen: false }" class="bg-slate-50 dark:bg-[#09090b] text-slate-900 dark:text-white font-sans antialiased min-h-screen flex">
     <?php include "../includes/sidebar.php"; ?>
     <div class="flex-1 flex flex-col min-w-0 main-wrapper">
-        <?php $page_title = "Edit Employee"; $page_subtitle = "Update employee information and details."; $page_actions = '<span class="inline-flex items-center gap-2 rounded-full bg-card-custom px-3 py-1 border border-body text-sm text-body-secondary"><i class="fa-solid fa-id-badge text-violet-400"></i> ' . htmlspecialchars($emp['employee_code']) . '</span>'; include "../includes/topbar.php"; ?>
+        <?php $page_title = "Edit Employee";
+        $page_subtitle = "Update employee information and details.";
+        $page_actions = '<span class="inline-flex items-center gap-2 rounded-full bg-card-custom px-3 py-1 border border-body text-sm text-body-secondary"><i class="fa-solid fa-id-badge text-violet-400"></i> ' . htmlspecialchars($emp['employee_code']) . '</span>';
+        include "../includes/topbar.php"; ?>
         <main class="flex-1 p-8 overflow-y-auto">
             <?php if ($message): ?>
                 <div class="mb-6 rounded-2xl px-6 py-4 shadow-sm border <?php echo $message_type === 'success' ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400' : 'bg-red-500/20 border-red-500/30 text-red-400'; ?>">
@@ -171,8 +213,8 @@ if (empty($nrc_number_val)) { $nrc_number_val = ''; }
                 </div>
             <?php endif; ?>
 
-            <form action="edit_employee.php" method="POST" class="grid grid-cols-1 xl:grid-cols-[1.6fr_1fr] gap-6 items-stretch">
-            <?php echo csrf_field(); ?>
+            <form action="edit_employee.php" method="POST" enctype="multipart/form-data" class="grid grid-cols-1 xl:grid-cols-[1.6fr_1fr] gap-6 items-stretch">
+                <?php echo csrf_field(); ?>
                 <input type="hidden" name="employee_id" value="<?php echo $emp['id']; ?>">
 
                 <!-- Left Column: Personal Details Card -->
@@ -181,10 +223,31 @@ if (empty($nrc_number_val)) { $nrc_number_val = ''; }
                         <i class="fa-solid fa-user text-violet-400 mr-2"></i>Personal Details
                     </div>
                     <div class="p-6 space-y-5">
+                        <div class="flex items-center gap-4">
+                            <div class="relative">
+                                <div class="w-20 h-20 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-2xl font-bold text-white shadow-md overflow-hidden" id="photo-preview">
+                                    <?php if (!empty($emp['profile_photo'])): ?>
+                                        <img src="../<?php echo htmlspecialchars($emp['profile_photo']); ?>" class="w-full h-full object-cover">
+                                    <?php else: ?>
+                                        <i class="fa-solid fa-camera text-lg opacity-60"></i>
+                                    <?php endif; ?>
+                                </div>
+                                <label for="profile_photo" class="absolute bottom-0 right-0 w-6 h-6 bg-violet-500 rounded-full flex items-center justify-center cursor-pointer shadow-md hover:bg-violet-400 transition">
+                                    <i class="fa-solid fa-pen text-[10px] text-white"></i>
+                                </label>
+                                <input type="file" name="profile_photo" id="profile_photo" accept="image/*" class="hidden" onchange="previewPhoto(this)">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-zinc-400 mb-1">Profile Photo</label>
+                                <p class="text-xs text-zinc-500">JPG, PNG, GIF or WEBP. Max 5MB.</p>
+                            </div>
+                        </div>
+
                         <div>
                             <label class="block text-xs font-semibold text-zinc-400 mb-1">Name <span class="text-red-500">*</span></label>
                             <input type="text" name="name" value="<?php echo htmlspecialchars($emp['name']); ?>" required class="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white placeholder-zinc-500 shadow-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-500/30">
                         </div>
+
                         <div>
                             <label class="block text-xs font-semibold text-zinc-400 mb-2">Father Name</label>
                             <input type="text" name="father_name" value="<?php echo htmlspecialchars($emp['father_name'] ?: ''); ?>" class="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white placeholder-zinc-500 shadow-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-500/30">
@@ -390,60 +453,71 @@ if (empty($nrc_number_val)) { $nrc_number_val = ''; }
             </span>
         </footer>
     </div>
-<script>
-const nrcTownships = <?php echo json_encode(get_nrc_township_codes()); ?>;
+    <script>
+        function previewPhoto(input) {
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const preview = document.getElementById('photo-preview');
+                    preview.innerHTML = '<img src="' + e.target.result + '" class="w-full h-full object-cover">';
+                };
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+        const nrcTownships = <?php echo json_encode(get_nrc_township_codes()); ?>;
 
-function populateTownship(state) {
-    const sel = document.getElementById('nrc_township');
-    sel.innerHTML = '<option value="">Township</option>';
-    if (state && nrcTownships[state]) {
-        nrcTownships[state].forEach(function(code) {
-            const opt = document.createElement('option');
-            opt.value = code; opt.textContent = code;
-            sel.appendChild(opt);
+        function populateTownship(state) {
+            const sel = document.getElementById('nrc_township');
+            sel.innerHTML = '<option value="">Township</option>';
+            if (state && nrcTownships[state]) {
+                nrcTownships[state].forEach(function(code) {
+                    const opt = document.createElement('option');
+                    opt.value = code;
+                    opt.textContent = code;
+                    sel.appendChild(opt);
+                });
+            }
+        }
+
+        function updateNrcPreview() {
+            const state = document.getElementById('nrc_state').value;
+            const township = document.getElementById('nrc_township').value;
+            const citizenship = document.getElementById('nrc_citizenship').value;
+            const number = document.getElementById('nrc_number').value;
+            const preview = document.getElementById('nrc-preview');
+            const previewVal = document.getElementById('nrc-preview-value');
+            if (state && township && citizenship && number) {
+                preview.classList.remove('hidden');
+                previewVal.textContent = state + '/' + township + '(' + citizenship + ')' + number.padStart(6, '0');
+            } else {
+                preview.classList.add('hidden');
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const stateSel = document.getElementById('nrc_state');
+            const townshipSel = document.getElementById('nrc_township');
+            const citizenshipSel = document.getElementById('nrc_citizenship');
+            const numberInp = document.getElementById('nrc_number');
+
+            stateSel.addEventListener('change', function() {
+                populateTownship(this.value);
+                updateNrcPreview();
+            });
+            townshipSel.addEventListener('change', updateNrcPreview);
+            citizenshipSel.addEventListener('change', updateNrcPreview);
+            numberInp.addEventListener('input', function() {
+                this.value = this.value.replace(/\D/g, '').slice(0, 6);
+                updateNrcPreview();
+            });
+
+            <?php if ($nrc_state_val): ?>
+                populateTownship('<?php echo $nrc_state_val; ?>');
+                townshipSel.value = '<?php echo $nrc_township_val; ?>';
+                updateNrcPreview();
+            <?php endif; ?>
         });
-    }
-}
-
-function updateNrcPreview() {
-    const state = document.getElementById('nrc_state').value;
-    const township = document.getElementById('nrc_township').value;
-    const citizenship = document.getElementById('nrc_citizenship').value;
-    const number = document.getElementById('nrc_number').value;
-    const preview = document.getElementById('nrc-preview');
-    const previewVal = document.getElementById('nrc-preview-value');
-    if (state && township && citizenship && number) {
-        preview.classList.remove('hidden');
-        previewVal.textContent = state + '/' + township + '(' + citizenship + ')' + number.padStart(6, '0');
-    } else {
-        preview.classList.add('hidden');
-    }
-}
-
-document.addEventListener('DOMContentLoaded', function() {
-    const stateSel = document.getElementById('nrc_state');
-    const townshipSel = document.getElementById('nrc_township');
-    const citizenshipSel = document.getElementById('nrc_citizenship');
-    const numberInp = document.getElementById('nrc_number');
-
-    stateSel.addEventListener('change', function() {
-        populateTownship(this.value);
-        updateNrcPreview();
-    });
-    townshipSel.addEventListener('change', updateNrcPreview);
-    citizenshipSel.addEventListener('change', updateNrcPreview);
-    numberInp.addEventListener('input', function() {
-        this.value = this.value.replace(/\D/g, '').slice(0, 6);
-        updateNrcPreview();
-    });
-
-    <?php if ($nrc_state_val): ?>
-    populateTownship('<?php echo $nrc_state_val; ?>');
-    townshipSel.value = '<?php echo $nrc_township_val; ?>';
-    updateNrcPreview();
-    <?php endif; ?>
-});
-</script>
+    </script>
 </body>
 
 </html>
