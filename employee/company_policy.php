@@ -24,7 +24,7 @@ foreach ($policies as $p) {
     <link rel="icon" type="image/svg+xml" href="../favicon.svg">
     <?php include "../includes/header.php"; ?>
 </head>
-<body x-data="{ sidebarOpen: false }" class="bg-slate-50 dark:bg-[#09090b] text-slate-900 dark:text-white font-sans antialiased">
+<body x-data="{ sidebarOpen: false }" class="bg-slate-50 dark:bg-[#0B1120] text-slate-900 dark:text-white font-sans antialiased">
     <?php include "../includes/sidebar.php"; ?>
     <div class="main-wrapper min-h-screen flex flex-col">
         <?php $page_title = "Company Policies"; $page_subtitle = "Review company policies and guidelines"; include "../includes/topbar.php"; ?>
@@ -45,7 +45,7 @@ foreach ($policies as $p) {
                     <span class="text-xs font-semibold uppercase tracking-wider text-zinc-500">Total Policies</span>
                 </div>
                 <div class="glass-strong rounded-2xl p-4 text-center">
-                    <div class="text-2xl font-bold text-gradient-violet"><?php echo count($grouped); ?></div>
+                    <div class="text-2xl font-bold text-gradient-sky"><?php echo count($grouped); ?></div>
                     <span class="text-xs font-semibold uppercase tracking-wider text-zinc-500">Categories</span>
                 </div>
                 <?php
@@ -54,7 +54,7 @@ foreach ($policies as $p) {
                     'Leave' => ['icon' => 'plane-departure', 'color' => 'blue'],
                     'Overtime' => ['icon' => 'clock', 'color' => 'amber'],
                     'Salary' => ['icon' => 'money-bill-wave', 'color' => 'green'],
-                    'General' => ['icon' => 'info-circle', 'color' => 'violet'],
+                    'General' => ['icon' => 'info-circle', 'color blue'],
                     'Conduct' => ['icon' => 'shield-halved', 'color' => 'rose'],
                     'Benefits' => ['icon' => 'gift', 'color' => 'cyan'],
                 ];

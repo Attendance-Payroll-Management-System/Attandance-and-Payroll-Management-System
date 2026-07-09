@@ -39,26 +39,29 @@ function nav_active($pages, $current)
     return in_array($current, (array)$pages);
 }
 
-function nav_item($href, $label, $icon, $current, $pages = null, $badge = null, $color = 'violet')
+function nav_item($href, $label, $icon, $current, $pages = null, $badge = null, $color = 'navy')
 {
     $active = $pages ? nav_active($pages, $current) : ($href === $current);
 
     $colors = [
-        'violet'   => ['css' => 'sidebar-icon-violet', 'text' => 'text-violet-500', 'active_bg' => 'from-violet-500/20 to-fuchsia-500/10', 'hover_bg' => 'hover:bg-violet-50', 'dark_hover_bg' => 'dark:hover:bg-violet-500/10'],
-        'blue'     => ['css' => 'sidebar-icon-blue', 'text' => 'text-blue-500', 'active_bg' => 'from-blue-500/20 to-cyan-500/10', 'hover_bg' => 'hover:bg-blue-50', 'dark_hover_bg' => 'dark:hover:bg-blue-500/10'],
-        'emerald'  => ['css' => 'sidebar-icon-emerald', 'text' => 'text-emerald-500', 'active_bg' => 'from-emerald-500/20 to-teal-500/10', 'hover_bg' => 'hover:bg-emerald-50', 'dark_hover_bg' => 'dark:hover:bg-emerald-500/10'],
-        'amber'    => ['css' => 'sidebar-icon-amber', 'text' => 'text-amber-500', 'active_bg' => 'from-amber-500/20 to-orange-500/10', 'hover_bg' => 'hover:bg-amber-50', 'dark_hover_bg' => 'dark:hover:bg-amber-500/10'],
-        'rose'     => ['css' => 'sidebar-icon-rose', 'text' => 'text-rose-500', 'active_bg' => 'from-rose-500/20 to-pink-500/10', 'hover_bg' => 'hover:bg-rose-50', 'dark_hover_bg' => 'dark:hover:bg-rose-500/10'],
-        'cyan'     => ['css' => 'sidebar-icon-cyan', 'text' => 'text-cyan-500', 'active_bg' => 'from-cyan-500/20 to-blue-500/10', 'hover_bg' => 'hover:bg-cyan-50', 'dark_hover_bg' => 'dark:hover:bg-cyan-500/10'],
-        'purple'   => ['css' => 'sidebar-icon-purple', 'text' => 'text-purple-500', 'active_bg' => 'from-purple-500/20 to-indigo-500/10', 'hover_bg' => 'hover:bg-purple-50', 'dark_hover_bg' => 'dark:hover:bg-purple-500/10'],
-        'orange'   => ['css' => 'sidebar-icon-orange', 'text' => 'text-orange-500', 'active_bg' => 'from-orange-500/20 to-red-500/10', 'hover_bg' => 'hover:bg-orange-50', 'dark_hover_bg' => 'dark:hover:bg-orange-500/10'],
-        'slate'    => ['css' => 'sidebar-icon-slate', 'text' => 'text-slate-500', 'active_bg' => 'from-slate-500/20 to-gray-500/10', 'hover_bg' => 'hover:bg-slate-50', 'dark_hover_bg' => 'dark:hover:bg-slate-500/10'],
+        'navy'    => ['css' => 'sidebar-icon-navy', 'text' => 'text-blue-600', 'active_bg' => 'from-blue-500/20 to-cyan-500/10', 'hover_bg' => 'hover:bg-blue-50', 'dark_hover_bg' => 'dark:hover:bg-blue-500/10'],
+        'indigo'  => ['css' => 'sidebar-icon-indigo', 'text' => 'text-indigo-500', 'active_bg' => 'from-indigo-500/20 to-blue-500/10', 'hover_bg' => 'hover:bg-indigo-50', 'dark_hover_bg' => 'dark:hover:bg-indigo-500/10'],
+        'blue'    => ['css' => 'sidebar-icon-blue', 'text' => 'text-blue-500', 'active_bg' => 'from-blue-500/20 to-cyan-500/10', 'hover_bg' => 'hover:bg-blue-50', 'dark_hover_bg' => 'dark:hover:bg-blue-500/10'],
+        'sky'     => ['css' => 'sidebar-icon-sky', 'text' => 'text-sky-500', 'active_bg' => 'from-sky-500/20 to-cyan-500/10', 'hover_bg' => 'hover:bg-sky-50', 'dark_hover_bg' => 'dark:hover:bg-sky-500/10'],
+        'emerald' => ['css' => 'sidebar-icon-emerald', 'text' => 'text-emerald-500', 'active_bg' => 'from-emerald-500/20 to-teal-500/10', 'hover_bg' => 'hover:bg-emerald-50', 'dark_hover_bg' => 'dark:hover:bg-emerald-500/10'],
+        'amber'   => ['css' => 'sidebar-icon-amber', 'text' => 'text-amber-500', 'active_bg' => 'from-amber-500/20 to-orange-500/10', 'hover_bg' => 'hover:bg-amber-50', 'dark_hover_bg' => 'dark:hover:bg-amber-500/10'],
+        'rose'    => ['css' => 'sidebar-icon-rose', 'text' => 'text-rose-500', 'active_bg' => 'from-rose-500/20 to-pink-500/10', 'hover_bg' => 'hover:bg-rose-50', 'dark_hover_bg' => 'dark:hover:bg-rose-500/10'],
+        'cyan'    => ['css' => 'sidebar-icon-cyan', 'text' => 'text-cyan-500', 'active_bg' => 'from-cyan-500/20 to-blue-500/10', 'hover_bg' => 'hover:bg-cyan-50', 'dark_hover_bg' => 'dark:hover:bg-cyan-500/10'],
+        'purple'  => ['css' => 'sidebar-icon-purple', 'text' => 'text-purple-500', 'active_bg' => 'from-purple-500/20 to-indigo-500/10', 'hover_bg' => 'hover:bg-purple-50', 'dark_hover_bg' => 'dark:hover:bg-purple-500/10'],
+        'orange'  => ['css' => 'sidebar-icon-orange', 'text' => 'text-orange-500', 'active_bg' => 'from-orange-500/20 to-red-500/10', 'hover_bg' => 'hover:bg-orange-50', 'dark_hover_bg' => 'dark:hover:bg-orange-500/10'],
+        'slate'   => ['css' => 'sidebar-icon-slate', 'text' => 'text-slate-500', 'active_bg' => 'from-slate-500/20 to-gray-500/10', 'hover_bg' => 'hover:bg-slate-50', 'dark_hover_bg' => 'dark:hover:bg-slate-500/10'],
+        'violet'  => ['css' => 'sidebar-icon-purple', 'text' => 'text-purple-500', 'active_bg' => 'from-purple-500/20 to-indigo-500/10', 'hover_bg' => 'hover:bg-purple-50', 'dark_hover_bg' => 'dark:hover:bg-purple-500/10'],
     ];
 
-    $c = $colors[$color] ?? $colors['violet'];
+    $c = $colors[$color] ?? $colors['navy'];
 
     $classes = $active
-        ? 'flex items-center gap-3 px-4 py-2.5 rounded-xl bg-gradient-to-r ' . $c['active_bg'] . ' text-slate-900 dark:text-white border border-white/[0.08] shadow-sm'
+        ? 'flex items-center gap-3 px-4 py-2.5 rounded-xl bg-gradient-to-r ' . $c['active_bg'] . ' text-slate-900 dark:text-white border border-blue-200 dark:border-white/[0.08] shadow-sm'
         : 'flex items-center gap-3 px-4 py-2.5 rounded-xl text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white ' . $c['hover_bg'] . ' ' . $c['dark_hover_bg'] . ' transition-all duration-200';
 
     $html = '<a href="' . $href . '" class="group nav-item ' . $classes . '">';
@@ -72,24 +75,27 @@ function nav_item($href, $label, $icon, $current, $pages = null, $badge = null, 
     return $html;
 }
 
-function nav_section($label, $icon, $children, $current_page, $badge = null, $color = 'violet')
+function nav_section($label, $icon, $children, $current_page, $badge = null, $color = 'navy')
 {
     $child_pages = array_column($children, 'page');
     $open = nav_active($child_pages, $current_page);
 
     $colors = [
-        'violet'   => ['css' => 'sidebar-icon-violet', 'active_text' => 'text-violet-600 dark:text-violet-300', 'active_bg' => 'bg-violet-500/10', 'border' => 'border-violet-400', 'dot' => 'bg-violet-400', 'hover_bg' => 'hover:bg-violet-50', 'dark_hover_bg' => 'dark:hover:bg-violet-500/10'],
-        'blue'     => ['css' => 'sidebar-icon-blue', 'active_text' => 'text-blue-600 dark:text-blue-300', 'active_bg' => 'bg-blue-500/10', 'border' => 'border-blue-400', 'dot' => 'bg-blue-400', 'hover_bg' => 'hover:bg-blue-50', 'dark_hover_bg' => 'dark:hover:bg-blue-500/10'],
-        'emerald'  => ['css' => 'sidebar-icon-emerald', 'active_text' => 'text-emerald-600 dark:text-emerald-300', 'active_bg' => 'bg-emerald-500/10', 'border' => 'border-emerald-400', 'dot' => 'bg-emerald-400', 'hover_bg' => 'hover:bg-emerald-50', 'dark_hover_bg' => 'dark:hover:bg-emerald-500/10'],
-        'amber'    => ['css' => 'sidebar-icon-amber', 'active_text' => 'text-amber-600 dark:text-amber-300', 'active_bg' => 'bg-amber-500/10', 'border' => 'border-amber-400', 'dot' => 'bg-amber-400', 'hover_bg' => 'hover:bg-amber-50', 'dark_hover_bg' => 'dark:hover:bg-amber-500/10'],
-        'rose'     => ['css' => 'sidebar-icon-rose', 'active_text' => 'text-rose-600 dark:text-rose-300', 'active_bg' => 'bg-rose-500/10', 'border' => 'border-rose-400', 'dot' => 'bg-rose-400', 'hover_bg' => 'hover:bg-rose-50', 'dark_hover_bg' => 'dark:hover:bg-rose-500/10'],
-        'cyan'     => ['css' => 'sidebar-icon-cyan', 'active_text' => 'text-cyan-600 dark:text-cyan-300', 'active_bg' => 'bg-cyan-500/10', 'border' => 'border-cyan-400', 'dot' => 'bg-cyan-400', 'hover_bg' => 'hover:bg-cyan-50', 'dark_hover_bg' => 'dark:hover:bg-cyan-500/10'],
-        'purple'   => ['css' => 'sidebar-icon-purple', 'active_text' => 'text-purple-600 dark:text-purple-300', 'active_bg' => 'bg-purple-500/10', 'border' => 'border-purple-400', 'dot' => 'bg-purple-400', 'hover_bg' => 'hover:bg-purple-50', 'dark_hover_bg' => 'dark:hover:bg-purple-500/10'],
-        'orange'   => ['css' => 'sidebar-icon-orange', 'active_text' => 'text-orange-600 dark:text-orange-300', 'active_bg' => 'bg-orange-500/10', 'border' => 'border-orange-400', 'dot' => 'bg-orange-400', 'hover_bg' => 'hover:bg-orange-50', 'dark_hover_bg' => 'dark:hover:bg-orange-500/10'],
-        'slate'    => ['css' => 'sidebar-icon-slate', 'active_text' => 'text-slate-600 dark:text-slate-300', 'active_bg' => 'bg-slate-500/10', 'border' => 'border-slate-400', 'dot' => 'bg-slate-400', 'hover_bg' => 'hover:bg-slate-50', 'dark_hover_bg' => 'dark:hover:bg-slate-500/10'],
+        'navy'    => ['css' => 'sidebar-icon-navy', 'active_text' => 'text-blue-600 dark:text-blue-300', 'active_bg' => 'bg-blue-500/10', 'border' => 'border-blue-400', 'dot' => 'bg-blue-400', 'hover_bg' => 'hover:bg-blue-50', 'dark_hover_bg' => 'dark:hover:bg-blue-500/10'],
+        'indigo'  => ['css' => 'sidebar-icon-indigo', 'active_text' => 'text-indigo-600 dark:text-indigo-300', 'active_bg' => 'bg-indigo-500/10', 'border' => 'border-indigo-400', 'dot' => 'bg-indigo-400', 'hover_bg' => 'hover:bg-indigo-50', 'dark_hover_bg' => 'dark:hover:bg-indigo-500/10'],
+        'blue'    => ['css' => 'sidebar-icon-blue', 'active_text' => 'text-blue-600 dark:text-blue-300', 'active_bg' => 'bg-blue-500/10', 'border' => 'border-blue-400', 'dot' => 'bg-blue-400', 'hover_bg' => 'hover:bg-blue-50', 'dark_hover_bg' => 'dark:hover:bg-blue-500/10'],
+        'sky'     => ['css' => 'sidebar-icon-sky', 'active_text' => 'text-sky-600 dark:text-sky-300', 'active_bg' => 'bg-sky-500/10', 'border' => 'border-sky-400', 'dot' => 'bg-sky-400', 'hover_bg' => 'hover:bg-sky-50', 'dark_hover_bg' => 'dark:hover:bg-sky-500/10'],
+        'emerald' => ['css' => 'sidebar-icon-emerald', 'active_text' => 'text-emerald-600 dark:text-emerald-300', 'active_bg' => 'bg-emerald-500/10', 'border' => 'border-emerald-400', 'dot' => 'bg-emerald-400', 'hover_bg' => 'hover:bg-emerald-50', 'dark_hover_bg' => 'dark:hover:bg-emerald-500/10'],
+        'amber'   => ['css' => 'sidebar-icon-amber', 'active_text' => 'text-amber-600 dark:text-amber-300', 'active_bg' => 'bg-amber-500/10', 'border' => 'border-amber-400', 'dot' => 'bg-amber-400', 'hover_bg' => 'hover:bg-amber-50', 'dark_hover_bg' => 'dark:hover:bg-amber-500/10'],
+        'rose'    => ['css' => 'sidebar-icon-rose', 'active_text' => 'text-rose-600 dark:text-rose-300', 'active_bg' => 'bg-rose-500/10', 'border' => 'border-rose-400', 'dot' => 'bg-rose-400', 'hover_bg' => 'hover:bg-rose-50', 'dark_hover_bg' => 'dark:hover:bg-rose-500/10'],
+        'cyan'    => ['css' => 'sidebar-icon-cyan', 'active_text' => 'text-cyan-600 dark:text-cyan-300', 'active_bg' => 'bg-cyan-500/10', 'border' => 'border-cyan-400', 'dot' => 'bg-cyan-400', 'hover_bg' => 'hover:bg-cyan-50', 'dark_hover_bg' => 'dark:hover:bg-cyan-500/10'],
+        'purple'  => ['css' => 'sidebar-icon-purple', 'active_text' => 'text-purple-600 dark:text-purple-300', 'active_bg' => 'bg-purple-500/10', 'border' => 'border-purple-400', 'dot' => 'bg-purple-400', 'hover_bg' => 'hover:bg-purple-50', 'dark_hover_bg' => 'dark:hover:bg-purple-500/10'],
+        'orange'  => ['css' => 'sidebar-icon-orange', 'active_text' => 'text-orange-600 dark:text-orange-300', 'active_bg' => 'bg-orange-500/10', 'border' => 'border-orange-400', 'dot' => 'bg-orange-400', 'hover_bg' => 'hover:bg-orange-50', 'dark_hover_bg' => 'dark:hover:bg-orange-500/10'],
+        'slate'   => ['css' => 'sidebar-icon-slate', 'active_text' => 'text-slate-600 dark:text-slate-300', 'active_bg' => 'bg-slate-500/10', 'border' => 'border-slate-400', 'dot' => 'bg-slate-400', 'hover_bg' => 'hover:bg-slate-50', 'dark_hover_bg' => 'dark:hover:bg-slate-500/10'],
+        'violet'  => ['css' => 'sidebar-icon-purple', 'active_text' => 'text-purple-600 dark:text-purple-300', 'active_bg' => 'bg-purple-500/10', 'border' => 'border-purple-400', 'dot' => 'bg-purple-400', 'hover_bg' => 'hover:bg-purple-50', 'dark_hover_bg' => 'dark:hover:bg-purple-500/10'],
     ];
 
-    $c = $colors[$color] ?? $colors['violet'];
+    $c = $colors[$color] ?? $colors['navy'];
 
     $html = '<div x-data="{ open: ' . ($open ? 'true' : 'false') . ' }" class="space-y-0.5">';
     $html .= '<button @click="open = !open" class="w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white ' . $c['hover_bg'] . ' ' . $c['dark_hover_bg'] . ' transition-all duration-200 group">';
@@ -118,7 +124,7 @@ function nav_section($label, $icon, $children, $current_page, $badge = null, $co
     return $html;
 }
 ?>
-<button @click="sidebarOpen = !sidebarOpen" class="fixed top-4 left-4 z-50 lg:hidden w-11 h-11 rounded-2xl bg-gradient-to-br from-violet-600 to-fuchsia-600 text-white flex items-center justify-center shadow-lg shadow-violet-600/30 hover:shadow-xl hover:shadow-violet-600/40 hover:scale-105 transition-all duration-200 animate-fade-in-left">
+<button @click="sidebarOpen = !sidebarOpen" class="fixed top-4 left-4 z-50 lg:hidden w-11 h-11 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 text-white flex items-center justify-center shadow-lg shadow-blue-600/30 hover:shadow-xl hover:shadow-blue-600/40 hover:scale-105 transition-all duration-200 animate-fade-in-left">
     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
     </svg>
@@ -126,32 +132,36 @@ function nav_section($label, $icon, $children, $current_page, $badge = null, $co
 
 <div x-show="sidebarOpen" @click="sidebarOpen = false" x-transition:enter="transition-opacity duration-300" x-transition:leave="transition-opacity duration-200" class="fixed inset-0 z-30 bg-black/70 backdrop-blur-sm lg:hidden" style="display: none;"></div>
 
-<aside class="fixed inset-y-0 left-0 z-40 w-64 bg-white dark:bg-[#0a0a0f] text-slate-900 dark:text-white flex flex-col border-r border-slate-200 dark:border-white/[0.06] transform transition-all duration-300 ease-in-out -translate-x-full lg:translate-x-0 shadow-2xl shadow-black/10 dark:shadow-black/40" :class="{ 'translate-x-0': sidebarOpen }">
+<aside class="fixed inset-y-0 left-0 z-40 w-64 bg-white dark:bg-[#0F172A] text-slate-900 dark:text-white flex flex-col border-r border-slate-200 dark:border-blue-500/10 transform transition-all duration-300 ease-in-out -translate-x-full lg:translate-x-0 shadow-2xl shadow-black/10 dark:shadow-black/40" :class="{ 'translate-x-0': sidebarOpen }">
 
     <div class="relative overflow-hidden px-5 py-6 border-b border-slate-100 dark:border-white/[0.06]">
-        <div class="absolute -inset-20 bg-gradient-to-br from-violet-500/30 via-fuchsia-500/20 to-amber-500/10 blur-3xl"></div>
-        <div class="absolute top-0 right-0 w-40 h-40 bg-violet-400/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/4"></div>
-        <div class="absolute bottom-0 left-0 w-32 h-32 bg-fuchsia-400/10 rounded-full blur-3xl translate-y-1/2 -translate-x-1/4"></div>
+        <div class="absolute -inset-20 bg-gradient-to-br from-blue-500/30 via-indigo-500/20 to-cyan-500/10 dark:from-blue-500/30 dark:via-indigo-500/20 dark:to-cyan-500/10 blur-3xl opacity-60 dark:opacity-100"></div>
+        <div class="absolute top-0 right-0 w-40 h-40 bg-blue-400/15 dark:bg-blue-400/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/4"></div>
+        <div class="absolute bottom-0 left-0 w-32 h-32 bg-indigo-400/15 dark:bg-indigo-400/10 rounded-full blur-3xl translate-y-1/2 -translate-x-1/4"></div>
         <div class="relative flex items-center gap-3">
-            <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-500 via-fuchsia-500 to-amber-500 flex items-center justify-center shadow-xl shadow-violet-500/40 ring-2 ring-white/20 sidebar-logo animate-float">
+            <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-600 via-indigo-600 to-blue-500 flex items-center justify-center shadow-xl shadow-blue-600/40 ring-2 ring-blue-200 dark:ring-white/20 sidebar-logo animate-float">
                 <i class="fas fa-bolt text-white text-lg"></i>
             </div>
             <div class="flex-1 min-w-0">
-                <h1 class="text-base font-extrabold tracking-tight bg-gradient-to-r from-violet-600 via-fuchsia-600 to-amber-600 dark:from-violet-400 dark:via-fuchsia-400 dark:to-amber-400 bg-clip-text text-transparent truncate">HNIN AKARI NWE</h1>
-                <p class="text-[9px] font-bold text-violet-500/70 dark:text-violet-300/70 tracking-[0.25em] uppercase truncate">Payroll Management</p>
+                <h1 class="text-base font-extrabold tracking-tight bg-gradient-to-r from-blue-700 via-indigo-600 to-blue-500 dark:from-blue-400 dark:via-indigo-400 dark:to-cyan-400 bg-clip-text text-transparent truncate">HNIN AKARI NWE</h1>
+                <p class="text-[9px] font-bold text-blue-500/70 dark:text-blue-300/70 tracking-[0.25em] uppercase truncate">Payroll Management</p>
             </div>
         </div>
     </div>
 
-    <div class="px-5 py-3 border-b border-slate-100 dark:border-white/[0.06] bg-gradient-to-r from-violet-50/50 to-fuchsia-50/50 dark:from-violet-500/5 dark:to-fuchsia-500/5">
+    <div class="px-5 py-3 border-b border-slate-100 dark:border-white/[0.06] bg-gradient-to-r from-blue-50/80 to-indigo-50/80 dark:from-blue-500/5 dark:to-indigo-500/5">
         <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 via-orange-500 to-rose-500 flex items-center justify-center text-xs font-bold text-white shadow-lg shadow-orange-500/30 shrink-0 ring-2 ring-white/20">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 via-indigo-500 to-blue-600 flex items-center justify-center text-xs font-bold text-white shadow-lg shadow-blue-500/30 shrink-0 ring-2 ring-blue-200 dark:ring-white/20">
                 <?php echo strtoupper(substr($sidebar_role === 'admin' ? $admin_name : $emp_name, 0, 2)); ?>
             </div>
-            <div class="min-w-0">
+            <div class="min-w-0 flex-1">
                 <p class="text-sm font-semibold text-slate-900 dark:text-white truncate"><?php echo htmlspecialchars($sidebar_role === 'admin' ? $admin_name : $emp_name); ?></p>
                 <p class="text-[10px] text-slate-400 dark:text-zinc-500 truncate"><?php echo $sidebar_role === 'admin' ? 'Administrator' : 'Employee'; ?></p>
             </div>
+            <button onclick="toggleTheme()" class="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 dark:text-zinc-500 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-all duration-200 shrink-0" title="Toggle theme">
+                <i class="fa-solid fa-sun text-sm dark:hidden"></i>
+                <i class="fa-solid fa-moon text-sm hidden dark:inline"></i>
+            </button>
         </div>
     </div>
 
@@ -172,7 +182,7 @@ function nav_section($label, $icon, $children, $current_page, $badge = null, $co
                 ['page' => 'insert1.php', 'href' => 'insert1.php', 'label' => 'Add Employee'],
                 ['page' => 'edit_employee.php', 'href' => 'edit_employee.php', 'label' => 'Edit Employee'],
                 ['page' => 'view_employee.php', 'href' => 'view_employee.php', 'label' => 'View Employee'],
-            ], $current_page, null, 'violet'); ?>
+            ], $current_page, null, 'navy'); ?>
             <?php echo nav_section('Attendance', 'calendar-check', [
                 ['page' => 'attendance.php', 'href' => 'attendance.php', 'label' => 'Monthly Attendance'],
                 ['page' => 'dailyattendance.php', 'href' => 'dailyattendance.php', 'label' => 'Daily Attendance'],
@@ -193,14 +203,14 @@ function nav_section($label, $icon, $children, $current_page, $badge = null, $co
                 ['page' => 'salary_slip.php', 'href' => 'salary_slip.php', 'label' => 'Salary Slips'],
                 ['page' => 'bonous.php', 'href' => 'bonous.php', 'label' => 'Bonuses'],
                 ['page' => 'deduction.php', 'href' => 'deduction.php', 'label' => 'Deductions'],
-            ], $current_page, null, 'cyan'); ?>
+            ], $current_page, null, 'indigo'); ?>
             <div class="px-4 pt-3 pb-1">
                 <p class="text-[10px] font-semibold text-slate-400 dark:text-zinc-500 tracking-[0.15em] uppercase">Organization</p>
             </div>
-            <?php echo nav_item('department.php', 'Departments', 'building', $current_page, null, null, 'purple'); ?>
+            <?php echo nav_item('department.php', 'Departments', 'building', $current_page, null, null, 'blue'); ?>
             <?php echo nav_item('position.php', 'Positions', 'briefcase', $current_page, null, null, 'orange'); ?>
             <?php echo nav_item('holiday.php', 'Holidays', 'calendar-day', $current_page, null, null, 'cyan'); ?>
-            <?php echo nav_item('policy.php', 'Company Policy', 'file-contract', $current_page, null, null, 'purple'); ?>
+            <?php echo nav_item('policy.php', 'Company Policy', 'file-contract', $current_page, null, null, 'indigo'); ?>
 
             <?php echo nav_section('Reports', 'chart-column', [
                 ['page' => 'reports.php', 'href' => 'reports.php', 'label' => 'Annual Report'],
@@ -213,7 +223,7 @@ function nav_section($label, $icon, $children, $current_page, $badge = null, $co
             <div class="px-4 pt-3 pb-1">
                 <p class="text-[10px] font-semibold text-slate-400 dark:text-zinc-500 tracking-[0.15em] uppercase">Account</p>
             </div>
-            <?php echo nav_item('profile.php', 'My Profile', 'circle-user', $current_page, null, null, 'violet'); ?>
+            <?php echo nav_item('profile.php', 'My Profile', 'circle-user', $current_page, null, null, 'navy'); ?>
 
             <div class="px-4 pt-3 pb-1">
                 <p class="text-[10px] font-semibold text-slate-400 dark:text-zinc-500 tracking-[0.15em] uppercase">System</p>
@@ -226,17 +236,17 @@ function nav_section($label, $icon, $children, $current_page, $badge = null, $co
             <div class="px-4 pb-2">
                 <p class="text-[10px] font-semibold text-slate-400 dark:text-zinc-500 tracking-[0.15em] uppercase">Main Menu</p>
             </div>
-            <?php echo nav_item('dashboard.php', 'Dashboard', 'house-chimney', $current_page, null, null, 'blue'); ?>
+            <?php echo nav_item('dashboard.php', 'Dashboard', 'house-chimney', $current_page, null, null, 'sky'); ?>
             <?php echo nav_item('attendance.php', 'Attendance', 'calendar-check', $current_page, null, null, 'emerald'); ?>
             <?php echo nav_item('leaverequest.php', 'Leave Request', 'paper-plane', $current_page, null, null, 'amber'); ?>
             <?php echo nav_item('overtimerequest.php', 'Overtime Request', 'stopwatch', $current_page, null, null, 'orange'); ?>
             <?php echo nav_item('attendanceall.php', 'My Records', 'folder-open', $current_page, null, null, 'cyan'); ?>
-            <?php echo nav_item('company_policy.php', 'Company Policy', 'file-contract', $current_page, null, null, 'purple'); ?>
+            <?php echo nav_item('company_policy.php', 'Company Policy', 'file-contract', $current_page, null, null, 'indigo'); ?>
 
             <div class="px-4 pt-3 pb-1">
                 <p class="text-[10px] font-semibold text-slate-400 dark:text-zinc-500 tracking-[0.15em] uppercase">Account</p>
             </div>
-            <?php echo nav_item('profile.php', 'My Profile', 'circle-user', $current_page, null, null, 'violet'); ?>
+            <?php echo nav_item('profile.php', 'My Profile', 'circle-user', $current_page, null, null, 'navy'); ?>
             <?php echo nav_item('payroll.php', 'My Payroll', 'wallet', $current_page, null, null, 'emerald'); ?>
             <?php echo nav_item('change_password.php', 'Change Password', 'key', $current_page, null, null, 'amber'); ?>
 

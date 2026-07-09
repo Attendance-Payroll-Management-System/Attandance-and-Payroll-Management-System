@@ -41,7 +41,7 @@ for ($m = 1; $m <= 12; $m++) {
 $departments = $conn->query("SELECT d.department_name, COUNT(e.id) as emp_count FROM departments d LEFT JOIN employee e ON e.department_id = d.id GROUP BY d.id ORDER BY emp_count DESC")->fetch_all(MYSQLI_ASSOC);
 $total_dept_emps = array_sum(array_column($departments, 'emp_count'));
 $dept_labels = []; $dept_counts = [];
-$dept_colors = ['#8B5CF6', '#D946EF', '#F59E0B', '#10B981', '#3B82F6', '#EF4444', '#14B8A6', '#F97316'];
+$dept_colors = ['#1E3A8A', '#4F46E5', '#0EA5E9', '#10B981', '#F59E0B', '#EF4444', '#06B6D4', '#F97316'];
 foreach ($departments as $dept) { $dept_labels[] = $dept['department_name'] ?? 'Unassigned'; $dept_counts[] = (int)$dept['emp_count']; }
 
 // ── Recent Attendance ──
@@ -63,7 +63,7 @@ $attendance_rate = $monthly_att['total_records'] > 0 ? round(($monthly_att['pres
     <link rel="icon" type="image/svg+xml" href="../favicon.svg">
     <?php include "../includes/header.php"; ?>
 </head>
-<body x-data="{ sidebarOpen: false }" class="bg-slate-50 dark:bg-[#09090b] text-slate-900 dark:text-white font-sans antialiased min-h-screen">
+<body x-data="{ sidebarOpen: false }" class="bg-slate-50 dark:bg-[#0B1120] text-slate-900 dark:text-white font-sans antialiased min-h-screen">
     <?php include "../includes/sidebar.php"; ?>
     <div class="main-wrapper flex flex-col min-h-screen">
         <?php include "../includes/topbar.php"; ?>
@@ -71,7 +71,7 @@ $attendance_rate = $monthly_att['total_records'] > 0 ? round(($monthly_att['pres
         <main class="p-6 lg:p-8 space-y-6 flex-1 page-content w-full page-enter">
 
             <!-- ═══ Welcome Banner ═══ -->
-            <div class="relative overflow-hidden bg-gradient-to-r from-violet-600 via-fuchsia-600 to-amber-500 rounded-2xl p-6 lg:p-8 animate-fade-in-up card-inner-glow">
+            <div class="relative overflow-hidden bg-gradient-to-r from-blue-700 via-indigo-600 to-blue-500 rounded-2xl p-6 lg:p-8 animate-fade-in-up card-inner-glow">
                 <div class="absolute inset-0 opacity-10">
                     <div class="absolute top-0 right-0 w-64 h-64 bg-white rounded-full blur-3xl -translate-y-1/2 translate-x-1/3"></div>
                     <div class="absolute bottom-0 left-0 w-48 h-48 bg-white rounded-full blur-3xl translate-y-1/2 -translate-x-1/4"></div>
@@ -96,7 +96,7 @@ $attendance_rate = $monthly_att['total_records'] > 0 ? round(($monthly_att['pres
                         <a href="employee.php" class="bg-white/20 hover:bg-white/30 text-white font-semibold text-sm px-5 py-2.5 rounded-xl border border-white/20 transition-all duration-200 text-center backdrop-blur-sm hover:scale-105 active:scale-95 flex items-center gap-2">
                             <i class="fa-solid fa-users"></i> View Employees
                         </a>
-                        <a href="reports.php" class="bg-white text-violet-700 font-semibold text-sm px-5 py-2.5 rounded-xl transition-all duration-200 text-center hover:shadow-lg hover:shadow-white/20 hover:scale-105 active:scale-95 flex items-center gap-2">
+                        <a href="reports.php" class="bg-white text-blue-700 font-semibold text-sm px-5 py-2.5 rounded-xl transition-all duration-200 text-center hover:shadow-lg hover:shadow-white/20 hover:scale-105 active:scale-95 flex items-center gap-2">
                             <i class="fa-solid fa-chart-line"></i> View Reports
                         </a>
                     </div>
@@ -109,10 +109,10 @@ $attendance_rate = $monthly_att['total_records'] > 0 ? round(($monthly_att['pres
                 <div class="group glass-strong rounded-2xl p-5 card-hover animate-fade-in-up stagger-1">
                     <div class="flex items-start justify-between">
                         <div>
-                            <span class="text-xs font-bold uppercase tracking-wider text-zinc-500"><i class="fa-solid fa-users mr-1 text-violet-400"></i>Total Employees</span>
+                            <span class="text-xs font-bold uppercase tracking-wider text-zinc-500"><i class="fa-solid fa-users mr-1 text-blue-400"></i>Total Employees</span>
                             <div class="text-3xl font-extrabold text-gradient mt-1"><span class="counter-value" data-counter="<?php echo $workforce; ?>">0</span></div>
                         </div>
-                        <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 text-violet-400 flex items-center justify-center text-lg group-hover:scale-110 transition-transform duration-300"><i class="fa-solid fa-users"></i></div>
+                        <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-500/20 to-indigo-500/20 text-blue-400 flex items-center justify-center text-lg group-hover:scale-110 transition-transform duration-300"><i class="fa-solid fa-users"></i></div>
                     </div>
                     <div class="mt-3 progress-bar"><div class="progress-bar-fill" style="width: 100%"></div></div>
                     <span class="text-xs text-emerald-400 font-medium mt-2 inline-block"><i class="fa-solid fa-circle-check mr-1"></i>All active</span>
@@ -195,10 +195,10 @@ $attendance_rate = $monthly_att['total_records'] > 0 ? round(($monthly_att['pres
                 <div class="group glass-strong rounded-2xl p-5 card-hover animate-fade-in-up stagger-7">
                     <div class="flex items-start justify-between">
                         <div>
-                            <span class="text-xs font-bold uppercase tracking-wider text-zinc-500"><i class="fa-solid fa-chart-line mr-1 text-violet-400"></i>Attendance Rate</span>
+                            <span class="text-xs font-bold uppercase tracking-wider text-zinc-500"><i class="fa-solid fa-chart-line mr-1 text-blue-400"></i>Attendance Rate</span>
                             <div class="text-3xl font-extrabold text-gradient mt-1"><?php echo $attendance_rate; ?>%</div>
                         </div>
-                        <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-violet-500/20 to-purple-500/20 text-violet-400 flex items-center justify-center text-lg group-hover:scale-110 transition-transform duration-300"><i class="fa-solid fa-chart-simple"></i></div>
+                        <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-500/20 to-indigo-500/20 text-blue-400 flex items-center justify-center text-lg group-hover:scale-110 transition-transform duration-300"><i class="fa-solid fa-chart-simple"></i></div>
                     </div>
                     <div class="mt-3 progress-bar"><div class="progress-bar-fill" style="width: <?php echo $attendance_rate; ?>%"></div></div>
                 </div>
@@ -221,7 +221,7 @@ $attendance_rate = $monthly_att['total_records'] > 0 ? round(($monthly_att['pres
                 <!-- Payroll Trend -->
                 <div class="glass-strong rounded-2xl p-6 card-hover animate-fade-in-up stagger-1">
                     <h3 class="font-bold text-white text-base mb-4 border-b border-white/[0.06] pb-3 flex items-center justify-between">
-                        <span><i class="fa-solid fa-chart-line text-violet-400 mr-2"></i>Payroll Trend (<?php echo date('Y'); ?>)</span>
+                        <span><i class="fa-solid fa-chart-line text-blue-400 mr-2"></i>Payroll Trend (<?php echo date('Y'); ?>)</span>
                         <span class="badge badge-slate text-[9px]">Annual</span>
                     </h3>
                     <div class="relative" style="height: 260px;">
@@ -231,7 +231,7 @@ $attendance_rate = $monthly_att['total_records'] > 0 ? round(($monthly_att['pres
 
                 <!-- Department Distribution -->
                 <div class="glass-strong rounded-2xl p-6 card-hover animate-fade-in-up stagger-2">
-                    <h3 class="font-bold text-white text-base mb-4 border-b border-white/[0.06] pb-3"><i class="fa-solid fa-chart-pie text-violet-400 mr-2"></i>Employee by Department</h3>
+                    <h3 class="font-bold text-white text-base mb-4 border-b border-white/[0.06] pb-3"><i class="fa-solid fa-chart-pie text-blue-400 mr-2"></i>Employee by Department</h3>
                     <div class="relative" style="height: 260px;">
                         <canvas id="deptChart"></canvas>
                     </div>
@@ -241,7 +241,7 @@ $attendance_rate = $monthly_att['total_records'] > 0 ? round(($monthly_att['pres
             <!-- ═══ Quick Actions ═══ -->
             <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 animate-fade-in-up stagger-1">
                 <a href="insert1.php" class="group glass-strong rounded-2xl p-5 card-hover text-center">
-                    <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 text-violet-400 flex items-center justify-center text-xl mx-auto group-hover:scale-110 transition-transform duration-300"><i class="fa-solid fa-user-plus"></i></div>
+                    <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500/20 to-indigo-500/20 text-blue-400 flex items-center justify-center text-xl mx-auto group-hover:scale-110 transition-transform duration-300"><i class="fa-solid fa-user-plus"></i></div>
                     <span class="text-xs font-bold text-zinc-300 mt-3 block">Add Employee</span>
                 </a>
                 <a href="dailyattendance.php" class="group glass-strong rounded-2xl p-5 card-hover text-center">
@@ -270,8 +270,8 @@ $attendance_rate = $monthly_att['total_records'] > 0 ? round(($monthly_att['pres
                 <!-- Recent Attendance -->
                 <div class="glass-strong rounded-2xl overflow-hidden card-hover animate-fade-in-up stagger-1">
                     <div class="p-5 border-b border-white/[0.06] flex items-center justify-between">
-                        <h3 class="font-bold text-white"><i class="fa-solid fa-clock-rotate-left text-violet-400 mr-2"></i>Recent Attendance</h3>
-                        <a href="dailyattendance.php" class="text-xs font-semibold text-violet-400 hover:text-violet-300 transition-colors"><i class="fa-regular fa-eye mr-1"></i>View All</a>
+                        <h3 class="font-bold text-white"><i class="fa-solid fa-clock-rotate-left text-blue-400 mr-2"></i>Recent Attendance</h3>
+                        <a href="dailyattendance.php" class="text-xs font-semibold text-blue-400 hover:text-blue-300 transition-colors"><i class="fa-regular fa-eye mr-1"></i>View All</a>
                     </div>
                     <div class="overflow-x-auto">
                         <table class="w-full text-left text-sm">
@@ -311,8 +311,8 @@ $attendance_rate = $monthly_att['total_records'] > 0 ? round(($monthly_att['pres
                 <!-- Recent Leave Requests -->
                 <div class="glass-strong rounded-2xl overflow-hidden card-hover animate-fade-in-up stagger-2">
                     <div class="p-5 border-b border-white/[0.06] flex items-center justify-between">
-                        <h3 class="font-bold text-white"><i class="fa-solid fa-envelope-open-text text-violet-400 mr-2"></i>Recent Leave Requests</h3>
-                        <a href="leaveApproval.php" class="text-xs font-semibold text-violet-400 hover:text-violet-300 transition-colors"><i class="fa-regular fa-eye mr-1"></i>View All</a>
+                        <h3 class="font-bold text-white"><i class="fa-solid fa-envelope-open-text text-blue-400 mr-2"></i>Recent Leave Requests</h3>
+                        <a href="leaveApproval.php" class="text-xs font-semibold text-blue-400 hover:text-blue-300 transition-colors"><i class="fa-regular fa-eye mr-1"></i>View All</a>
                     </div>
                     <div class="overflow-x-auto">
                         <table class="w-full text-left text-sm">
@@ -357,7 +357,7 @@ $attendance_rate = $monthly_att['total_records'] > 0 ? round(($monthly_att['pres
 
             <!-- ═══ Department Density ═══ -->
             <div class="glass-strong rounded-2xl p-6 card-hover animate-fade-in-up stagger-1">
-                <h3 class="font-bold text-white text-base mb-4 border-b border-white/[0.06] pb-3"><i class="fa-solid fa-building text-violet-400 mr-2"></i>Department Distribution</h3>
+                <h3 class="font-bold text-white text-base mb-4 border-b border-white/[0.06] pb-3"><i class="fa-solid fa-building text-blue-400 mr-2"></i>Department Distribution</h3>
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     <?php foreach ($departments as $dept):
                         $pct = $total_dept_emps > 0 ? round(($dept['emp_count'] / $total_dept_emps) * 100) : 0;
@@ -388,8 +388,8 @@ $attendance_rate = $monthly_att['total_records'] > 0 ? round(($monthly_att['pres
                         datasets: [{
                             label: 'Net Payroll ($)',
                             data: <?php echo json_encode($monthly_payroll_data); ?>,
-                            backgroundColor: isDark ? 'rgba(139,92,246,0.4)' : 'rgba(139,92,246,0.15)',
-                            borderColor: '#8B5CF6',
+                            backgroundColor: isDark ? 'rgba(30,58,138,0.4)' : 'rgba(30,58,138,0.15)',
+                            borderColor: '#1E3A8A',
                             borderWidth: 2,
                             borderRadius: 8,
                             borderSkipped: false

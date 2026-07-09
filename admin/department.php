@@ -51,7 +51,7 @@ $departments = $conn->query("SELECT d.*, (SELECT COUNT(*) FROM employee e WHERE 
     <link rel="icon" type="image/svg+xml" href="../favicon.svg">
     <?php include "../includes/header.php"; ?>
 </head>
-<body x-data="{ sidebarOpen: false }" class="bg-slate-50 dark:bg-[#09090b] text-slate-900 dark:text-white font-sans antialiased min-h-screen flex">
+<body x-data="{ sidebarOpen: false }" class="bg-slate-50 dark:bg-[#0B1120] text-slate-900 dark:text-white font-sans antialiased min-h-screen flex">
     <?php include "../includes/sidebar.php"; ?>
     <div class="flex-1 flex flex-col min-w-0 main-wrapper">
         <?php $page_title = "Departments"; $page_subtitle = "Manage company departments and employee distribution."; include "../includes/topbar.php"; ?>
@@ -86,7 +86,7 @@ $departments = $conn->query("SELECT d.*, (SELECT COUNT(*) FROM employee e WHERE 
                     <?php else: ?>
                     <section class="card-hover glass-strong rounded-2xl overflow-hidden">
                         <div class="p-6 border-b border-white/[0.06] flex items-center justify-between">
-                            <h2 class="font-bold text-white text-lg"><i class="fa-solid fa-building text-violet-400 mr-2"></i>Department List</h2>
+                            <h2 class="font-bold text-white text-lg"><i class="fa-solid fa-building text-blue-400 mr-2"></i>Department List</h2>
                             <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold bg-indigo-500/20 text-indigo-400"><?php echo count($departments); ?> departments</span>
                         </div>
                         <div class="overflow-x-auto">
@@ -119,14 +119,14 @@ $departments = $conn->query("SELECT d.*, (SELECT COUNT(*) FROM employee e WHERE 
 
                 <div>
                     <section class="group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-6">
-                        <h2 class="font-bold text-white text-lg mb-6"><i class="fa-solid fa-plus text-violet-400 mr-2"></i>Add Department</h2>
+                        <h2 class="font-bold text-white text-lg mb-6"><i class="fa-solid fa-plus text-blue-400 mr-2"></i>Add Department</h2>
                         <form method="POST" class="space-y-4 text-sm">
                         <?php echo csrf_field(); ?>
                             <div class="floating-group">
                                 <input type="text" name="department_name" id="dept_name" required placeholder=" " class="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 pt-6 pb-2 text-sm text-white shadow-sm outline-none transition">
                                 <label for="dept_name" class="absolute left-4 top-3.5 text-sm text-zinc-500 pointer-events-none transition-all duration-200">Department Name</label>
                             </div>
-                            <button type="submit" name="add_department" class="w-full rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700 text-white font-semibold text-sm px-5 py-3 shadow-sm transition flex items-center justify-center gap-2">
+                            <button type="submit" name="add_department" class="w-full rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold text-sm px-5 py-3 shadow-sm transition flex items-center justify-center gap-2">
                                 <i class="fa-solid fa-building"></i> Add Department
                             </button>
                         </form>

@@ -79,7 +79,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <?php include "../includes/header.php"; ?>
 </head>
 
-<body x-data="{ sidebarOpen: false }" class="bg-slate-50 dark:bg-[#09090b] text-slate-900 dark:text-white font-sans antialiased flex h-screen overflow-hidden">
+<body x-data="{ sidebarOpen: false }" class="bg-slate-50 dark:bg-[#0B1120] text-slate-900 dark:text-white font-sans antialiased flex h-screen overflow-hidden">
 
     <?php include "../includes/sidebar.php"; ?>
     <div class="flex-1 flex flex-col h-full overflow-y-auto lg:ml-64">

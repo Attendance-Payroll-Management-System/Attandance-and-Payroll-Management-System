@@ -104,13 +104,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 </head>
 <body class="min-h-screen flex flex-col items-center justify-center bg-grid px-4 bg-body text-body overflow-hidden">
     <div class="fixed inset-0 overflow-hidden pointer-events-none">
-        <div class="absolute -top-40 -right-40 w-96 h-96 bg-violet-500/10 rounded-full blur-3xl animate-breathe"></div>
-        <div class="absolute -bottom-40 -left-40 w-96 h-96 bg-fuchsia-500/10 rounded-full blur-3xl animate-breathe" style="animation-delay: 2s;"></div>
+        <div class="absolute -top-40 -right-40 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-breathe"></div>
+        <div class="absolute -bottom-40 -left-40 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl animate-breathe" style="animation-delay: 2s;"></div>
         <div class="absolute top-1/2 -translate-y-1/2 -left-20 w-60 h-60 bg-amber-500/5 rounded-full blur-3xl animate-breathe" style="animation-delay: 4s;"></div>
-        <div class="absolute top-20 right-20 w-32 h-32 border border-violet-500/10 rounded-full animate-spin-slow"></div>
-        <div class="absolute bottom-20 left-20 w-24 h-24 border border-fuchsia-500/10 rounded-full animate-spin-slow" style="animation-direction: reverse;"></div>
-        <svg class="absolute top-1/4 left-1/4 w-16 h-16 text-violet-500/5 animate-float" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
-        <svg class="absolute bottom-1/4 right-1/4 w-20 h-20 text-fuchsia-500/5 animate-float" style="animation-delay: 2s;" viewBox="0 0 24 24" fill="currentColor"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/></svg>
+        <div class="absolute top-20 right-20 w-32 h-32 border border-blue-500/10 rounded-full animate-spin-slow"></div>
+        <div class="absolute bottom-20 left-20 w-24 h-24 border border-indigo-500/10 rounded-full animate-spin-slow" style="animation-direction: reverse;"></div>
+        <svg class="absolute top-1/4 left-1/4 w-16 h-16 text-blue-500/5 animate-float" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+        <svg class="absolute bottom-1/4 right-1/4 w-20 h-20 text-indigo-500/5 animate-float" style="animation-delay: 2s;" viewBox="0 0 24 24" fill="currentColor"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/></svg>
     </div>
 
     <div class="fixed top-4 right-4 z-50">
@@ -122,7 +122,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
     <div class="w-full max-w-[420px] space-y-6 relative z-10">
         <div class="flex flex-col items-center gap-4 animate-fade-in-up">
-            <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-500 via-fuchsia-500 to-amber-500 flex items-center justify-center shadow-2xl shadow-violet-500/20 animate-float ring-2 ring-white/20 glow-violet card-inner-glow">
+            <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-600 via-indigo-600 to-blue-500 flex items-center justify-center shadow-2xl shadow-blue-500/20 animate-float ring-2 ring-white/20 glow-navy card-inner-glow">
                 <i class="fas fa-shield-halved text-white text-2xl"></i>
             </div>
             <div class="text-center">
@@ -142,20 +142,20 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
             <form action="login.php" method="POST" class="space-y-5">
                 <div class="space-y-1.5">
-                    <label class="text-sm font-medium text-zinc-300"><i class="fa-regular fa-envelope mr-1.5 text-violet-400"></i>Email / Username</label>
-                    <input type="text" name="username" placeholder="admin@company.com" class="w-full px-4 py-3 rounded-xl bg-white/[0.06] border border-white/10 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50 transition-all duration-200">
+                    <label class="text-sm font-medium text-zinc-300"><i class="fa-regular fa-envelope mr-1.5 text-blue-400"></i>Email / Username</label>
+                    <input type="text" name="username" placeholder="admin@company.com" class="w-full px-4 py-3 rounded-xl bg-white/[0.06] border border-white/10 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all duration-200">
                 </div>
                 <div class="space-y-1.5">
-                    <label class="text-sm font-medium text-zinc-300"><i class="fa-solid fa-lock mr-1.5 text-violet-400"></i>Password</label>
+                    <label class="text-sm font-medium text-zinc-300"><i class="fa-solid fa-lock mr-1.5 text-blue-400"></i>Password</label>
                     <div class="relative">
-                        <input type="password" name="password" id="admin-login-password" placeholder="Enter password" class="w-full px-4 py-3 pr-11 rounded-xl bg-white/[0.06] border border-white/10 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50 transition-all duration-200">
-                        <span class="pw-eye-toggle absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-violet-400 cursor-pointer select-none z-10" role="button" tabindex="0" data-target="admin-login-password">
+                        <input type="password" name="password" id="admin-login-password" placeholder="Enter password" class="w-full px-4 py-3 pr-11 rounded-xl bg-white/[0.06] border border-white/10 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all duration-200">
+                        <span class="pw-eye-toggle absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-blue-400 cursor-pointer select-none z-10" role="button" tabindex="0" data-target="admin-login-password">
                             <i class="fa-solid fa-eye text-base"></i>
                         </span>
                     </div>
                 </div>
 
-                <button type="submit" class="w-full bg-gradient-to-r from-violet-600 via-fuchsia-600 to-amber-600 hover:from-violet-500 hover:via-fuchsia-500 hover:to-amber-500 text-white font-semibold px-4 py-3.5 rounded-xl shadow-lg shadow-violet-600/20 hover:shadow-xl hover:shadow-violet-500/30 transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 animate-gradient btn-hover-lift relative overflow-hidden">
+                <button type="submit" class="w-full bg-gradient-to-r from-blue-700 via-indigo-600 to-blue-600 hover:from-blue-600 hover:via-indigo-500 hover:to-blue-500 text-white font-semibold px-4 py-3.5 rounded-xl shadow-lg shadow-blue-600/20 hover:shadow-xl hover:shadow-blue-500/30 transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 animate-gradient btn-hover-lift relative overflow-hidden">
                     <span class="relative z-10"><i class="fa-solid fa-lock-open mr-2"></i> Authenticate</span>
                     <span class="absolute inset-0 bg-white/10 opacity-0 hover:opacity-100 transition-opacity"></span>
                 </button>
@@ -165,7 +165,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
         <div class="flex items-center justify-center gap-3 animate-fade-in-up stagger-2">
             <span class="h-px w-12 bg-body-secondary"></span>
-            <a href="../employee/login.php" class="text-sm text-body-muted hover:text-violet-400 font-medium transition-colors flex items-center gap-1.5">
+            <a href="../employee/login.php" class="text-sm text-body-muted hover:text-blue-400 font-medium transition-colors flex items-center gap-1.5">
                 <i class="fa-solid fa-arrow-left text-xs"></i> Employee Login
             </a>
             <span class="h-px w-12 bg-body-secondary"></span>

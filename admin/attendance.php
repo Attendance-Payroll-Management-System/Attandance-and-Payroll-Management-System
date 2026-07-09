@@ -14,6 +14,9 @@ $days_in_month = date('t', strtotime($month_start));
 
 $day_names = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
+// Fetch departments for filter
+$departments = $conn->query("SELECT id, department_name FROM departments ORDER BY department_name ASC")->fetch_all(MYSQLI_ASSOC);
+
 // Fetch holidays for the month
 $holiday_map = [];
 $conn->query("CREATE TABLE IF NOT EXISTS holidays (
@@ -34,10 +37,9 @@ foreach ($h_stmt->get_result()->fetch_all(MYSQLI_ASSOC) as $h) {
 }
 $h_stmt->close();
 
-// Build weeks: group days of month into week chunks (Mon-Sun)
+// Build weeks
 $weeks = [];
 $week_start = new DateTime($month_start);
-// Find the Monday of the week containing the 1st
 $week_start->modify('monday this week');
 $month_end_dt = new DateTime($month_end);
 
@@ -57,10 +59,11 @@ while ($week_start <= $month_end_dt) {
     $week_start->modify('+7 days');
 }
 
-// Fetch attendance records for the month
-$att_sql = "SELECT a.*, e.name, e.employee_code, d.department_name
+// Fetch attendance records
+$att_sql = "SELECT a.*, e.name, e.employee_code, e.profile_photo, p.position_name, d.department_name
 FROM attendance a
 JOIN employee e ON a.employee_id = e.id
+LEFT JOIN positions p ON e.position_id = p.id
 LEFT JOIN departments d ON e.department_id = d.id
 WHERE a.attendance_date BETWEEN ? AND ? AND e.status = 'active'
 ORDER BY e.name ASC, a.attendance_date ASC";
@@ -71,17 +74,19 @@ $stmt->execute();
 $att_rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
 
-// Build employee map [employee_id => {name, code, dept}]
-// and attendance map [employee_id][date] => status
+// Build employee data and attendance map
 $employees = [];
 $att_map = [];
 foreach ($att_rows as $row) {
     $eid = $row['employee_id'];
     if (!isset($employees[$eid])) {
         $employees[$eid] = [
+            'id' => $eid,
             'name' => $row['name'],
             'code' => $row['employee_code'],
-            'dept' => $row['department_name'] ?? '-',
+            'profile_photo' => $row['profile_photo'] ?? '',
+            'position' => $row['position_name'] ?? '-',
+            'department' => $row['department_name'] ?? '-',
         ];
     }
     $att_map[$eid][$row['attendance_date']] = $row['status'];
@@ -116,6 +121,14 @@ function status_badge($status) {
         default => 'bg-gray-200',
     };
 }
+
+// Build flat list of all day columns for JS
+$all_days = [];
+foreach ($weeks as $week) {
+    foreach ($week as $d) {
+        $all_days[] = $d;
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -125,10 +138,19 @@ function status_badge($status) {
     <title>HNIN AKARI NWE · Monthly Attendance</title>
     <link rel="icon" type="image/svg+xml" href="../favicon.svg">
     <?php include "../includes/header.php"; ?>
+    <style>
+        .att-row.filter-hidden,
+        .att-row.page-hidden {
+            display: none !important;
+        }
+        [x-cloak] {
+            display: none !important;
+        }
+    </style>
 </head>
-<body x-data="{ sidebarOpen: false }" class="bg-slate-50 dark:bg-[#09090b] text-slate-900 dark:text-white font-sans antialiased min-h-screen flex">
+<body x-data="attendancePage()" class="bg-slate-50 dark:bg-[#0B1120] text-slate-900 dark:text-white font-sans antialiased min-h-screen">
     <?php include "../includes/sidebar.php"; ?>
-    <div class="flex-1 flex flex-col min-w-0 main-wrapper">
+    <div class="main-wrapper flex flex-col min-h-screen">
         <?php
             $page_title = "Monthly Attendance";
             $page_subtitle = "Weekly attendance grid for " . $month_name . ' ' . $selected_year;
@@ -145,55 +167,48 @@ function status_badge($status) {
                 <option value="<?php echo $y; ?>" <?php echo $y == $selected_year ? 'selected' : ''; ?>><?php echo $y; ?></option>
                 <?php endfor; ?>
             </select>
-            <button type="submit" class="rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700 text-white font-semibold text-sm px-5 py-2.5 shadow-sm transition flex items-center gap-2">
+            <button type="submit" class="rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold text-sm px-5 py-2.5 shadow-sm transition flex items-center gap-2">
                 <i class="fa-solid fa-magnifying-glass"></i> View
             </button>
         </form>
         <?php $page_actions = ob_get_clean(); include "../includes/topbar.php"; ?>
-        <main class="flex-1 p-8 overflow-y-auto">
+        <main class="p-6 lg:p-8 space-y-6 flex-1 page-content w-full page-enter">
 
-            <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+            <!-- Summary Stats -->
+            <section class="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                 <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-5">
-                    <span class="text-xs font-bold uppercase tracking-wider text-zinc-500">Active Employees</span>
-                    <p class="text-2xl font-bold text-white"><?php echo $total_employees; ?></p>
-                    <span class="text-xs text-zinc-500"><?php echo $days_in_month; ?> days</span>
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500/20 to-indigo-500/20 text-blue-400 flex items-center justify-center">
+                            <i class="fa-solid fa-users"></i>
+                        </div>
+                        <div>
+                            <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Active Employees</span>
+                            <p class="text-2xl font-extrabold text-white"><?php echo $total_employees; ?></p>
+                        </div>
+                    </div>
                 </div>
                 <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-5">
-                    <span class="text-xs font-bold uppercase tracking-wider text-zinc-500">Attendance Rate</span>
-                    <p class="text-2xl font-bold text-emerald-400"><?php echo $attendance_rate; ?>%</p>
-                    <span class="text-xs text-zinc-500">Present / total</span>
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500/20 to-teal-500/20 text-emerald-400 flex items-center justify-center">
+                            <i class="fa-solid fa-chart-line"></i>
+                        </div>
+                        <div>
+                            <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Attendance Rate</span>
+                            <p class="text-2xl font-extrabold text-emerald-400"><?php echo $attendance_rate; ?>%</p>
+                        </div>
+                    </div>
                 </div>
                 <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-5">
-                    <span class="text-xs font-bold uppercase tracking-wider text-emerald-400"><i class="fa-solid fa-circle text-[8px] mr-1"></i>Present</span>
-                    <p class="text-2xl font-bold text-white"><?php echo $status_counts['present']; ?></p>
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-400"><i class="fa-solid fa-circle text-[8px] mr-1"></i>Present</span>
+                    <p class="text-2xl font-bold text-white mt-1"><?php echo $status_counts['present']; ?></p>
                 </div>
                 <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-5">
-                    <span class="text-xs font-bold uppercase tracking-wider text-amber-500"><i class="fa-solid fa-circle text-[8px] mr-1"></i>Late</span>
-                    <p class="text-2xl font-bold text-white"><?php echo $status_counts['late']; ?></p>
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-amber-500"><i class="fa-solid fa-circle text-[8px] mr-1"></i>Late</span>
+                    <p class="text-2xl font-bold text-white mt-1"><?php echo $status_counts['late']; ?></p>
                 </div>
                 <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-5">
-                    <span class="text-xs font-bold uppercase tracking-wider text-blue-400"><i class="fa-solid fa-circle text-[8px] mr-1"></i>Leave</span>
-                    <p class="text-2xl font-bold text-white"><?php echo $status_counts['leave']; ?></p>
-                </div>
-                <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-5">
-                    <span class="text-xs font-bold uppercase tracking-wider text-red-500"><i class="fa-solid fa-circle text-[8px] mr-1"></i>AWOL</span>
-                    <p class="text-2xl font-bold text-white"><?php echo $status_counts['awol']; ?></p>
-                </div>
-                <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-5">
-                    <span class="text-xs font-bold uppercase tracking-wider text-rose-400"><i class="fa-solid fa-circle text-[8px] mr-1"></i>Full-Day Absent</span>
-                    <p class="text-2xl font-bold text-white"><?php echo $status_counts['full_absent']; ?></p>
-                </div>
-                <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-5">
-                    <span class="text-xs font-bold uppercase tracking-wider text-orange-400"><i class="fa-solid fa-circle text-[8px] mr-1"></i>Half-Day Absent</span>
-                    <p class="text-2xl font-bold text-white"><?php echo $status_counts['half_absent']; ?></p>
-                </div>
-                <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-5">
-                    <span class="text-xs font-bold uppercase tracking-wider text-pink-400"><i class="fa-solid fa-circle text-[8px] mr-1"></i>Public Holiday</span>
-                    <p class="text-2xl font-bold text-white"><?php echo $status_counts['public_holiday']; ?></p>
-                </div>
-                <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-5">
-                    <span class="text-xs font-bold uppercase tracking-wider text-purple-400"><i class="fa-solid fa-circle text-[8px] mr-1"></i>Weekend</span>
-                    <p class="text-2xl font-bold text-white"><?php echo $status_counts['weekend']; ?></p>
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-blue-400"><i class="fa-solid fa-circle text-[8px] mr-1"></i>Leave</span>
+                    <p class="text-2xl font-bold text-white mt-1"><?php echo $status_counts['leave']; ?></p>
                 </div>
             </section>
 
@@ -214,10 +229,36 @@ function status_badge($status) {
                 <p class="text-zinc-400 mt-2 max-w-md mx-auto">Attendance records for <?php echo $month_name . ' ' . $selected_year; ?> will appear here once employees start checking in.</p>
             </div>
             <?php else: ?>
+
+            <!-- Filter & Search Bar -->
+            <div class="glass-strong rounded-2xl p-4">
+                <div class="flex flex-col sm:flex-row gap-3">
+                    <div class="sm:w-48">
+                        <select x-model="departmentFilter" @change="filterEmployees()" class="w-full px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-white/[0.05] border border-slate-200 dark:border-white/[0.08] text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 dark:focus:border-blue-500/50 transition-all duration-200">
+                            <option value="all">All Departments</option>
+                            <?php foreach ($departments as $dept): ?>
+                            <option value="<?php echo htmlspecialchars($dept['department_name']); ?>"><?php echo htmlspecialchars($dept['department_name']); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="relative flex-1">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-zinc-500 text-sm"></i>
+                        <input type="text" x-model="searchQuery" @input="filterEmployees()" placeholder="Search by name, ID, position, or department..."
+                            class="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-100 dark:bg-white/[0.05] border border-slate-200 dark:border-white/[0.08] text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 dark:focus:border-blue-500/50 transition-all duration-200">
+                    </div>
+                    <div class="flex items-center gap-2 sm:w-auto">
+                        <span class="text-xs text-slate-500 dark:text-zinc-400 whitespace-nowrap">
+                            <span x-text="filteredCount"></span> of <span><?php echo count($employees); ?></span> employees
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Weekly Attendance Matrix -->
             <section class="card-hover glass-strong rounded-2xl overflow-hidden">
-                <div class="p-6 border-b border-white/[0.06] flex items-center justify-between">
-                    <h2 class="font-bold text-white text-lg"><i class="fa-solid fa-calendar-days text-violet-400 mr-2"></i>Weekly Attendance Matrix</h2>
-                    <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold bg-indigo-500/20 text-indigo-400"><?php echo $total_employees; ?> employees</span>
+                <div class="p-5 border-b border-white/[0.06] flex items-center justify-between">
+                    <h2 class="font-bold text-white text-base"><i class="fa-solid fa-calendar-days text-blue-400 mr-2"></i>Weekly Attendance Matrix</h2>
+                    <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold bg-indigo-500/20 text-indigo-400"><?php echo $month_name . ' ' . $selected_year; ?></span>
                 </div>
                 <div class="overflow-x-auto" style="max-height: 600px; overflow-y: auto;">
                     <table class="w-full text-left text-xs border-collapse">
@@ -261,51 +302,103 @@ function status_badge($status) {
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-white/[0.06]">
-                                <?php foreach ($employees as $eid => $emp): ?>
-                                    <?php
-                                    $worked = 0;
-                                    $total_work_days = 0;
-                                    foreach ($weeks as $week) {
-                                        foreach ($week as $day_ymd) {
-                                            $s = $att_map[$eid][$day_ymd] ?? '';
-                                            if ($s === 'present' || $s === 'late') $worked++;
-                                            if (!empty($s)) $total_work_days++;
-                                        }
+                            <?php foreach ($employees as $eid => $emp):
+                                $worked = 0;
+                                $total_work_days = 0;
+                                foreach ($weeks as $week) {
+                                    foreach ($week as $day_ymd) {
+                                        $s = $att_map[$eid][$day_ymd] ?? '';
+                                        if ($s === 'present' || $s === 'late') $worked++;
+                                        if (!empty($s)) $total_work_days++;
                                     }
-                                    $emp_rate = $total_work_days > 0 ? round(($worked / $total_work_days) * 100, 1) : 0;
-                                    $rate_color = $emp_rate >= 90 ? 'text-emerald-400' : ($emp_rate >= 75 ? 'text-amber-400' : 'text-red-400');
-                                ?>
-                                <tr class="hover:bg-white/[0.02] transition">
-                                    <td class="px-4 py-2.5 font-medium text-body sticky left-0 bg-body z-10"><?php echo htmlspecialchars($emp['name']); ?></td>
-                                    <td class="px-4 py-2.5 text-body-secondary sticky left-[140px] bg-body z-10"><?php echo htmlspecialchars($emp['code']); ?></td>
-                                    <?php foreach ($weeks as $week): ?>
-                                        <?php foreach ($week as $day_ymd): ?>
-                                        <?php
-                                        $status = $att_map[$eid][$day_ymd] ?? '';
-                                        $is_holiday = isset($holiday_map[$day_ymd]);
-                                        ?>
-                                        <td class="px-1 py-2.5 text-center border-x border-white/[0.06] <?php echo $is_holiday && !$status ? 'bg-pink-50/30' : ''; ?>">
-                                            <?php if ($status): ?>
-                                            <span class="inline-block w-4 h-4 rounded-full <?php echo status_badge($status); ?>" title="<?php echo ucfirst($status) . ' ' . date('M j', strtotime($day_ymd)); ?>"></span>
-                                            <?php elseif ($is_holiday): ?>
-                                            <span class="inline-block w-4 h-4 rounded-full bg-pink-300 border border-pink-400 flex items-center justify-center text-white text-[8px]" title="<?php echo htmlspecialchars($holiday_map[$day_ymd]); ?>">
-                                                <i class="fa-solid fa-star"></i>
-                                            </span>
+                                }
+                                $emp_rate = $total_work_days > 0 ? round(($worked / $total_work_days) * 100, 1) : 0;
+                                $rate_color = $emp_rate >= 90 ? 'text-emerald-400' : ($emp_rate >= 75 ? 'text-amber-400' : 'text-red-400');
+                            ?>
+                            <tr class="att-row hover:bg-white/[0.02] transition"
+                                data-id="<?php echo $eid; ?>"
+                                data-name="<?php echo htmlspecialchars(strtolower($emp['name'])); ?>"
+                                data-code="<?php echo htmlspecialchars(strtolower($emp['code'])); ?>"
+                                data-position="<?php echo htmlspecialchars(strtolower($emp['position'])); ?>"
+                                data-department="<?php echo htmlspecialchars($emp['department']); ?>">
+                                <td class="px-4 py-2.5 font-medium text-body sticky left-0 bg-body z-10">
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-7 h-7 rounded-full overflow-hidden shrink-0 ring-2 ring-blue-500/10">
+                                            <?php if (!empty($emp['profile_photo'])): ?>
+                                                <img src="../<?php echo htmlspecialchars($emp['profile_photo']); ?>" class="w-full h-full object-cover" alt="">
                                             <?php else: ?>
-                                            <span class="inline-block w-4 h-4 rounded-full bg-white/10 border border-white/10" title="<?php echo date('M j', strtotime($day_ymd)); ?>"></span>
+                                                <div class="w-full h-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-[9px] font-bold text-white"><?php echo htmlspecialchars(substr($emp['name'], 0, 2)); ?></div>
                                             <?php endif; ?>
-                                        </td>
-                                        <?php endforeach; ?>
+                                        </div>
+                                        <span class="truncate"><?php echo htmlspecialchars($emp['name']); ?></span>
+                                    </div>
+                                </td>
+                                <td class="px-4 py-2.5 text-body-secondary sticky left-[140px] bg-body z-10"><?php echo htmlspecialchars($emp['code']); ?></td>
+                                <?php foreach ($weeks as $week): ?>
+                                    <?php foreach ($week as $day_ymd): ?>
+                                    <?php
+                                    $status = $att_map[$eid][$day_ymd] ?? '';
+                                    $is_holiday = isset($holiday_map[$day_ymd]);
+                                    ?>
+                                    <td class="px-1 py-2.5 text-center border-x border-white/[0.06] <?php echo $is_holiday && !$status ? 'bg-pink-50/30' : ''; ?>">
+                                        <?php if ($status): ?>
+                                        <span class="inline-block w-4 h-4 rounded-full <?php echo status_badge($status); ?>" title="<?php echo ucfirst($status) . ' ' . date('M j', strtotime($day_ymd)); ?>"></span>
+                                        <?php elseif ($is_holiday): ?>
+                                        <span class="inline-block w-4 h-4 rounded-full bg-pink-300 border border-pink-400 flex items-center justify-center text-white text-[8px]" title="<?php echo htmlspecialchars($holiday_map[$day_ymd]); ?>">
+                                            <i class="fa-solid fa-star"></i>
+                                        </span>
+                                        <?php else: ?>
+                                        <span class="inline-block w-4 h-4 rounded-full bg-white/10 border border-white/10" title="<?php echo date('M j', strtotime($day_ymd)); ?>"></span>
+                                        <?php endif; ?>
+                                    </td>
                                     <?php endforeach; ?>
-                                    <td class="px-3 py-2.5 text-center font-bold <?php echo $rate_color; ?>"><?php echo $emp_rate; ?>%</td>
-                                </tr>
                                 <?php endforeach; ?>
+                                <td class="px-3 py-2.5 text-center font-bold <?php echo $rate_color; ?>"><?php echo $emp_rate; ?>%</td>
+                            </tr>
+                            <?php endforeach; ?>
                         </tbody>
                     </table>
                 </div>
             </section>
 
-            <section class="mt-4 flex flex-wrap items-center gap-6 text-xs text-zinc-400">
+            <!-- No Results -->
+            <div x-show="filteredCount === 0" x-cloak class="text-center py-12">
+                <i class="fa-solid fa-users-slash text-4xl text-slate-300 dark:text-zinc-600 mb-4"></i>
+                <h3 class="text-lg font-bold text-slate-700 dark:text-zinc-300">No attendance records found</h3>
+                <p class="text-sm text-slate-500 dark:text-zinc-500 mt-1">Try adjusting your search or filter criteria.</p>
+            </div>
+
+            <!-- Pagination -->
+            <div x-show="totalPages > 1" x-cloak>
+                <div class="glass-strong rounded-2xl p-4">
+                    <div class="flex items-center justify-between flex-wrap gap-3">
+                        <div class="text-xs text-zinc-500">
+                            Page <span x-text="currentPage"></span> of <span x-text="totalPages"></span>
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                            <button @click="goToPage(Math.max(1, currentPage - 1))" :disabled="currentPage === 1"
+                                class="w-9 h-9 rounded-xl flex items-center justify-center text-xs font-semibold transition-all duration-200"
+                                :class="currentPage === 1 ? 'bg-white/[0.03] text-zinc-600 cursor-not-allowed' : 'bg-white dark:bg-white/[0.06] border border-slate-200 dark:border-white/[0.08] text-slate-500 dark:text-zinc-400 hover:border-blue-300 dark:hover:border-blue-500/30 hover:text-blue-600 dark:hover:text-blue-400'">
+                                <i class="fa-solid fa-chevron-left text-xs"></i>
+                            </button>
+                            <template x-for="page in visiblePages" :key="page">
+                                <button @click="goToPage(page)"
+                                    class="w-9 h-9 rounded-xl flex items-center justify-center text-xs font-semibold transition-all duration-200"
+                                    :class="page === currentPage ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20' : 'bg-white dark:bg-white/[0.06] border border-slate-200 dark:border-white/[0.08] text-slate-500 dark:text-zinc-400 hover:border-blue-300 dark:hover:border-blue-500/30 hover:text-blue-600 dark:hover:text-blue-400'"
+                                    x-text="page"></button>
+                            </template>
+                            <button @click="goToPage(Math.min(totalPages, currentPage + 1))" :disabled="currentPage === totalPages"
+                                class="w-9 h-9 rounded-xl flex items-center justify-center text-xs font-semibold transition-all duration-200"
+                                :class="currentPage === totalPages ? 'bg-white/[0.03] text-zinc-600 cursor-not-allowed' : 'bg-white dark:bg-white/[0.06] border border-slate-200 dark:border-white/[0.08] text-slate-500 dark:text-zinc-400 hover:border-blue-300 dark:hover:border-blue-500/30 hover:text-blue-600 dark:hover:text-blue-400'">
+                                <i class="fa-solid fa-chevron-right text-xs"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Legend -->
+            <section class="flex flex-wrap items-center gap-4 text-xs text-zinc-400">
                 <span><span class="inline-block w-3 h-3 rounded-full bg-emerald-500 align-middle mr-1"></span> Present</span>
                 <span><span class="inline-block w-3 h-3 rounded-full bg-amber-400 align-middle mr-1"></span> Late</span>
                 <span><span class="inline-block w-3 h-3 rounded-full bg-blue-500 align-middle mr-1"></span> Leave</span>
@@ -316,6 +409,7 @@ function status_badge($status) {
                 <span><span class="inline-block w-3 h-3 rounded-full bg-purple-500 align-middle mr-1"></span> Weekend</span>
                 <span><span class="inline-block w-3 h-3 rounded-full bg-white/10 border border-white/10 align-middle mr-1"></span> No Record</span>
             </section>
+
             <?php endif; ?>
         </main>
 
@@ -327,5 +421,97 @@ function status_badge($status) {
             </span>
         </footer>
     </div>
+
+    <script>
+    function attendancePage() {
+        const totalEmps = <?php echo count($employees); ?>;
+        return {
+            searchQuery: '',
+            departmentFilter: 'all',
+            currentPage: 1,
+            perPage: 5,
+            filteredCount: totalEmps,
+
+            get totalPages() {
+                return Math.max(1, Math.ceil(this.filteredCount / this.perPage));
+            },
+
+            get visiblePages() {
+                const pages = [];
+                const total = this.totalPages;
+                const current = this.currentPage;
+                let start = Math.max(1, current - 2);
+                let end = Math.min(total, current + 2);
+                if (end - start < 4) {
+                    if (start === 1) end = Math.min(total, start + 4);
+                    else start = Math.max(1, end - 4);
+                }
+                for (let i = start; i <= end; i++) pages.push(i);
+                return pages;
+            },
+
+            filterEmployees() {
+                const q = this.searchQuery.toLowerCase().trim();
+                const dept = this.departmentFilter;
+                const rows = document.querySelectorAll('.att-row');
+                let visibleCount = 0;
+
+                rows.forEach(row => {
+                    const name = row.dataset.name || '';
+                    const code = row.dataset.code || '';
+                    const position = row.dataset.position || '';
+                    const department = row.dataset.department || '';
+
+                    const matchDept = dept === 'all' || department === dept;
+                    const matchSearch = !q || name.includes(q) || code.includes(q) || position.includes(q) || department.toLowerCase().includes(q);
+                    const visible = matchDept && matchSearch;
+
+                    if (visible) {
+                        row.classList.remove('filter-hidden');
+                        visibleCount++;
+                    } else {
+                        row.classList.add('filter-hidden');
+                    }
+                });
+
+                this.filteredCount = visibleCount;
+                this.currentPage = 1;
+                this.applyPagination();
+            },
+
+            goToPage(page) {
+                this.currentPage = page;
+                this.applyPagination();
+            },
+
+            applyPagination() {
+                const rows = Array.from(document.querySelectorAll('.att-row:not(.filter-hidden)'));
+                const total = rows.length;
+                const start = (this.currentPage - 1) * this.perPage;
+                const end = start + this.perPage;
+
+                rows.forEach((row, i) => {
+                    if (i >= start && i < end) {
+                        row.classList.remove('page-hidden');
+                    } else {
+                        row.classList.add('page-hidden');
+                    }
+                });
+
+                // Also hide rows that are filter-hidden
+                document.querySelectorAll('.att-row.filter-hidden').forEach(row => {
+                    row.classList.add('page-hidden');
+                });
+            },
+
+            init() {
+                // Initial pagination on page load
+                this.$nextTick(() => {
+                    this.applyPagination();
+                });
+            }
+        };
+    }
+    </script>
 </body>
 </html>

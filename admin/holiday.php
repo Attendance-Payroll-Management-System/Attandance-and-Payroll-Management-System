@@ -80,7 +80,7 @@ for ($m = 1; $m <= 12; $m++) {
     <link rel="icon" type="image/svg+xml" href="../favicon.svg">
     <?php include "../includes/header.php"; ?>
 </head>
-<body x-data="{ sidebarOpen: false }" class="bg-slate-50 dark:bg-[#09090b] text-slate-900 dark:text-white font-sans antialiased min-h-screen flex">
+<body x-data="{ sidebarOpen: false }" class="bg-slate-50 dark:bg-[#0B1120] text-slate-900 dark:text-white font-sans antialiased min-h-screen flex">
     <?php include "../includes/sidebar.php"; ?>
     <div class="flex-1 flex flex-col min-w-0 main-wrapper">
         <?php
@@ -111,7 +111,7 @@ for ($m = 1; $m <= 12; $m++) {
                 <div class="lg:col-span-3">
                     <section class="card-hover glass-strong rounded-2xl overflow-hidden">
                         <div class="p-6 border-b border-white/[0.06] flex items-center justify-between">
-                            <h2 class="font-bold text-white text-lg"><i class="fa-solid fa-calendar-days text-violet-400 mr-2"></i><?php echo $selected_year; ?> Holiday Calendar</h2>
+                            <h2 class="font-bold text-white text-lg"><i class="fa-solid fa-calendar-days text-blue-400 mr-2"></i><?php echo $selected_year; ?> Holiday Calendar</h2>
                             <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold bg-indigo-500/20 text-indigo-400"><?php echo count($holidays); ?> holidays</span>
                         </div>
                         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-6">
@@ -148,26 +148,26 @@ for ($m = 1; $m <= 12; $m++) {
 
                 <div>
                     <section class="group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-6">
-                        <h2 class="font-bold text-white text-lg mb-6"><i class="fa-solid fa-plus text-violet-400 mr-2"></i>Add Holiday</h2>
+                        <h2 class="font-bold text-white text-lg mb-6"><i class="fa-solid fa-plus text-blue-400 mr-2"></i>Add Holiday</h2>
                         <form method="POST" class="space-y-4 text-sm">
                         <?php echo csrf_field(); ?>
                             <div>
                                 <label class="text-xs font-semibold text-zinc-400 block mb-1.5">Holiday Name</label>
-                                <input type="text" name="holiday_name" required class="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white placeholder-zinc-500 shadow-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-500/30">
+                                <input type="text" name="holiday_name" required class="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white placeholder-zinc-500 shadow-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30">
                             </div>
                             <div>
                                 <label class="text-xs font-semibold text-zinc-400 block mb-1.5">Date</label>
-                                <input type="date" name="holiday_date" required class="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white placeholder-zinc-500 shadow-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-500/30">
+                                <input type="date" name="holiday_date" required class="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white placeholder-zinc-500 shadow-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30">
                             </div>
                             <div>
                                 <label class="text-xs font-semibold text-zinc-400 block mb-1.5">Type</label>
-                                <select name="type" class="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white placeholder-zinc-500 shadow-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-500/30">
+                                <select name="type" class="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white placeholder-zinc-500 shadow-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30">
                                     <option value="Public">Public</option>
                                     <option value="Company">Company</option>
                                     <option value="Optional">Optional</option>
                                 </select>
                             </div>
-                            <button type="submit" name="add_holiday" class="w-full rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700 text-white font-semibold text-sm px-5 py-3 shadow-sm transition flex items-center justify-center gap-2">
+                            <button type="submit" name="add_holiday" class="w-full rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold text-sm px-5 py-3 shadow-sm transition flex items-center justify-center gap-2">
                                 <i class="fa-solid fa-plus"></i> Add Holiday
                             </button>
                         </form>

@@ -184,7 +184,7 @@ if ($admin['position_id']) {
     <link rel="icon" type="image/svg+xml" href="../favicon.svg">
     <?php include "../includes/header.php"; ?>
 </head>
-<body x-data="{ sidebarOpen: false, activeTab: 'profile' }" class="bg-slate-50 dark:bg-[#09090b] text-slate-900 dark:text-white font-sans antialiased min-h-screen flex">
+<body x-data="{ sidebarOpen: false, activeTab: 'profile' }" class="bg-slate-50 dark:bg-[#0B1120] text-slate-900 dark:text-white font-sans antialiased min-h-screen flex">
     <?php include "../includes/sidebar.php"; ?>
     <div class="flex-1 flex flex-col min-w-0 main-wrapper">
         <?php include "../includes/topbar.php"; ?>
@@ -202,7 +202,7 @@ if ($admin['position_id']) {
 
             <!-- Profile Header Card -->
             <div class="glass-strong rounded-2xl overflow-hidden mb-6 animate-fade-in-up">
-                <div class="h-32 bg-gradient-to-r from-violet-600 via-fuchsia-600 to-amber-500 relative">
+                <div class="h-32 bg-gradient-to-r from-blue-600 via-indigo-600 to-amber-500 relative">
                     <div class="absolute inset-0 bg-black/10"></div>
                 </div>
                 <div class="px-6 pb-6 relative">
@@ -212,11 +212,11 @@ if ($admin['position_id']) {
                             <?php if (!empty($admin['profile_photo'])): ?>
                             <img src="../<?php echo htmlspecialchars($admin['profile_photo']); ?>" alt="Profile" class="w-24 h-24 rounded-full border-4 border-white dark:border-[#18181b] object-cover shadow-lg">
                             <?php else: ?>
-                            <div class="w-24 h-24 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white flex items-center justify-center text-3xl font-bold border-4 border-white dark:border-[#18181b] shadow-lg">
+                            <div class="w-24 h-24 rounded-full bg-gradient-to-br from-blue-500 to-indigo-500 text-white flex items-center justify-center text-3xl font-bold border-4 border-white dark:border-[#18181b] shadow-lg">
                                 <?php echo strtoupper(substr($admin_name, 0, 2)); ?>
                             </div>
                             <?php endif; ?>
-                            <label for="photo-upload" class="absolute bottom-0 right-0 w-8 h-8 bg-violet-600 rounded-full flex items-center justify-center text-white text-xs cursor-pointer hover:bg-violet-700 transition shadow-lg opacity-0 group-hover:opacity-100">
+                            <label for="photo-upload" class="absolute bottom-0 right-0 w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white text-xs cursor-pointer hover:bg-blue-700 transition shadow-lg opacity-0 group-hover:opacity-100">
                                 <i class="fa-solid fa-camera"></i>
                             </label>
                             <input type="file" id="photo-upload" name="profile_photo" class="hidden" accept="image/*" onchange="document.getElementById('photo-form').submit();">
@@ -229,7 +229,7 @@ if ($admin['position_id']) {
                             <h1 class="text-2xl font-bold text-slate-900 dark:text-white"><?php echo htmlspecialchars($admin['name']); ?></h1>
                             <p class="text-sm text-slate-500 dark:text-zinc-400"><?php echo htmlspecialchars($admin['email']); ?></p>
                             <div class="flex flex-wrap justify-center sm:justify-start gap-2 mt-2">
-                                <span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-violet-500/20 text-violet-400">
+                                <span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-500/20 text-blue-400">
                                     <i class="fa-solid fa-shield-halved mr-1"></i>Administrator
                                 </span>
                                 <?php if ($admin['status'] === 'active'): ?>
@@ -245,16 +245,16 @@ if ($admin['position_id']) {
 
             <!-- Tab Navigation -->
             <div class="flex gap-2 mb-6 overflow-x-auto pb-2">
-                <button @click="activeTab = 'profile'" :class="activeTab === 'profile' ? 'bg-violet-600 text-white' : 'glass-strong text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap">
+                <button @click="activeTab = 'profile'" :class="activeTab === 'profile' ? 'bg-blue-600 text-white' : 'glass-strong text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap">
                     <i class="fa-solid fa-user-pen mr-2"></i>Edit Profile
                 </button>
-                <button @click="activeTab = 'password'" :class="activeTab === 'password' ? 'bg-violet-600 text-white' : 'glass-strong text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap">
+                <button @click="activeTab = 'password'" :class="activeTab === 'password' ? 'bg-blue-600 text-white' : 'glass-strong text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap">
                     <i class="fa-solid fa-lock mr-2"></i>Change Password
                 </button>
-                <button @click="activeTab = 'account'" :class="activeTab === 'account' ? 'bg-violet-600 text-white' : 'glass-strong text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap">
+                <button @click="activeTab = 'account'" :class="activeTab === 'account' ? 'bg-blue-600 text-white' : 'glass-strong text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap">
                     <i class="fa-solid fa-circle-info mr-2"></i>Account Info
                 </button>
-                <button @click="activeTab = 'settings'" :class="activeTab === 'settings' ? 'bg-violet-600 text-white' : 'glass-strong text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap">
+                <button @click="activeTab = 'settings'" :class="activeTab === 'settings' ? 'bg-blue-600 text-white' : 'glass-strong text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap">
                     <i class="fa-solid fa-gear mr-2"></i>Account Settings
                 </button>
             </div>
@@ -264,27 +264,27 @@ if ($admin['position_id']) {
                 <form method="POST" class="glass-strong rounded-2xl p-6 animate-fade-in-up">
                     <input type="hidden" name="action" value="update_profile">
                     <h3 class="text-lg font-bold text-slate-900 dark:text-white mb-6">
-                        <i class="fa-solid fa-user-pen text-violet-400 mr-2"></i>Personal Information
+                        <i class="fa-solid fa-user-pen text-blue-400 mr-2"></i>Personal Information
                     </h3>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
                         <div>
                             <label class="block text-xs font-semibold text-slate-500 dark:text-zinc-400 mb-2">Full Name *</label>
                             <input type="text" name="full_name" value="<?php echo htmlspecialchars($admin['name']); ?>" required
-                                class="w-full rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/[0.06] px-4 py-2.5 text-sm text-slate-900 dark:text-white outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20">
+                                class="w-full rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/[0.06] px-4 py-2.5 text-sm text-slate-900 dark:text-white outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20">
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-slate-500 dark:text-zinc-400 mb-2">Email Address *</label>
                             <input type="email" name="email" value="<?php echo htmlspecialchars($admin['email']); ?>" required
-                                class="w-full rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/[0.06] px-4 py-2.5 text-sm text-slate-900 dark:text-white outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20">
+                                class="w-full rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/[0.06] px-4 py-2.5 text-sm text-slate-900 dark:text-white outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20">
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-slate-500 dark:text-zinc-400 mb-2">Phone Number</label>
                             <input type="text" name="phone" value="<?php echo htmlspecialchars($admin['phone'] ?? ''); ?>"
-                                class="w-full rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/[0.06] px-4 py-2.5 text-sm text-slate-900 dark:text-white outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20">
+                                class="w-full rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/[0.06] px-4 py-2.5 text-sm text-slate-900 dark:text-white outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20">
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-slate-500 dark:text-zinc-400 mb-2">Gender</label>
-                            <select name="gender" class="w-full rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/[0.06] px-4 py-2.5 text-sm text-slate-900 dark:text-white outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20">
+                            <select name="gender" class="w-full rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/[0.06] px-4 py-2.5 text-sm text-slate-900 dark:text-white outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20">
                                 <option value="Male" <?php echo ($admin['gender'] ?? '') === 'Male' ? 'selected' : ''; ?>>Male</option>
                                 <option value="Female" <?php echo ($admin['gender'] ?? '') === 'Female' ? 'selected' : ''; ?>>Female</option>
                             </select>
@@ -292,7 +292,7 @@ if ($admin['position_id']) {
                         <div>
                             <label class="block text-xs font-semibold text-slate-500 dark:text-zinc-400 mb-2">Date of Birth</label>
                             <input type="date" name="dob" value="<?php echo htmlspecialchars($admin['dob'] ?? ''); ?>"
-                                class="w-full rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/[0.06] px-4 py-2.5 text-sm text-slate-900 dark:text-white outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20">
+                                class="w-full rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/[0.06] px-4 py-2.5 text-sm text-slate-900 dark:text-white outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20">
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-slate-500 dark:text-zinc-400 mb-2">Employee Code</label>
@@ -301,7 +301,7 @@ if ($admin['position_id']) {
                         </div>
                     </div>
                     <div class="mt-6 flex justify-end">
-                        <button type="submit" class="px-6 py-2.5 bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold rounded-lg transition-all">
+                        <button type="submit" class="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-all">
                             <i class="fa-solid fa-save mr-2"></i>Save Changes
                         </button>
                     </div>
@@ -313,15 +313,15 @@ if ($admin['position_id']) {
                 <form method="POST" class="glass-strong rounded-2xl p-6 animate-fade-in-up">
                     <input type="hidden" name="action" value="change_password">
                     <h3 class="text-lg font-bold text-slate-900 dark:text-white mb-6">
-                        <i class="fa-solid fa-lock text-violet-400 mr-2"></i>Change Password
+                        <i class="fa-solid fa-lock text-blue-400 mr-2"></i>Change Password
                     </h3>
                     <div class="max-w-md space-y-5">
                         <div>
                             <label class="block text-xs font-semibold text-slate-500 dark:text-zinc-400 mb-2">Current Password</label>
                             <div class="relative">
                                 <input type="password" name="current_password" id="admin-profile-current-pw" required
-                                    class="w-full rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/[0.06] px-4 py-2.5 pr-11 text-sm text-slate-900 dark:text-white outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20">
-                                <span class="pw-eye-toggle absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-zinc-400 hover:text-violet-500 dark:hover:text-violet-400 cursor-pointer select-none z-10" role="button" tabindex="0" data-target="admin-profile-current-pw">
+                                    class="w-full rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/[0.06] px-4 py-2.5 pr-11 text-sm text-slate-900 dark:text-white outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20">
+                                <span class="pw-eye-toggle absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-zinc-400 hover:text-blue-500 dark:hover:text-blue-400 cursor-pointer select-none z-10" role="button" tabindex="0" data-target="admin-profile-current-pw">
                                     <i class="fa-solid fa-eye text-base"></i>
                                 </span>
                             </div>
@@ -330,8 +330,8 @@ if ($admin['position_id']) {
                             <label class="block text-xs font-semibold text-slate-500 dark:text-zinc-400 mb-2">New Password</label>
                             <div class="relative">
                                 <input type="password" name="new_password" id="admin-profile-new-pw" required minlength="6"
-                                    class="w-full rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/[0.06] px-4 py-2.5 pr-11 text-sm text-slate-900 dark:text-white outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20">
-                                <span class="pw-eye-toggle absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-zinc-400 hover:text-violet-500 dark:hover:text-violet-400 cursor-pointer select-none z-10" role="button" tabindex="0" data-target="admin-profile-new-pw">
+                                    class="w-full rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/[0.06] px-4 py-2.5 pr-11 text-sm text-slate-900 dark:text-white outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20">
+                                <span class="pw-eye-toggle absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-zinc-400 hover:text-blue-500 dark:hover:text-blue-400 cursor-pointer select-none z-10" role="button" tabindex="0" data-target="admin-profile-new-pw">
                                     <i class="fa-solid fa-eye text-base"></i>
                                 </span>
                             </div>
@@ -340,15 +340,15 @@ if ($admin['position_id']) {
                             <label class="block text-xs font-semibold text-slate-500 dark:text-zinc-400 mb-2">Confirm New Password</label>
                             <div class="relative">
                                 <input type="password" name="confirm_password" id="admin-profile-confirm-pw" required minlength="6"
-                                    class="w-full rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/[0.06] px-4 py-2.5 pr-11 text-sm text-slate-900 dark:text-white outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20">
-                                <span class="pw-eye-toggle absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-zinc-400 hover:text-violet-500 dark:hover:text-violet-400 cursor-pointer select-none z-10" role="button" tabindex="0" data-target="admin-profile-confirm-pw">
+                                    class="w-full rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/[0.06] px-4 py-2.5 pr-11 text-sm text-slate-900 dark:text-white outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20">
+                                <span class="pw-eye-toggle absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-zinc-400 hover:text-blue-500 dark:hover:text-blue-400 cursor-pointer select-none z-10" role="button" tabindex="0" data-target="admin-profile-confirm-pw">
                                     <i class="fa-solid fa-eye text-base"></i>
                                 </span>
                             </div>
                         </div>
                     </div>
                     <div class="mt-6 flex justify-end">
-                        <button type="submit" class="px-6 py-2.5 bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold rounded-lg transition-all">
+                        <button type="submit" class="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-all">
                             <i class="fa-solid fa-key mr-2"></i>Update Password
                         </button>
                     </div>
@@ -359,7 +359,7 @@ if ($admin['position_id']) {
             <div x-show="activeTab === 'account'" x-transition style="display: none;">
                 <div class="glass-strong rounded-2xl p-6 animate-fade-in-up">
                     <h3 class="text-lg font-bold text-slate-900 dark:text-white mb-6">
-                        <i class="fa-solid fa-circle-info text-violet-400 mr-2"></i>Account Information
+                        <i class="fa-solid fa-circle-info text-blue-400 mr-2"></i>Account Information
                     </h3>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div class="space-y-4">
@@ -410,12 +410,12 @@ if ($admin['position_id']) {
                     <!-- Theme Settings -->
                     <div class="glass-strong rounded-2xl p-6 animate-fade-in-up">
                         <h3 class="text-lg font-bold text-slate-900 dark:text-white mb-6">
-                            <i class="fa-solid fa-palette text-violet-400 mr-2"></i>Appearance
+                            <i class="fa-solid fa-palette text-blue-400 mr-2"></i>Appearance
                         </h3>
                         <div class="flex items-center justify-between p-4 rounded-lg bg-slate-50 dark:bg-white/[0.02] border border-slate-200 dark:border-white/[0.06]">
                             <div class="flex items-center gap-3">
-                                <div class="w-10 h-10 rounded-lg bg-violet-500/20 flex items-center justify-center">
-                                    <i class="fa-solid fa-circle-half-stroke text-violet-400"></i>
+                                <div class="w-10 h-10 rounded-lg bg-blue-500/20 flex items-center justify-center">
+                                    <i class="fa-solid fa-circle-half-stroke text-blue-400"></i>
                                 </div>
                                 <div>
                                     <p class="text-sm font-semibold text-slate-900 dark:text-white">Dark Mode</p>
@@ -431,7 +431,7 @@ if ($admin['position_id']) {
                     <!-- Notification Settings -->
                     <div class="glass-strong rounded-2xl p-6 animate-fade-in-up">
                         <h3 class="text-lg font-bold text-slate-900 dark:text-white mb-6">
-                            <i class="fa-solid fa-bell text-violet-400 mr-2"></i>Notifications
+                            <i class="fa-solid fa-bell text-blue-400 mr-2"></i>Notifications
                         </h3>
                         <div class="space-y-4">
                             <div class="flex items-center justify-between p-4 rounded-lg bg-slate-50 dark:bg-white/[0.02] border border-slate-200 dark:border-white/[0.06]">
@@ -476,12 +476,12 @@ if ($admin['position_id']) {
                     <!-- Quick Links -->
                     <div class="glass-strong rounded-2xl p-6 animate-fade-in-up">
                         <h3 class="text-lg font-bold text-slate-900 dark:text-white mb-6">
-                            <i class="fa-solid fa-link text-violet-400 mr-2"></i>Quick Links
+                            <i class="fa-solid fa-link text-blue-400 mr-2"></i>Quick Links
                         </h3>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <a href="settings.php" class="flex items-center gap-3 p-4 rounded-lg bg-slate-50 dark:bg-white/[0.02] border border-slate-200 dark:border-white/[0.06] hover:bg-slate-100 dark:hover:bg-white/[0.04] transition">
-                                <div class="w-10 h-10 rounded-lg bg-violet-500/20 flex items-center justify-center">
-                                    <i class="fa-solid fa-gear text-violet-400"></i>
+                                <div class="w-10 h-10 rounded-lg bg-blue-500/20 flex items-center justify-center">
+                                    <i class="fa-solid fa-gear text-blue-400"></i>
                                 </div>
                                 <div>
                                     <p class="text-sm font-semibold text-slate-900 dark:text-white">System Settings</p>

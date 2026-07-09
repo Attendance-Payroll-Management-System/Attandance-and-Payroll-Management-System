@@ -50,7 +50,7 @@ $positions = $conn->query("SELECT * FROM positions ORDER BY position_name");
     <?php include "../includes/header.php"; ?>
 </head>
 
-<body x-data="{ sidebarOpen: false }" class="bg-slate-50 dark:bg-[#09090b] text-slate-900 dark:text-white font-sans antialiased min-h-screen flex">
+<body x-data="{ sidebarOpen: false }" class="bg-slate-50 dark:bg-[#0B1120] text-slate-900 dark:text-white font-sans antialiased min-h-screen flex">
     <?php include "../includes/sidebar.php"; ?>
     <div class="flex-1 flex flex-col min-w-0 main-wrapper">
         <?php $page_title = "Positions"; $page_subtitle = "Manage employee positions";
@@ -70,14 +70,14 @@ $positions = $conn->query("SELECT * FROM positions ORDER BY position_name");
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     <div class="lg:col-span-1 animate-fade-in-up stagger-1">
                         <div class="glass-strong rounded-2xl p-6 card-hover">
-                            <h2 class="text-lg font-bold text-white mb-4"><i class="fas fa-plus text-violet-400 mr-2"></i>Add Position</h2>
+                            <h2 class="text-lg font-bold text-white mb-4"><i class="fas fa-plus text-blue-400 mr-2"></i>Add Position</h2>
                             <form method="POST" class="space-y-4">
                             <?php echo csrf_field(); ?>
                                 <div>
                                     <label class="block text-sm font-medium text-zinc-400 mb-1">Position Name</label>
-                                    <input type="text" name="position_name" required placeholder="e.g. Software Engineer" class="w-full px-4 py-2.5 rounded-xl border border-white/10 bg-white/[0.06] text-white placeholder-zinc-500 focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all duration-200">
+                                    <input type="text" name="position_name" required placeholder="e.g. Software Engineer" class="w-full px-4 py-2.5 rounded-xl border border-white/10 bg-white/[0.06] text-white placeholder-zinc-500 focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-all duration-200">
                                 </div>
-                                <button type="submit" class="w-full bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700 text-white font-medium px-4 py-2.5 rounded-xl transition-all duration-200 hover:-translate-y-0.5 shadow-sm">
+                                <button type="submit" class="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-medium px-4 py-2.5 rounded-xl transition-all duration-200 hover:-translate-y-0.5 shadow-sm">
                                     <i class="fas fa-plus mr-2"></i>Add Position
                                 </button>
                             </form>

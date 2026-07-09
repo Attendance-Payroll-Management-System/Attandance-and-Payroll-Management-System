@@ -83,7 +83,7 @@ if (!$is_cli):
     <link rel="icon" type="image/svg+xml" href="../favicon.svg">
     <?php include "../includes/header.php"; ?>
 </head>
-<body x-data="{ sidebarOpen: false }" class="bg-slate-50 dark:bg-[#09090b] text-slate-900 dark:text-white font-sans antialiased min-h-screen flex">
+<body x-data="{ sidebarOpen: false }" class="bg-slate-50 dark:bg-[#0B1120] text-slate-900 dark:text-white font-sans antialiased min-h-screen flex">
     <?php include "../includes/sidebar.php"; ?>
     <div class="flex-1 flex flex-col min-w-0 main-wrapper">
         <?php $page_title = "Process Daily Attendance"; $page_subtitle = "Automatically mark weekend, holiday, and AWOL attendance for all active employees."; include "../includes/topbar.php"; ?>
@@ -103,13 +103,13 @@ if (!$is_cli):
                 <?php endif; ?>
 
                 <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-6">
-                    <h2 class="text-lg font-bold text-white mb-6"><i class="fa-solid fa-robot text-violet-400 mr-2"></i>Attendance Processor</h2>
+                    <h2 class="text-lg font-bold text-white mb-6"><i class="fa-solid fa-robot text-blue-400 mr-2"></i>Attendance Processor</h2>
 
                     <form method="POST" class="space-y-4">
                     <?php echo csrf_field(); ?>
                         <div>
                             <label class="text-xs font-semibold text-zinc-400 block mb-1.5">Process Date</label>
-                            <input type="date" name="date" value="<?php echo $process_date; ?>" required class="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white placeholder-zinc-500 shadow-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-500/30">
+                            <input type="date" name="date" value="<?php echo $process_date; ?>" required class="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white placeholder-zinc-500 shadow-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30">
                             <p class="text-xs text-zinc-500 mt-1">Select the date to process attendance for.</p>
                         </div>
 
@@ -131,7 +131,7 @@ if (!$is_cli):
                         </div>
                         <?php endif; ?>
 
-                        <button type="submit" class="w-full rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700 text-white font-semibold text-sm px-5 py-3 shadow-sm transition flex items-center justify-center gap-2">
+                        <button type="submit" class="w-full rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold text-sm px-5 py-3 shadow-sm transition flex items-center justify-center gap-2">
                             <i class="fa-solid fa-play"></i> Process Attendance for <?php echo $process_date; ?>
                         </button>
                     </form>
@@ -139,7 +139,7 @@ if (!$is_cli):
 
                 <!-- Processing Log -->
                 <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-6 mt-6">
-                    <h2 class="text-lg font-bold text-white mb-4"><i class="fa-solid fa-clock-rotate-left text-violet-400 mr-2"></i>Processing History</h2>
+                    <h2 class="text-lg font-bold text-white mb-4"><i class="fa-solid fa-clock-rotate-left text-blue-400 mr-2"></i>Processing History</h2>
                     <div class="overflow-x-auto">
                         <table class="w-full text-left text-sm">
                             <thead class="text-zinc-500 text-xs uppercase tracking-wider border-b border-white/[0.06]">

@@ -69,7 +69,7 @@ elseif ($hour < 17) $greeting = "Good Afternoon";
     <link rel="icon" type="image/svg+xml" href="../favicon.svg">
     <?php include "../includes/header.php"; ?>
 </head>
-<body x-data="{ sidebarOpen: false }" class="bg-slate-50 dark:bg-[#09090b] text-slate-900 dark:text-white font-sans antialiased">
+<body x-data="{ sidebarOpen: false }" class="bg-slate-50 dark:bg-[#0B1120] text-slate-900 dark:text-white font-sans antialiased">
     <?php include "../includes/sidebar.php"; ?>
     <div class="main-wrapper min-h-screen flex flex-col">
         <?php $page_title = "Dashboard"; $page_subtitle = $greeting . ', ' . htmlspecialchars($employee_name) . ' · ' . date('l, F j, Y'); include "../includes/topbar.php"; ?>
@@ -78,7 +78,7 @@ elseif ($hour < 17) $greeting = "Good Afternoon";
                 <div class="group glass-strong rounded-2xl hover:-translate-y-1 transition-all duration-300 p-5 card-hover animate-fade-in-up stagger-1">
                     <div class="flex items-start justify-between">
                         <div class="flex items-center gap-3">
-                            <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 text-violet-400 flex items-center justify-center text-lg group-hover:scale-110 transition-transform duration-300"><i class="fa-solid fa-calendar-check"></i></div>
+                            <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-sky-500/20 to-cyan-500/20 text-sky-400 flex items-center justify-center text-lg group-hover:scale-110 transition-transform duration-300"><i class="fa-solid fa-calendar-check"></i></div>
                             <div>
                                 <span class="text-xs font-semibold uppercase tracking-wider text-zinc-500">Attendance</span>
                                 <div class="text-2xl font-bold text-gradient mt-0.5"><?php echo $present_days; ?><span class="text-sm font-medium text-zinc-500">/<?php echo $total_days; ?></span></div>
@@ -146,7 +146,7 @@ elseif ($hour < 17) $greeting = "Good Afternoon";
                             <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-cyan-500/20 to-blue-500/20 text-cyan-400 flex items-center justify-center text-lg group-hover:scale-110 transition-transform duration-300"><i class="fa-solid fa-file-invoice-dollar"></i></div>
                             <div>
                                 <span class="text-xs font-semibold uppercase tracking-wider text-zinc-500">Payroll</span>
-                                <div class="text-2xl font-bold text-gradient-violet mt-0.5"><?php echo $payroll_data ? '$' . number_format($payroll_data['net_salary'], 2) : '--'; ?></div>
+                                <div class="text-2xl font-bold text-gradient-sky mt-0.5"><?php echo $payroll_data ? '$' . number_format($payroll_data['net_salary'], 2) : '--'; ?></div>
                             </div>
                         </div>
                     </div>
@@ -155,7 +155,7 @@ elseif ($hour < 17) $greeting = "Good Afternoon";
                 <div class="group glass-strong rounded-2xl hover:-translate-y-1 transition-all duration-300 p-5 card-hover animate-fade-in-up stagger-7">
                     <div class="flex items-start justify-between">
                         <div class="flex items-center gap-3">
-                            <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-indigo-500/20 to-violet-500/20 text-indigo-400 flex items-center justify-center text-lg group-hover:scale-110 transition-transform duration-300"><i class="fa-solid fa-chart-line"></i></div>
+                            <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-indigo-500/20 to-blue-500/20 text-indigo-400 flex items-center justify-center text-lg group-hover:scale-110 transition-transform duration-300"><i class="fa-solid fa-chart-line"></i></div>
                             <div>
                                 <span class="text-xs font-semibold uppercase tracking-wider text-zinc-500">Annual Payroll</span>
                                 <div class="text-2xl font-bold text-white mt-0.5"><?php echo $annual_data ? '$' . number_format($annual_data['net_annual_salary'], 2) : '--'; ?></div>
@@ -164,7 +164,7 @@ elseif ($hour < 17) $greeting = "Good Afternoon";
                     </div>
                     <div class="mt-3 text-xs text-zinc-500"><?php echo $annual_data ? 'Year '.$annual_data['payroll_year'] : 'No annual data yet'; ?></div>
                 </div>
-                <div class="group bg-gradient-to-br from-violet-600 via-fuchsia-600 to-amber-600 rounded-2xl shadow-xl shadow-violet-600/10 hover:shadow-2xl hover:shadow-violet-500/20 hover:-translate-y-1 transition-all duration-300 p-5 text-white animate-fade-in-up stagger-8 card-inner-glow">
+                <div class="group bg-gradient-to-br from-blue-600 via-indigo-600 to-sky-600 rounded-2xl shadow-xl shadow-blue-600/10 hover:shadow-2xl hover:shadow-blue-500/20 hover:-translate-y-1 transition-all duration-300 p-5 text-white animate-fade-in-up stagger-8 card-inner-glow">
                     <div class="flex items-start justify-between relative z-10">
                         <div class="flex items-center gap-3">
                             <div class="w-11 h-11 rounded-xl bg-white/20 flex items-center justify-center text-lg group-hover:scale-110 transition-transform"><i class="fa-solid fa-bolt"></i></div>
@@ -181,8 +181,8 @@ elseif ($hour < 17) $greeting = "Good Afternoon";
             <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
                 <div class="glass-strong rounded-2xl p-6 card-hover animate-fade-in-up stagger-1">
                     <div class="flex items-center justify-between border-b border-white/[0.06] pb-4 mb-4">
-                        <h3 class="font-bold text-white"><i class="fa-solid fa-chart-simple text-violet-400 mr-2"></i>Attendance Overview</h3>
-                        <a href="attendanceall.php" class="text-xs font-semibold text-violet-400 hover:text-violet-300 transition-colors"><i class="fa-regular fa-eye mr-1"></i>View All</a>
+                        <h3 class="font-bold text-white"><i class="fa-solid fa-chart-simple text-sky-400 mr-2"></i>Attendance Overview</h3>
+                        <a href="attendanceall.php" class="text-xs font-semibold text-sky-400 hover:text-sky-300 transition-colors"><i class="fa-regular fa-eye mr-1"></i>View All</a>
                     </div>
                     <div class="space-y-4">
                         <div class="flex items-center justify-between text-sm">
@@ -191,9 +191,9 @@ elseif ($hour < 17) $greeting = "Good Afternoon";
                         </div>
                         <div class="progress-bar"><div class="progress-bar-fill" style="width: <?php echo $attendance_rate; ?>%"></div></div>
                         <div class="grid grid-cols-3 gap-3 pt-2">
-                            <div class="bg-violet-500/10 rounded-xl p-3 text-center ring-1 ring-violet-500/10 glow-violet">
-                                <span class="text-lg font-bold text-violet-400"><?php echo $present_days; ?></span>
-                                <p class="text-[10px] text-violet-400/60 font-medium uppercase tracking-wider">Present</p>
+                            <div class="bg-blue-500/10 rounded-xl p-3 text-center ring-1 ring-blue-500/10 glow-navy">
+                                <span class="text-lg font-bold text-sky-400"><?php echo $present_days; ?></span>
+                                <p class="text-[10px] text-sky-400/60 font-medium uppercase tracking-wider">Present</p>
                             </div>
                             <div class="bg-amber-500/10 rounded-xl p-3 text-center ring-1 ring-amber-500/10 glow-amber">
                                 <span class="text-lg font-bold text-amber-400"><?php echo $late_days; ?></span>
@@ -217,7 +217,7 @@ elseif ($hour < 17) $greeting = "Good Afternoon";
                         </div>
                         <div class="bg-white/[0.04] rounded-xl p-4 ring-1 ring-white/[0.06]">
                             <span class="text-xs font-semibold uppercase tracking-wider text-zinc-500">OT Amount</span>
-                            <div class="text-lg font-bold text-gradient-violet mt-1">$<?php echo $payroll_data && $payroll_data['ot_amount'] ? number_format($payroll_data['ot_amount'], 2) : '0.00'; ?></div>
+                            <div class="text-lg font-bold text-gradient-sky mt-1">$<?php echo $payroll_data && $payroll_data['ot_amount'] ? number_format($payroll_data['ot_amount'], 2) : '0.00'; ?></div>
                         </div>
                         <div class="bg-white/[0.04] rounded-xl p-4 ring-1 ring-white/[0.06]">
                             <span class="text-xs font-semibold uppercase tracking-wider text-zinc-500">Bonuses</span>
@@ -242,7 +242,7 @@ elseif ($hour < 17) $greeting = "Good Afternoon";
                     <div class="mt-4 border-t border-white/[0.06] pt-4">
                         <div class="flex items-center justify-between">
                             <span class="text-xs font-semibold text-zinc-500">Annual Net (<?php echo $annual_data['payroll_year']; ?>)</span>
-                            <span class="text-lg font-bold text-violet-400">$<?php echo number_format($annual_data['net_annual_salary'], 2); ?></span>
+                            <span class="text-lg font-bold text-sky-400">$<?php echo number_format($annual_data['net_annual_salary'], 2); ?></span>
                         </div>
                     </div>
                     <?php endif; ?>

@@ -31,7 +31,6 @@ $page_info_map = [
     'reports.php'            => ['Reports',                 'View attendance reports, payroll reports, leave reports, overtime reports, and employee analytics.'],
     'profile.php'            => ['My Profile',              'View and manage your profile information, password, and account settings.'],
     'settings.php'           => ['Settings',                'Configure system settings, company information, payroll rules, and preferences.'],
-    'email_log.php'          => ['Email Log',               'View email communication history, sent payslips, and notification logs.'],
 ];
 
 $detected = $page_info_map[$current_page] ?? null;
@@ -72,7 +71,7 @@ if (isset($conn) && $conn) {
 
 $short_name = explode(' ', $admin_name)[0];
 ?>
-<header class="sticky top-0 z-20 bg-white/80 dark:bg-[#0a0a0f]/80 backdrop-blur-xl border-b border-slate-200 dark:border-white/[0.06]">
+<header class="sticky top-0 z-20 bg-white/80 dark:bg-[#0F172A]/80 backdrop-blur-xl border-b border-slate-200 dark:border-blue-500/10">
     <div class="flex items-center justify-between px-4 lg:px-8 h-16">
         <div class="min-w-0 flex-1">
             <h1 class="text-xl font-bold tracking-tight text-slate-900 dark:text-white truncate"><?php echo htmlspecialchars($page_title); ?></h1>
@@ -84,7 +83,7 @@ $short_name = explode(' ', $admin_name)[0];
 
             <!-- Notifications -->
             <div class="relative" x-data="{ open: false }">
-                <button @click="open = !open" class="relative p-2.5 text-slate-500 dark:text-zinc-400 hover:text-violet-600 dark:hover:text-white bg-slate-100 dark:bg-white/[0.06] hover:bg-slate-200 dark:hover:bg-white/[0.1] rounded-xl transition-all duration-200">
+                <button @click="open = !open" class="relative p-2.5 text-slate-500 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-white bg-slate-100 dark:bg-white/[0.06] hover:bg-slate-200 dark:hover:bg-white/[0.1] rounded-xl transition-all duration-200">
                     <i class="fa-solid fa-bell text-lg"></i>
                     <?php if ($unread_count > 0): ?>
                     <span class="absolute -top-0.5 -right-0.5 w-5 h-5 bg-rose-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-lg shadow-rose-500/30 animate-scale-in"><?php echo $unread_count; ?></span>
@@ -99,9 +98,9 @@ $short_name = explode(' ', $admin_name)[0];
                      x-transition:leave-end="opacity-0 scale-95 -translate-y-2"
                      class="absolute right-0 mt-2 w-80 lg:w-96 glass-strong rounded-xl shadow-xl border border-black/10 dark:border-white/10 z-50" style="display: none;">
                     <div class="p-3 border-b border-black/[0.06] dark:border-white/[0.06] flex items-center justify-between">
-                        <h4 class="text-sm font-bold text-slate-900 dark:text-white"><i class="fa-regular fa-bell mr-1.5 text-violet-400"></i>Notifications</h4>
+                        <h4 class="text-sm font-bold text-slate-900 dark:text-white"><i class="fa-regular fa-bell mr-1.5 text-blue-400"></i>Notifications</h4>
                         <?php if ($unread_count > 0): ?>
-                        <a href="mark_notifications_read.php" class="text-[10px] font-semibold text-violet-600 dark:text-violet-400 hover:text-violet-700 dark:hover:text-violet-300 transition-colors">Mark all read</a>
+                        <a href="mark_notifications_read.php" class="text-[10px] font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors">Mark all read</a>
                         <?php endif; ?>
                     </div>
                     <div class="max-h-96 overflow-y-auto">
@@ -112,7 +111,7 @@ $short_name = explode(' ', $admin_name)[0];
                         </div>
                         <?php else: ?>
                             <?php foreach ($topbar_notifications as $noti): ?>
-                            <a href="<?php echo $noti['link'] ?: '#'; ?>" class="block px-4 py-3 border-b border-black/[0.04] dark:border-white/[0.04] hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition <?php echo !$noti['is_read'] ? 'bg-violet-500/5 dark:bg-violet-500/10' : ''; ?>">
+                            <a href="<?php echo $noti['link'] ?: '#'; ?>" class="block px-4 py-3 border-b border-black/[0.04] dark:border-white/[0.04] hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition <?php echo !$noti['is_read'] ? 'bg-blue-500/5 dark:bg-blue-500/10' : ''; ?>">
                                 <p class="text-xs text-slate-700 dark:text-zinc-300"><?php echo htmlspecialchars($noti['message']); ?></p>
                                 <p class="text-[10px] text-slate-400 dark:text-zinc-500 mt-1"><?php echo date('M d, h:i A', strtotime($noti['created_at'])); ?></p>
                             </a>
@@ -120,7 +119,7 @@ $short_name = explode(' ', $admin_name)[0];
                         <?php endif; ?>
                     </div>
                     <div class="p-2 border-t border-black/[0.06] dark:border-white/[0.06] text-center">
-                        <a href="dashboard.php" class="text-xs font-semibold text-violet-600 dark:text-violet-400 hover:text-violet-700 dark:hover:text-violet-300 transition-colors"><i class="fa-regular fa-eye mr-1"></i>View Dashboard</a>
+                        <a href="dashboard.php" class="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"><i class="fa-regular fa-eye mr-1"></i>View Dashboard</a>
                     </div>
                 </div>
             </div>
@@ -132,7 +131,7 @@ $short_name = explode(' ', $admin_name)[0];
             </button>
 
             <!-- Settings -->
-            <a href="settings.php" class="p-2.5 text-slate-500 dark:text-zinc-400 hover:text-violet-600 dark:hover:text-white bg-slate-100 dark:bg-white/[0.06] hover:bg-slate-200 dark:hover:bg-white/[0.1] rounded-xl transition-all duration-200">
+            <a href="settings.php" class="p-2.5 text-slate-500 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-white bg-slate-100 dark:bg-white/[0.06] hover:bg-slate-200 dark:hover:bg-white/[0.1] rounded-xl transition-all duration-200">
                 <i class="fa-solid fa-gear text-lg"></i>
             </a>
 
@@ -140,9 +139,9 @@ $short_name = explode(' ', $admin_name)[0];
             <div class="relative" x-data="{ open: false }">
                 <button @click="open = !open" class="flex items-center gap-2 pl-1.5 pr-3 py-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-white/[0.06] transition-all duration-200">
                     <?php if (!empty($admin_photo)): ?>
-                    <img src="../<?php echo htmlspecialchars($admin_photo); ?>" alt="" class="w-8 h-8 rounded-full object-cover ring-2 ring-violet-500/30">
+                    <img src="../<?php echo htmlspecialchars($admin_photo); ?>" alt="" class="w-8 h-8 rounded-full object-cover ring-2 ring-blue-500/30">
                     <?php else: ?>
-                    <div class="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white flex items-center justify-center text-xs font-bold shadow-lg shadow-violet-500/20">
+                    <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-500 text-white flex items-center justify-center text-xs font-bold shadow-lg shadow-blue-500/20">
                         <?php echo strtoupper(substr($admin_name, 0, 2)); ?>
                     </div>
                     <?php endif; ?>
@@ -159,12 +158,12 @@ $short_name = explode(' ', $admin_name)[0];
                      x-transition:leave-end="opacity-0 scale-95 -translate-y-2"
                      class="absolute right-0 mt-2 w-64 glass-strong rounded-2xl shadow-2xl border border-black/10 dark:border-white/10 z-50 overflow-hidden" style="display: none;">
 
-                    <div class="p-4 bg-gradient-to-r from-violet-500/10 to-fuchsia-500/10 border-b border-black/[0.06] dark:border-white/[0.06]">
+                    <div class="p-4 bg-gradient-to-r from-blue-500/10 to-indigo-500/10 border-b border-black/[0.06] dark:border-white/[0.06]">
                         <div class="flex items-center gap-3">
                             <?php if (!empty($admin_photo)): ?>
-                            <img src="../<?php echo htmlspecialchars($admin_photo); ?>" alt="" class="w-10 h-10 rounded-full object-cover ring-2 ring-white dark:ring-[#18181b] shadow-lg">
+                            <img src="../<?php echo htmlspecialchars($admin_photo); ?>" alt="" class="w-10 h-10 rounded-full object-cover ring-2 ring-white dark:ring-[#1E293B] shadow-lg">
                             <?php else: ?>
-                            <div class="w-10 h-10 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white flex items-center justify-center text-sm font-bold shadow-lg shadow-violet-500/20">
+                            <div class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-500 text-white flex items-center justify-center text-sm font-bold shadow-lg shadow-blue-500/20">
                                 <?php echo strtoupper(substr($admin_name, 0, 2)); ?>
                             </div>
                             <?php endif; ?>
@@ -197,7 +196,7 @@ $short_name = explode(' ', $admin_name)[0];
 </header>
 
 <?php if (!empty($page_actions)): ?>
-<div class="bg-white/60 dark:bg-[#0a0a0f]/60 border-b border-slate-200 dark:border-white/[0.06] px-4 lg:px-8 py-2.5 flex flex-wrap items-center justify-end gap-2">
+<div class="bg-white/60 dark:bg-[#0F172A]/60 border-b border-slate-200 dark:border-blue-500/10 px-4 lg:px-8 py-2.5 flex flex-wrap items-center justify-end gap-2">
     <div class="flex items-center gap-2"><?php echo $page_actions; ?></div>
 </div>
 <?php endif; ?>

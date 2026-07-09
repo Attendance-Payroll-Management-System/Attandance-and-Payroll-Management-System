@@ -60,11 +60,11 @@
         .nav-links a:hover { color: var(--text-primary); background: var(--bg-card-hover); }
 
         .nav-cta {
-            background: linear-gradient(135deg, #8B5CF6, #D946EF) !important;
+            background: linear-gradient(135deg, #1E3A8A, #4F46E5) !important;
             color: #fff !important; padding: 8px 20px !important; border-radius: 10px !important;
             font-weight: 600 !important;
         }
-        .nav-cta:hover { transform: translateY(-1px); box-shadow: 0 4px 15px rgba(139,92,246,0.3) !important; }
+        .nav-cta:hover { transform: translateY(-1px); box-shadow: 0 4px 15px rgba(30,58,138,0.3) !important; }
 
         .nav-toggle-btn {
             background: none; border: 1px solid var(--border-color); border-radius: 10px;
@@ -90,18 +90,18 @@
             padding: 100px 24px 80px;
             text-align: center;
             overflow: hidden;
-            background: linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #4c1d95 100%);
+            background: linear-gradient(135deg, #0F172A 0%, #1E3A8A 50%, #1E40AF 100%);
         }
         .dark .hero-section {
-            background: linear-gradient(135deg, #0f0a1a 0%, #1a0a2e 50%, #2d0a4e 100%);
+            background: linear-gradient(135deg, #020617 0%, #0F172A 50%, #1E3A8A 100%);
         }
         .hero-section::before {
             content: '';
             position: absolute; inset: 0;
             background-image:
-                radial-gradient(circle at 20% 50%, rgba(139,92,246,0.15) 0%, transparent 50%),
-                radial-gradient(circle at 80% 50%, rgba(217,70,239,0.1) 0%, transparent 50%),
-                radial-gradient(circle at 50% 100%, rgba(245,158,11,0.08) 0%, transparent 30%);
+                radial-gradient(circle at 20% 50%, rgba(30,58,138,0.20) 0%, transparent 50%),
+                radial-gradient(circle at 80% 50%, rgba(79,70,229,0.12) 0%, transparent 50%),
+                radial-gradient(circle at 50% 100%, rgba(14,165,233,0.08) 0%, transparent 30%);
         }
         .hero-section::after {
             content: '';
@@ -130,7 +130,7 @@
             color: #fff; margin-bottom: 20px;
         }
         .hero-section h1 span {
-            background: linear-gradient(135deg, #c4b5fd, #f0abfc, #fde68a);
+            background: linear-gradient(135deg, #93C5FD, #A5B4FC, #67E8F9);
             -webkit-background-clip: text; -webkit-text-fill-color: transparent;
             background-clip: text;
         }
@@ -147,7 +147,7 @@
         .hero-primary {
             background: #fff; color: #4c1d95;
         }
-        .hero-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(139,92,246,0.3); }
+        .hero-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(30,58,138,0.3); }
         .hero-secondary {
             border: 2px solid rgba(255,255,255,0.2); color: #fff;
         }
@@ -206,12 +206,12 @@
         .feature-card:hover {
             transform: translateY(-4px);
             box-shadow: var(--shadow-card-hover);
-            border-color: rgba(139,92,246,0.2);
+            border-color: rgba(30,58,138,0.2);
         }
         .feature-icon-wrap {
             width: 48px; height: 48px;
             border-radius: 14px;
-            background: linear-gradient(135deg, rgba(139,92,246,0.1), rgba(217,70,239,0.1));
+            background: linear-gradient(135deg, rgba(30,58,138,0.1), rgba(79,70,229,0.1));
             display: flex; align-items: center; justify-content: center;
             font-size: 20px; margin-bottom: 16px;
         }
@@ -222,7 +222,7 @@
         .cta-section {
             max-width: 800px; margin: 0 auto 80px; padding: 0 24px;
             text-align: center;
-            background: linear-gradient(135deg, rgba(139,92,246,0.05), rgba(217,70,239,0.05));
+            background: linear-gradient(135deg, rgba(30,58,138,0.05), rgba(79,70,229,0.05));
             border: 1px solid var(--glass-strong-border);
             border-radius: 24px; padding: 60px 40px;
         }
@@ -232,10 +232,10 @@
         .cta-primary {
             text-decoration: none; font-weight: 600; font-size: 15px;
             padding: 14px 28px; border-radius: 12px;
-            background: linear-gradient(135deg, #8B5CF6, #D946EF);
+            background: linear-gradient(135deg, #1E3A8A, #4F46E5);
             color: #fff; transition: all 0.25s;
         }
-        .cta-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(139,92,246,0.3); }
+        .cta-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(30,58,138,0.3); }
         .cta-secondary {
             text-decoration: none; font-weight: 600; font-size: 15px;
             padding: 14px 28px; border-radius: 12px;
@@ -318,7 +318,7 @@
         </div>
         <div class="features-grid">
             <div class="feature-card">
-                <div class="feature-icon-wrap" style="color: #8B5CF6;"><i class="fa-solid fa-fingerprint"></i></div>
+                <div class="feature-icon-wrap" style="color: #1E3A8A;"><i class="fa-solid fa-fingerprint"></i></div>
                 <h4>Attendance Tracking</h4>
                 <p>Real-time check-in/out with automatic late detection, monthly summaries, and per-employee attendance history.</p>
             </div>
@@ -333,7 +333,7 @@
                 <p>Automated salary calculation with OT, bonuses, deductions, and tax — generates detailed payslips in seconds.</p>
             </div>
             <div class="feature-card">
-                <div class="feature-icon-wrap" style="color: #D946EF;"><i class="fa-solid fa-clock"></i></div>
+                <div class="feature-icon-wrap" style="color: #4F46E5;"><i class="fa-solid fa-clock"></i></div>
                 <h4>Overtime Tracking</h4>
                 <p>Request and approve overtime with hour logging, rate calculation, and automatic payroll integration.</p>
             </div>

@@ -77,6 +77,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['check_in']) && !$is_in
     } elseif (strtotime($current_time) < strtotime($WORK_START)) {
         $message = "Check-in is not allowed before " . date('h:i A', strtotime($WORK_START)) . " MMT. Official working hours start at " . date('h:i A', strtotime($WORK_START)) . ".";
         $message_type = "error";
+    } elseif (strtotime($current_time) >= strtotime($WORK_END)) {
+        $message = "Check-in is not allowed after " . date('h:i A', strtotime($WORK_END)) . " MMT. Official working hours end at " . date('h:i A', strtotime($WORK_END)) . ".";
+        $message_type = "error";
     } else {
         $ip = $_SERVER['REMOTE_ADDR'] ?? null;
         $is_late = is_late_checkin($current_time) ? 1 : 0;
@@ -115,48 +118,29 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['check_out']) && !$is_i
 
         if ($att) {
             if ($att['check_out'] === null) {
-                // Block normal check-out after 5:00 PM unless approved overtime exists
-                $checkout_ts = strtotime($current_datetime);
-                $work_end_ts = strtotime($WORK_END);
-                $has_ot = has_approved_overtime_after($conn, $employee_id, $today, $WORK_END);
+                $ip = $_SERVER['REMOTE_ADDR'] ?? null;
+                $check_in_ts = $att['check_in'] ? strtotime($att['check_in']) : 0;
+                $check_out_ts = strtotime($current_datetime);
+                $total_seconds = max(0, $check_out_ts - $check_in_ts);
+                $total_hours = round($total_seconds / 3600, 2);
 
-                if ($checkout_ts > $work_end_ts && !$has_ot) {
-                    $message = "Normal check-out is not allowed after " . date('h:i A', strtotime($WORK_END)) . " MMT. If you have approved overtime, please wait for your overtime approval.";
-                    $message_type = "error";
+                $stmt = $conn->prepare("UPDATE attendance SET check_out = ?, check_out_ip = ?, check_out_source = 'web', total_working_hours = ? WHERE id = ?");
+                $stmt->bind_param('ssdi', $current_datetime, $ip, $total_hours, $att['id']);
+                if ($stmt->execute()) {
+                    $stmt->close();
+
+                    // Recalculate and update status based on check-out time rules
+                    $new_status = recalculate_attendance_after_checkout($conn, $att['id'], $employee_id, $today, $att['check_in'], $current_datetime, $total_hours);
+
+                    $time_display = date('h:i:s A');
+                    $status_display = get_attendance_status_label($new_status);
+
+                    $message = "Check-out recorded at $time_display ($total_hours hours worked). Status: $status_display.";
+                    $message_type = "success";
                 } else {
-                    $ip = $_SERVER['REMOTE_ADDR'] ?? null;
-                    $check_in_ts = $att['check_in'] ? strtotime($att['check_in']) : 0;
-                    $check_out_ts = strtotime($current_datetime);
-                    $total_seconds = max(0, $check_out_ts - $check_in_ts);
-                    $total_hours = round($total_seconds / 3600, 2);
-
-                    $stmt = $conn->prepare("UPDATE attendance SET check_out = ?, check_out_ip = ?, check_out_source = 'web', total_working_hours = ? WHERE id = ?");
-                    $stmt->bind_param('ssdi', $current_datetime, $ip, $total_hours, $att['id']);
-                    if ($stmt->execute()) {
-                        $stmt->close();
-
-                        // Recalculate and update status based on rules
-                        $new_status = recalculate_attendance_after_checkout($conn, $att['id'], $employee_id, $today, $att['check_in'], $current_datetime, $total_hours);
-
-                        $time_display = date('h:i:s A');
-                        $status_display = get_attendance_status_label($new_status);
-
-                        // Show OT note if applicable
-                        $ot_note = '';
-                        if ($has_ot) {
-                            $ot_end = get_approved_ot_end_time($conn, $employee_id, $today);
-                            if ($ot_end) {
-                                $ot_note = " (OT approved until " . date('h:i A', strtotime($ot_end)) . ")";
-                            }
-                        }
-
-                        $message = "Check-out recorded at $time_display ($total_hours hours worked). Status: $status_display.$ot_note";
-                        $message_type = "success";
-                    } else {
-                        $message = "Error recording check-out.";
-                        $message_type = "error";
-                        $stmt->close();
-                    }
+                    $message = "Error recording check-out.";
+                    $message_type = "error";
+                    $stmt->close();
                 }
             } else {
                 $message = "Already checked out today.";
@@ -219,7 +203,7 @@ $ot_conflict = check_overtime_attendance_conflict($conn, $employee_id, $today);
     <?php include "../includes/header.php"; ?>
 </head>
 
-<body class="bg-slate-50 dark:bg-[#09090b] text-slate-900 dark:text-white font-sans antialiased flex h-screen overflow-hidden" x-data="{ sidebarOpen: false }">
+<body class="bg-slate-50 dark:bg-[#0B1120] text-slate-900 dark:text-white font-sans antialiased flex h-screen overflow-hidden" x-data="{ sidebarOpen: false }">
     <?php include "../includes/sidebar.php"; ?>
     <div class="flex-1 flex flex-col h-full overflow-y-auto lg:ml-64">
         <header class="glass-strong px-8 py-4 flex items-center justify-between shrink-0 sticky top-0 z-20">
@@ -237,9 +221,9 @@ $ot_conflict = check_overtime_attendance_conflict($conn, $employee_id, $today);
                     </button>
                     <div x-show="notifOpen" @click.outside="notifOpen = false" class="absolute right-0 mt-2 w-96 glass-strong rounded-xl shadow-xl border border-white/10 z-50" style="display: none;">
                         <div class="p-3 border-b border-white/[0.06] flex items-center justify-between">
-                            <h4 class="text-sm font-bold text-white"><i class="fa-regular fa-bell mr-1.5 text-violet-400"></i>Notifications</h4>
+                            <h4 class="text-sm font-bold text-white"><i class="fa-regular fa-bell mr-1.5 text-sky-400"></i>Notifications</h4>
                             <?php if ($unread_notifications > 0): ?>
-                            <a href="mark_notifications_read.php" class="text-[10px] text-violet-400 hover:text-violet-300 font-semibold transition-colors">Mark all read</a>
+                            <a href="mark_notifications_read.php" class="text-[10px] text-sky-400 hover:text-sky-300 font-semibold transition-colors">Mark all read</a>
                             <?php endif; ?>
                         </div>
                         <div class="max-h-96 overflow-y-auto">
@@ -247,7 +231,7 @@ $ot_conflict = check_overtime_attendance_conflict($conn, $employee_id, $today);
                                 <p class="p-4 text-xs text-zinc-500 text-center">No notifications</p>
                             <?php else: ?>
                                 <?php foreach ($notifications as $noti): ?>
-                                    <a href="<?php echo $noti['link'] ?: '#'; ?>" class="block px-4 py-3 border-b border-white/[0.04] hover:bg-white/[0.02] transition <?php echo !$noti['is_read'] ? 'bg-violet-500/5' : ''; ?>">
+                                    <a href="<?php echo $noti['link'] ?: '#'; ?>" class="block px-4 py-3 border-b border-white/[0.04] hover:bg-white/[0.02] transition <?php echo !$noti['is_read'] ? 'bg-sky-500/5' : ''; ?>">
                                         <p class="text-xs text-zinc-300"><?php echo htmlspecialchars($noti['message']); ?></p>
                                         <p class="text-[10px] text-zinc-500 mt-1"><?php echo htmlspecialchars($employee_name) . ' - '; ?><?php echo date('M d, h:i A', strtotime($noti['created_at'])); ?></p>
                                     </a>
@@ -438,6 +422,9 @@ $ot_conflict = check_overtime_attendance_conflict($conn, $employee_id, $today);
                             </div>
                             <div class="text-xs text-zinc-500 mt-1">
                                 <i class="fa-solid fa-business-time mr-1"></i> Working hours: <?php echo date('h:i A', strtotime($WORK_START)); ?> - <?php echo date('h:i A', strtotime($WORK_END)); ?> MMT (8 hours).
+                            </div>
+                            <div class="text-xs text-zinc-500 mt-1">
+                                <i class="fa-solid fa-circle-info mr-1"></i> Check-in is not allowed after <?php echo date('h:i A', strtotime($WORK_END)); ?> MMT.
                             </div>
                             <?php if (!$today_att || !$today_att['check_out']): ?>
                             <?php

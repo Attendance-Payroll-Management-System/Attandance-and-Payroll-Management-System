@@ -151,8 +151,184 @@ foreach ($payroll_data as $p) {
     <title>HNIN AKARI NWE · Payroll Processing</title>
     <link rel="icon" type="image/svg+xml" href="../favicon.svg">
     <?php include "../includes/header.php"; ?>
+    <style>
+        .payroll-stat {
+            position: relative;
+            overflow: hidden;
+            background: var(--glass-strong-bg);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-strong-border);
+            border-radius: 1rem;
+            padding: 1.25rem;
+            transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .payroll-stat:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-card-hover);
+        }
+        .payroll-stat::after {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -50%;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            opacity: 0.06;
+            transition: opacity 0.3s;
+        }
+        .payroll-stat:hover::after { opacity: 0.12; }
+        .payroll-stat.net::after { background: #10B981; }
+        .payroll-stat.ot::after { background: #F59E0B; }
+        .payroll-stat.bonus::after { background: #6366F1; }
+        .payroll-stat.ded::after { background: #F43F5E; }
+        .stat-icon-box {
+            width: 2.75rem;
+            height: 2.75rem;
+            border-radius: 0.875rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+            flex-shrink: 0;
+        }
+        .sheet-card {
+            position: relative;
+            overflow: hidden;
+            background: var(--glass-strong-bg);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-strong-border);
+            border-radius: 1.25rem;
+            transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .sheet-card:hover {
+            box-shadow: var(--shadow-card-hover);
+        }
+        .sheet-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, #1E3A8A, #4F46E5, #F59E0B);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        .sheet-card:hover::before { opacity: 1; }
+        .table-row {
+            transition: all 0.2s ease;
+        }
+        .table-row:hover {
+            background: linear-gradient(90deg, rgba(139,92,246,0.03), rgba(217,70,239,0.02), transparent) !important;
+        }
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.375rem;
+            padding: 0.35rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .status-calculated {
+            background: rgba(16,185,129,0.12);
+            color: #10B981;
+            border: 1px solid rgba(16,185,129,0.2);
+        }
+        .run-payroll-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.625rem 1.25rem;
+            border-radius: 0.75rem;
+            background: linear-gradient(135deg, #10B981, #059669);
+            color: white;
+            font-weight: 600;
+            font-size: 0.875rem;
+            transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+            box-shadow: 0 4px 15px rgba(16,185,129,0.25);
+        }
+        .run-payroll-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(16,185,129,0.35);
+        }
+        .run-payroll-btn:active { transform: translateY(0); }
+        .view-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.625rem 1.25rem;
+            border-radius: 0.75rem;
+            background: linear-gradient(135deg, #1E3A8A, #4F46E5);
+            color: white;
+            font-weight: 600;
+            font-size: 0.875rem;
+            transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+            box-shadow: 0 4px 15px rgba(139,92,246,0.25);
+        }
+        .view-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(139,92,246,0.35);
+        }
+        .employee-cell {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        .employee-avatar {
+            width: 2.5rem;
+            height: 2.5rem;
+            border-radius: 0.75rem;
+            background: linear-gradient(135deg, #1E3A8A, #4F46E5);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            font-weight: 700;
+            flex-shrink: 0;
+            box-shadow: 0 4px 12px rgba(139,92,246,0.2);
+        }
+        .amount-positive {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            color: #F59E0B;
+        }
+        .amount-positive::before {
+            content: '+';
+            font-size: 0.625rem;
+            font-weight: 700;
+        }
+        .amount-deduction {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            color: #F43F5E;
+        }
+        .amount-deduction::before {
+            content: '−';
+            font-size: 0.75rem;
+            font-weight: 700;
+        }
+        .net-highlight {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.375rem;
+            padding: 0.375rem 0.75rem;
+            border-radius: 0.625rem;
+            background: rgba(139,92,246,0.1);
+            border: 1px solid rgba(139,92,246,0.2);
+            color: #A78BFA;
+            font-weight: 700;
+            font-family: 'Courier New', monospace;
+        }
+    </style>
 </head>
-<body x-data="{ sidebarOpen: false }" class="bg-slate-50 dark:bg-[#09090b] text-slate-900 dark:text-white font-sans antialiased min-h-screen flex">
+<body x-data="{ sidebarOpen: false }" class="bg-slate-50 dark:bg-[#0B1120] text-slate-900 dark:text-white font-sans antialiased min-h-screen flex">
     <?php include "../includes/sidebar.php"; ?>
     <div class="flex-1 flex flex-col min-w-0 main-wrapper">
         <?php
@@ -162,20 +338,30 @@ foreach ($payroll_data as $p) {
         ?>
         <form method="POST" class="flex flex-wrap items-center gap-3 glass-strong rounded-xl p-3">
         <?php echo csrf_field(); ?>
-            <select name="pay_month" class="bg-white/[0.06] border-white/10 text-white placeholder-zinc-500 text-sm rounded-lg p-2.5">
-                <?php for ($m = 1; $m <= 12; $m++): ?>
-                <option value="<?php echo $m; ?>" <?php echo $m == $selected_month ? 'selected' : ''; ?>><?php echo date('F', mktime(0,0,0,$m,1)); ?></option>
-                <?php endfor; ?>
-            </select>
-            <select name="pay_year" class="bg-white/[0.06] border-white/10 text-white placeholder-zinc-500 text-sm rounded-lg p-2.5">
-                <?php for ($y = date('Y') - 1; $y <= date('Y') + 1; $y++): ?>
-                <option value="<?php echo $y; ?>" <?php echo $y == $selected_year ? 'selected' : ''; ?>><?php echo $y; ?></option>
-                <?php endfor; ?>
-            </select>
-            <button type="submit" class="rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700 text-white font-semibold text-sm px-5 py-2.5 shadow-sm transition flex items-center gap-2">
+            <div class="flex items-center gap-2">
+                <div class="w-9 h-9 rounded-lg bg-blue-500/15 flex items-center justify-center">
+                    <i class="fa-regular fa-calendar text-blue-500 text-sm"></i>
+                </div>
+                <select name="pay_month" class="bg-white/[0.06] border border-white/10 text-white text-sm rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-blue-500/30 min-w-[130px]">
+                    <?php for ($m = 1; $m <= 12; $m++): ?>
+                    <option value="<?php echo $m; ?>" <?php echo $m == $selected_month ? 'selected' : ''; ?>><?php echo date('F', mktime(0,0,0,$m,1)); ?></option>
+                    <?php endfor; ?>
+                </select>
+            </div>
+            <div class="flex items-center gap-2">
+                <div class="w-9 h-9 rounded-lg bg-indigo-500/15 flex items-center justify-center">
+                    <i class="fa-solid fa-clock-rotate-left text-indigo-500 text-sm"></i>
+                </div>
+                <select name="pay_year" class="bg-white/[0.06] border border-white/10 text-white text-sm rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-blue-500/30 min-w-[100px]">
+                    <?php for ($y = date('Y') - 1; $y <= date('Y') + 1; $y++): ?>
+                    <option value="<?php echo $y; ?>" <?php echo $y == $selected_year ? 'selected' : ''; ?>><?php echo $y; ?></option>
+                    <?php endfor; ?>
+                </select>
+            </div>
+            <button type="submit" class="view-btn">
                 <i class="fa-solid fa-magnifying-glass"></i> View
             </button>
-            <button type="submit" name="run_payroll" value="1" class="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm px-5 py-2.5 shadow-sm transition flex items-center gap-2">
+            <button type="submit" name="run_payroll" value="1" class="run-payroll-btn">
                 <i class="fa-solid fa-bolt"></i> Run Payroll
             </button>
         </form>
@@ -183,89 +369,163 @@ foreach ($payroll_data as $p) {
         <main class="flex-1 p-8 overflow-y-auto">
 
             <?php if ($message): ?>
-                <div class="mb-6 rounded-2xl px-6 py-4 shadow-sm border <?php echo $message_type == 'success' ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400' : 'bg-red-500/20 border-red-500/30 text-red-400'; ?>">
+                <div class="mb-6 rounded-2xl px-6 py-4 shadow-sm border animate-fade-in-down <?php echo $message_type == 'success' ? 'bg-emerald-500/15 border-emerald-500/25' : 'bg-red-500/15 border-red-500/25'; ?>">
                     <div class="flex items-center gap-3">
-                        <i class="fa-solid <?php echo $message_type == 'success' ? 'fa-circle-check' : 'fa-circle-exclamation'; ?> text-lg"></i>
-                        <p class="font-medium"><?php echo htmlspecialchars($message); ?></p>
+                        <div class="w-10 h-10 rounded-xl <?php echo $message_type == 'success' ? 'bg-emerald-500/20' : 'bg-red-500/20'; ?> flex items-center justify-center">
+                            <i class="fa-solid <?php echo $message_type == 'success' ? 'fa-circle-check text-emerald-500' : 'fa-circle-exclamation text-red-500'; ?> text-lg"></i>
+                        </div>
+                        <div>
+                            <p class="font-semibold <?php echo $message_type == 'success' ? 'text-emerald-400' : 'text-red-400'; ?>"><?php echo htmlspecialchars($message); ?></p>
+                        </div>
                     </div>
                 </div>
             <?php endif; ?>
 
-            <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-6">
-                    <div class="flex items-center justify-between mb-2">
-                        <span class="text-xs font-bold uppercase tracking-wider text-zinc-500">Total Net Payout</span>
-                        <span class="p-2 bg-gradient-to-br from-emerald-500/20 to-green-500/20 text-emerald-400 rounded-lg text-sm"><i class="fa-solid fa-dollar-sign"></i></span>
+            <!-- Stats Cards -->
+            <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+                <!-- Total Net Payout -->
+                <div class="payroll-stat net animate-fade-in-up stagger-1">
+                    <div class="flex items-center gap-3">
+                        <div class="stat-icon-box bg-gradient-to-br from-emerald-500/20 to-teal-500/10">
+                            <i class="fa-solid fa-dollar-sign text-emerald-500"></i>
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <span class="text-[11px] font-bold uppercase tracking-wider text-zinc-500">Total Net Payout</span>
+                            <p class="text-xl font-extrabold text-emerald-400 mt-0.5 truncate">$<?php echo number_format($total_net, 2); ?></p>
+                            <p class="text-[10px] text-zinc-500 mt-0.5"><?php echo $emp_count; ?> employees</p>
+                        </div>
                     </div>
-                    <p class="text-2xl font-bold text-white">$<?php echo number_format($total_net, 2); ?></p>
-                    <p class="text-xs text-zinc-500 mt-1"><?php echo $emp_count; ?> employees</p>
                 </div>
-                <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-6">
-                    <div class="flex items-center justify-between mb-2">
-                        <span class="text-xs font-bold uppercase tracking-wider text-zinc-500">Overtime Disbursed</span>
-                        <span class="p-2 bg-gradient-to-br from-amber-500/20 to-orange-500/20 text-amber-400 rounded-lg text-sm"><i class="fa-solid fa-clock"></i></span>
+
+                <!-- Overtime Disbursed -->
+                <div class="payroll-stat ot animate-fade-in-up stagger-2">
+                    <div class="flex items-center gap-3">
+                        <div class="stat-icon-box bg-gradient-to-br from-amber-500/20 to-orange-500/10">
+                            <i class="fa-solid fa-clock text-amber-500"></i>
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <span class="text-[11px] font-bold uppercase tracking-wider text-zinc-500">Overtime Disbursed</span>
+                            <p class="text-xl font-extrabold text-amber-400 mt-0.5 truncate">$<?php echo number_format($total_ot, 2); ?></p>
+                            <p class="text-[10px] text-zinc-500 mt-0.5"><?php echo $month_name; ?> <?php echo $selected_year; ?></p>
+                        </div>
                     </div>
-                    <p class="text-2xl font-bold text-white">$<?php echo number_format($total_ot, 2); ?></p>
-                    <p class="text-xs text-zinc-500 mt-1"><?php echo $month_name; ?> <?php echo $selected_year; ?></p>
                 </div>
-                <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-6">
-                    <div class="flex items-center justify-between mb-2">
-                        <span class="text-xs font-bold uppercase tracking-wider text-zinc-500">Bonuses Applied</span>
-                        <span class="p-2 bg-gradient-to-br from-indigo-500/20 to-violet-500/20 text-indigo-400 rounded-lg text-sm"><i class="fa-solid fa-gift"></i></span>
+
+                <!-- Bonuses Applied -->
+                <div class="payroll-stat bonus animate-fade-in-up stagger-3">
+                    <div class="flex items-center gap-3">
+                        <div class="stat-icon-box bg-gradient-to-br from-indigo-500/20 to-blue-500/10">
+                            <i class="fa-solid fa-gift text-indigo-500"></i>
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <span class="text-[11px] font-bold uppercase tracking-wider text-zinc-500">Bonuses Applied</span>
+                            <p class="text-xl font-extrabold text-indigo-400 mt-0.5 truncate">$<?php echo number_format($total_bonus, 2); ?></p>
+                        </div>
                     </div>
-                    <p class="text-2xl font-bold text-white">$<?php echo number_format($total_bonus, 2); ?></p>
                 </div>
-                <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-6">
-                    <div class="flex items-center justify-between mb-2">
-                        <span class="text-xs font-bold uppercase tracking-wider text-zinc-500">Deductions Withheld</span>
-                        <span class="p-2 bg-gradient-to-br from-rose-500/20 to-pink-500/20 text-rose-400 rounded-lg text-sm"><i class="fa-solid fa-chart-line"></i></span>
+
+                <!-- Deductions Withheld -->
+                <div class="payroll-stat ded animate-fade-in-up stagger-4">
+                    <div class="flex items-center gap-3">
+                        <div class="stat-icon-box bg-gradient-to-br from-rose-500/20 to-pink-500/10">
+                            <i class="fa-solid fa-chart-line text-rose-500"></i>
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <span class="text-[11px] font-bold uppercase tracking-wider text-zinc-500">Deductions Withheld</span>
+                            <p class="text-xl font-extrabold text-rose-400 mt-0.5 truncate">$<?php echo number_format($total_ded, 2); ?></p>
+                        </div>
                     </div>
-                    <p class="text-2xl font-bold text-white">$<?php echo number_format($total_ded, 2); ?></p>
                 </div>
             </section>
 
-            <section class="card-hover glass-strong rounded-2xl overflow-hidden">
+            <!-- Salary Sheet -->
+            <section class="sheet-card animate-fade-in-up stagger-5">
                 <div class="p-6 border-b border-white/[0.06] flex items-center justify-between">
-                    <h2 class="font-bold text-white text-lg"><i class="fa-solid fa-file-invoice-dollar text-violet-400 mr-2"></i>Salary Sheets - <?php echo $month_name . ' ' . $selected_year; ?></h2>
-                    <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold bg-indigo-500/20 text-indigo-400"><?php echo $emp_count; ?> Employees</span>
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500/20 to-indigo-500/10 flex items-center justify-center">
+                            <i class="fa-solid fa-file-invoice-dollar text-blue-500"></i>
+                        </div>
+                        <div>
+                            <h2 class="font-bold text-white text-lg">Salary Sheets</h2>
+                            <p class="text-xs text-zinc-500 mt-0.5"><?php echo $month_name . ' ' . $selected_year; ?></p>
+                        </div>
+                    </div>
+                    <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20">
+                        <i class="fa-solid fa-users text-indigo-400 text-xs"></i>
+                        <span class="text-xs font-semibold text-indigo-400"><?php echo $emp_count; ?> Employees</span>
+                    </div>
                 </div>
                 <div class="overflow-x-auto">
                     <table class="w-full text-left text-sm whitespace-nowrap">
-                        <thead class="text-zinc-500 text-xs font-bold uppercase tracking-wider border-b border-white/[0.06]">
+                        <thead class="text-white text-xs font-bold uppercase tracking-wider">
                             <tr>
                                 <th class="px-6 py-4">Employee</th>
                                 <th class="px-6 py-4 text-right">Base Salary</th>
                                 <th class="px-6 py-4 text-right">OT Amount</th>
                                 <th class="px-6 py-4 text-right">Bonuses</th>
                                 <th class="px-6 py-4 text-right">Deductions</th>
-                                <th class="px-6 py-4 text-right font-semibold text-white">Gross Salary</th>
-                                <th class="px-6 py-4 text-right font-semibold text-white">Net Salary</th>
+                                <th class="px-6 py-4 text-right">Gross Salary</th>
+                                <th class="px-6 py-4 text-right font-bold">Net Salary</th>
                                 <th class="px-6 py-4 text-center">Status</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-white/[0.06]">
                             <?php if (empty($payroll_data)): ?>
                             <tr>
-                                <td colspan="8" class="px-6 py-12 text-center text-zinc-500">
-                                    <p class="text-lg mb-2">No payroll data for <?php echo $month_name . ' ' . $selected_year; ?></p>
-                                    <p class="text-sm">Click <strong>"Run Payroll"</strong> to calculate salaries with attendance & leave integration.</p>
+                                <td colspan="8" class="px-6 py-16 text-center">
+                                    <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500/10 to-indigo-500/10 flex items-center justify-center mx-auto mb-4">
+                                        <i class="fa-solid fa-file-invoice-dollar text-2xl text-zinc-500"></i>
+                                    </div>
+                                    <p class="text-zinc-400 font-medium">No payroll data for <?php echo $month_name . ' ' . $selected_year; ?></p>
+                                    <p class="text-zinc-500 text-sm mt-2">Click <strong class="text-emerald-400">"Run Payroll"</strong> to calculate salaries with attendance & leave integration.</p>
                                 </td>
                             </tr>
                             <?php else: ?>
-                                <?php foreach ($payroll_data as $p): ?>
-                                <tr class="hover:bg-white/[0.02] transition">
+                                <?php foreach ($payroll_data as $idx => $p): ?>
+                                <tr class="table-row animate-fade-in-up" style="animation-delay: <?php echo 0.05 + ($idx * 0.03); ?>s;">
                                     <td class="px-6 py-4">
-                                        <div class="font-medium text-white"><?php echo htmlspecialchars($p['name']); ?></div>
-                                        <div class="text-xs text-zinc-500"><?php echo htmlspecialchars($p['employee_code']); ?></div>
+                                        <div class="employee-cell">
+                                            <div class="employee-avatar">
+                                                <?php echo strtoupper(substr($p['name'], 0, 2)); ?>
+                                            </div>
+                                            <div>
+                                                <div class="font-semibold text-white"><?php echo htmlspecialchars($p['name']); ?></div>
+                                                <div class="text-[11px] text-zinc-500 font-medium"><?php echo htmlspecialchars($p['employee_code']); ?></div>
+                                            </div>
+                                        </div>
                                     </td>
-                                    <td class="px-6 py-4 text-right font-mono">$<?php echo number_format($p['basic_salary'], 2); ?></td>
-                                    <td class="px-6 py-4 text-right text-amber-400 font-mono">+$<?php echo number_format($p['ot_amount'], 2); ?></td>
-                                    <td class="px-6 py-4 text-right text-emerald-400 font-mono">+$<?php echo number_format($p['bonus_amount'], 2); ?></td>
-                                    <td class="px-6 py-4 text-right text-rose-400 font-mono">-$<?php echo number_format($p['deduction_amount'], 2); ?></td>
-                                    <td class="px-6 py-4 text-right font-bold text-white font-mono">$<?php echo number_format($p['gross_salary'], 2); ?></td>
-                                    <td class="px-6 py-4 text-right font-bold text-violet-400 font-mono">$<?php echo number_format($p['net_salary'], 2); ?></td>
+                                    <td class="px-6 py-4 text-right font-mono text-white font-medium">$<?php echo number_format($p['basic_salary'], 2); ?></td>
+                                    <td class="px-6 py-4 text-right">
+                                        <?php if ($p['ot_amount'] > 0): ?>
+                                            <span class="amount-positive font-mono font-medium">$<?php echo number_format($p['ot_amount'], 2); ?></span>
+                                        <?php else: ?>
+                                            <span class="font-mono text-zinc-600">—</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td class="px-6 py-4 text-right">
+                                        <?php if ($p['bonus_amount'] > 0): ?>
+                                            <span class="inline-flex items-center gap-1 font-mono text-emerald-400 font-medium">
+                                                <i class="fa-solid fa-plus text-[9px]"></i>$<?php echo number_format($p['bonus_amount'], 2); ?>
+                                            </span>
+                                        <?php else: ?>
+                                            <span class="font-mono text-zinc-600">—</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td class="px-6 py-4 text-right">
+                                        <?php if ($p['deduction_amount'] > 0): ?>
+                                            <span class="amount-deduction font-mono font-medium">$<?php echo number_format($p['deduction_amount'], 2); ?></span>
+                                        <?php else: ?>
+                                            <span class="font-mono text-zinc-600">—</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td class="px-6 py-4 text-right font-mono text-white font-bold">$<?php echo number_format($p['gross_salary'], 2); ?></td>
+                                    <td class="px-6 py-4 text-right">
+                                        <span class="net-highlight">$<?php echo number_format($p['net_salary'], 2); ?></span>
+                                    </td>
                                     <td class="px-6 py-4 text-center">
-                                        <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold bg-emerald-500/20 text-emerald-400">Calculated</span>
+                                        <span class="status-badge status-calculated">
+                                            <i class="fa-solid fa-check-circle text-[10px]"></i> Calculated
+                                        </span>
                                     </td>
                                 </tr>
                                 <?php endforeach; ?>

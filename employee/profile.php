@@ -95,7 +95,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <link rel="icon" type="image/svg+xml" href="../favicon.svg">
     <?php include "../includes/header.php"; ?>
 </head>
-<body x-data="{ sidebarOpen: false }" class="bg-slate-50 dark:bg-[#09090b] text-slate-900 dark:text-white font-sans antialiased min-h-screen flex">
+<body x-data="{ sidebarOpen: false }" class="bg-slate-50 dark:bg-[#0B1120] text-slate-900 dark:text-white font-sans antialiased min-h-screen flex">
     <?php $sidebar_role = 'employee'; include "../includes/sidebar.php"; ?>
     <div class="flex-1 flex flex-col min-w-0 main-wrapper">
         <?php $page_title = "My Profile"; $page_subtitle = "Manage your personal information and account details."; include "../includes/topbar.php"; ?>
@@ -113,13 +113,17 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
                 <div class="xl:col-span-1 space-y-6">
                     <div class="glass-strong rounded-2xl p-6 text-center card-hover animate-fade-in-up stagger-1">
-                        <div class="w-20 h-20 rounded-2xl bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white flex items-center justify-center text-3xl font-bold mx-auto shadow-xl shadow-violet-500/20 ring-2 ring-white/10 animate-float">
+                        <?php if (!empty($employee['profile_photo'])): ?>
+                        <img src="../<?php echo htmlspecialchars($employee['profile_photo']); ?>" alt="Profile" class="w-20 h-20 rounded-2xl object-cover mx-auto shadow-xl shadow-sky-500/20 ring-2 ring-white/10 animate-float">
+                        <?php else: ?>
+                        <div class="w-20 h-20 rounded-2xl bg-gradient-to-br from-sky-500 to-cyan-500 text-white flex items-center justify-center text-3xl font-bold mx-auto shadow-xl shadow-sky-500/20 ring-2 ring-white/10 animate-float">
                             <?php echo strtoupper(substr($employee['name'], 0, 2)); ?>
                         </div>
+                        <?php endif; ?>
                         <h2 class="text-xl font-bold text-body mt-4"><?php echo htmlspecialchars($employee['name']); ?></h2>
                         <p class="text-sm text-body-secondary"><?php echo htmlspecialchars($employee['position_name'] ?? 'No Position'); ?></p>
                         <div class="mt-4 flex justify-center gap-2">
-                            <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold bg-violet-500/20 text-violet-400"><?php echo htmlspecialchars($employee['department_name'] ?? 'N/A'); ?></span>
+                            <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold bg-sky-500/20 text-sky-400"><?php echo htmlspecialchars($employee['department_name'] ?? 'N/A'); ?></span>
                             <?php if ($employee['status'] === 'active'): ?>
                                 <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold bg-emerald-500/20 text-emerald-400">Active</span>
                             <?php endif; ?>
@@ -127,7 +131,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     </div>
 
                     <div class="glass-strong rounded-2xl p-6 card-hover animate-fade-in-up stagger-2">
-                        <h3 class="font-bold text-white text-sm mb-4 border-b border-white/[0.06] pb-3"><i class="fa-solid fa-briefcase text-violet-400 mr-2"></i>Employment Info</h3>
+                        <h3 class="font-bold text-white text-sm mb-4 border-b border-white/[0.06] pb-3"><i class="fa-solid fa-briefcase text-sky-400 mr-2"></i>Employment Info</h3>
                         <dl class="space-y-3 text-sm">
                             <div class="flex justify-between">
                                 <dt class="text-zinc-500">Employee Code</dt>
@@ -160,11 +164,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 <div class="xl:col-span-2">
                     <form method="POST" class="glass-strong rounded-2xl p-6 card-hover animate-fade-in-up stagger-2">
                     <?php echo csrf_field(); ?>
-                        <h3 class="font-bold text-white text-base mb-6 border-b border-white/[0.06] pb-4"><i class="fa-solid fa-user-pen text-violet-400 mr-2"></i>Personal Information</h3>
+                        <h3 class="font-bold text-white text-base mb-6 border-b border-white/[0.06] pb-4"><i class="fa-solid fa-user-pen text-sky-400 mr-2"></i>Personal Information</h3>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
                             <div class="space-y-1.5">
                                 <label class="text-sm font-medium text-zinc-300">Full Name *</label>
-                                <input type="text" name="name" value="<?php echo htmlspecialchars($employee['name']); ?>" class="w-full px-4 py-2.5 rounded-xl bg-white/[0.06] border border-white/10 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50 transition-all">
+                                <input type="text" name="name" value="<?php echo htmlspecialchars($employee['name']); ?>" class="w-full px-4 py-2.5 rounded-xl bg-white/[0.06] border border-white/10 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-sky-500/50 transition-all">
                             </div>
                             <div class="space-y-1.5">
                                 <label class="text-sm font-medium text-zinc-300">Email</label>
@@ -172,28 +176,28 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                             </div>
                             <div class="space-y-1.5">
                                 <label class="text-sm font-medium text-zinc-300">Phone</label>
-                                <input type="text" name="phone" value="<?php echo htmlspecialchars($employee['phone'] ?? ''); ?>" class="w-full px-4 py-2.5 rounded-xl bg-white/[0.06] border border-white/10 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50 transition-all">
+                                <input type="text" name="phone" value="<?php echo htmlspecialchars($employee['phone'] ?? ''); ?>" class="w-full px-4 py-2.5 rounded-xl bg-white/[0.06] border border-white/10 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-sky-500/50 transition-all">
                             </div>
                             <div class="space-y-1.5">
                                 <label class="text-sm font-medium text-zinc-300">Gender</label>
-                                <select name="gender" class="w-full px-4 py-2.5 rounded-xl bg-white/[0.06] border border-white/10 text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50 transition-all">
+                                <select name="gender" class="w-full px-4 py-2.5 rounded-xl bg-white/[0.06] border border-white/10 text-white focus:outline-none focus:ring-2 focus:ring-sky-500/50 transition-all">
                                     <option value="Male" <?php echo ($employee['gender'] ?? '') == 'Male' ? 'selected' : ''; ?>>Male</option>
                                     <option value="Female" <?php echo ($employee['gender'] ?? '') == 'Female' ? 'selected' : ''; ?>>Female</option>
                                 </select>
                             </div>
                             <div class="space-y-1.5">
                                 <label class="text-sm font-medium text-zinc-300">Date of Birth</label>
-                                <input type="date" name="dob" value="<?php echo $employee['dob'] ?? ''; ?>" class="w-full px-4 py-2.5 rounded-xl bg-white/[0.06] border border-white/10 text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50 transition-all">
+                                <input type="date" name="dob" value="<?php echo $employee['dob'] ?? ''; ?>" class="w-full px-4 py-2.5 rounded-xl bg-white/[0.06] border border-white/10 text-white focus:outline-none focus:ring-2 focus:ring-sky-500/50 transition-all">
                             </div>
                             <div class="space-y-1.5">
                                 <label class="text-sm font-medium text-zinc-300">Father's Name</label>
-                                <input type="text" name="father_name" value="<?php echo htmlspecialchars($employee['father_name'] ?? ''); ?>" class="w-full px-4 py-2.5 rounded-xl bg-white/[0.06] border border-white/10 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50 transition-all">
+                                <input type="text" name="father_name" value="<?php echo htmlspecialchars($employee['father_name'] ?? ''); ?>" class="w-full px-4 py-2.5 rounded-xl bg-white/[0.06] border border-white/10 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-sky-500/50 transition-all">
                             </div>
                             <div class="md:col-span-2 space-y-1.5">
                                 <label class="text-sm font-medium text-zinc-300">NRC / ID</label>
                                 <div class="grid grid-cols-12 gap-2" id="nrc-container">
                                     <div class="col-span-3">
-                                        <select name="nrc_state" id="nrc_state" class="w-full px-2 py-2.5 rounded-xl bg-white/[0.06] border border-white/10 text-white text-sm outline-none focus:ring-2 focus:ring-violet-500/50 transition-all">
+                                        <select name="nrc_state" id="nrc_state" class="w-full px-2 py-2.5 rounded-xl bg-white/[0.06] border border-white/10 text-white text-sm outline-none focus:ring-2 focus:ring-sky-500/50 transition-all">
                                             <option value="">State</option>
                                             <?php foreach (get_nrc_state_codes() as $val => $label): ?>
                                                 <option value="<?php echo $val; ?>" <?php echo ($nrc_state_val === $val) ? 'selected' : ''; ?>><?php echo $val; ?></option>
@@ -202,28 +206,28 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                     </div>
                                     <span class="col-span-1 flex items-center justify-center text-zinc-500 text-lg font-bold">/</span>
                                     <div class="col-span-4">
-                                        <select name="nrc_township" id="nrc_township" class="w-full px-2 py-2.5 rounded-xl bg-white/[0.06] border border-white/10 text-white text-sm outline-none focus:ring-2 focus:ring-violet-500/50 transition-all">
+                                        <select name="nrc_township" id="nrc_township" class="w-full px-2 py-2.5 rounded-xl bg-white/[0.06] border border-white/10 text-white text-sm outline-none focus:ring-2 focus:ring-sky-500/50 transition-all">
                                             <option value="">Township</option>
                                         </select>
                                     </div>
                                     <div class="col-span-2">
-                                        <select name="nrc_citizenship" id="nrc_citizenship" class="w-full px-2 py-2.5 rounded-xl bg-white/[0.06] border border-white/10 text-white text-sm outline-none focus:ring-2 focus:ring-violet-500/50 transition-all">
+                                        <select name="nrc_citizenship" id="nrc_citizenship" class="w-full px-2 py-2.5 rounded-xl bg-white/[0.06] border border-white/10 text-white text-sm outline-none focus:ring-2 focus:ring-sky-500/50 transition-all">
                                             <?php foreach (get_nrc_citizenship_types() as $val => $label): ?>
                                                 <option value="<?php echo $val; ?>" <?php echo ($nrc_citizenship_val === $val) ? 'selected' : ''; ?>><?php echo $val; ?></option>
                                             <?php endforeach; ?>
                                         </select>
                                     </div>
                                     <div class="col-span-2">
-                                        <input type="text" name="nrc_number" id="nrc_number" value="<?php echo htmlspecialchars($nrc_number_val); ?>" maxlength="6" placeholder="123456" class="w-full px-2 py-2.5 rounded-xl bg-white/[0.06] border border-white/10 text-white text-sm placeholder-zinc-500 outline-none focus:ring-2 focus:ring-violet-500/50 transition-all">
+                                        <input type="text" name="nrc_number" id="nrc_number" value="<?php echo htmlspecialchars($nrc_number_val); ?>" maxlength="6" placeholder="123456" class="w-full px-2 py-2.5 rounded-xl bg-white/[0.06] border border-white/10 text-white text-sm placeholder-zinc-500 outline-none focus:ring-2 focus:ring-sky-500/50 transition-all">
                                     </div>
                                 </div>
                                 <div id="nrc-preview" class="mt-1 text-xs text-zinc-400 <?php echo $nrc_state_val ? '' : 'hidden'; ?>">
-                                    NRC: <span id="nrc-preview-value" class="text-violet-400 font-mono font-semibold"><?php echo htmlspecialchars($employee['nrc'] ?? ''); ?></span>
+                                    NRC: <span id="nrc-preview-value" class="text-sky-400 font-mono font-semibold"><?php echo htmlspecialchars($employee['nrc'] ?? ''); ?></span>
                                 </div>
                             </div>
                             <div class="space-y-1.5">
                                 <label class="text-sm font-medium text-zinc-300">Marital Status</label>
-                                <select name="married_status" class="w-full px-4 py-2.5 rounded-xl bg-white/[0.06] border border-white/10 text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50 transition-all">
+                                <select name="married_status" class="w-full px-4 py-2.5 rounded-xl bg-white/[0.06] border border-white/10 text-white focus:outline-none focus:ring-2 focus:ring-sky-500/50 transition-all">
                                     <option value="">Select</option>
                                     <option value="Single" <?php echo ($employee['married_status'] ?? '') == 'Single' ? 'selected' : ''; ?>>Single</option>
                                     <option value="Married" <?php echo ($employee['married_status'] ?? '') == 'Married' ? 'selected' : ''; ?>>Married</option>
@@ -232,11 +236,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                             </div>
                             <div class="space-y-1.5">
                                 <label class="text-sm font-medium text-zinc-300">Ethnicity</label>
-                                <input type="text" name="ethnicity" value="<?php echo htmlspecialchars($employee['ethnicity'] ?? ''); ?>" class="w-full px-4 py-2.5 rounded-xl bg-white/[0.06] border border-white/10 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50 transition-all">
+                                <input type="text" name="ethnicity" value="<?php echo htmlspecialchars($employee['ethnicity'] ?? ''); ?>" class="w-full px-4 py-2.5 rounded-xl bg-white/[0.06] border border-white/10 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-sky-500/50 transition-all">
                             </div>
                             <div class="space-y-1.5">
                                 <label class="text-sm font-medium text-zinc-300">Religion</label>
-                                <select name="religion" class="w-full px-4 py-2.5 rounded-xl bg-white/[0.06] border border-white/10 text-white outline-none focus:ring-2 focus:ring-violet-500/50 transition-all">
+                                <select name="religion" class="w-full px-4 py-2.5 rounded-xl bg-white/[0.06] border border-white/10 text-white outline-none focus:ring-2 focus:ring-sky-500/50 transition-all">
                                     <option value="">Select Religion</option>
                                     <?php foreach (get_nrc_religion_options() as $val => $label): ?>
                                         <option value="<?php echo $val; ?>" <?php echo (($employee['religion'] ?? '') === $val) ? 'selected' : ''; ?>><?php echo $label; ?></option>
@@ -245,11 +249,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                             </div>
                             <div class="md:col-span-2 space-y-1.5">
                                 <label class="text-sm font-medium text-zinc-300">Permanent Address</label>
-                                <textarea name="permanent_address" rows="3" class="w-full px-4 py-2.5 rounded-xl bg-white/[0.06] border border-white/10 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50 transition-all"><?php echo htmlspecialchars($employee['permanent_address'] ?? ''); ?></textarea>
+                                <textarea name="permanent_address" rows="3" class="w-full px-4 py-2.5 rounded-xl bg-white/[0.06] border border-white/10 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-sky-500/50 transition-all"><?php echo htmlspecialchars($employee['permanent_address'] ?? ''); ?></textarea>
                             </div>
                         </div>
                         <div class="mt-6 flex justify-end">
-                            <button type="submit" class="rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white font-semibold text-sm px-6 py-2.5 shadow-lg transition-all duration-200 hover:-translate-y-0.5">
+                            <button type="submit" class="rounded-xl bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-cyan-500 text-white font-semibold text-sm px-6 py-2.5 shadow-lg transition-all duration-200 hover:-translate-y-0.5">
                                 <i class="fa-solid fa-floppy-disk mr-2"></i> Save Changes
                             </button>
                         </div>

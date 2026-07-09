@@ -62,10 +62,10 @@ if (!$emp) {
     <?php include "../includes/header.php"; ?>
 </head>
 
-<body x-data="{ sidebarOpen: false }" class="bg-slate-50 dark:bg-[#09090b] text-slate-900 dark:text-white font-sans antialiased min-h-screen flex">
+<body x-data="{ sidebarOpen: false }" class="bg-slate-50 dark:bg-[#0B1120] text-slate-900 dark:text-white font-sans antialiased min-h-screen flex">
     <?php include "../includes/sidebar.php"; ?>
     <div class="flex-1 flex flex-col min-w-0 main-wrapper">
-        <?php $page_title = "Employee Profile"; $page_subtitle = "Detailed information about " . htmlspecialchars($emp['name']); $page_actions = '<a href="edit_employee.php?id=' . $emp['id'] . '" class="rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700 text-white font-semibold text-sm px-5 py-2.5 shadow-sm transition flex items-center gap-2"><i class="fa-solid fa-pen"></i> Edit Profile</a><a href="employee.php" class="rounded-xl border border-white/10 glass-strong hover:bg-white/[0.06] text-zinc-300 font-semibold text-sm px-5 py-2.5 shadow-sm transition flex items-center gap-2"><i class="fa-solid fa-arrow-left"></i> Back to List</a>'; include "../includes/topbar.php"; ?>
+        <?php $page_title = "Employee Profile"; $page_subtitle = "Detailed information about " . htmlspecialchars($emp['name']); $page_actions = '<a href="edit_employee.php?id=' . $emp['id'] . '" class="rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold text-sm px-5 py-2.5 shadow-sm transition flex items-center gap-2"><i class="fa-solid fa-pen"></i> Edit Profile</a><a href="employee.php" class="rounded-xl border border-white/10 glass-strong hover:bg-white/[0.06] text-zinc-300 font-semibold text-sm px-5 py-2.5 shadow-sm transition flex items-center gap-2"><i class="fa-solid fa-arrow-left"></i> Back to List</a>'; include "../includes/topbar.php"; ?>
 
         <main class="flex-1 p-8">
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -81,7 +81,7 @@ if (!$emp) {
                             <?php endif; ?>
                         </div>
                         <h1 class="text-2xl font-bold text-white leading-tight"><?php echo htmlspecialchars($emp['name']); ?></h1>
-                        <p class="text-sm font-medium text-violet-400 mt-1"><?php echo htmlspecialchars($emp['role'] ?: $emp['position_name']); ?></p>
+                        <p class="text-sm font-medium text-blue-400 mt-1"><?php echo htmlspecialchars($emp['role'] ?: $emp['position_name']); ?></p>
                         <span class="inline-block mt-3 bg-white/10 text-zinc-400 text-xs font-mono px-2 py-1 rounded border border-white/10">
                             <?php echo htmlspecialchars($emp['employee_code']); ?>
                         </span>
@@ -99,7 +99,7 @@ if (!$emp) {
                         <div class="space-y-3 text-sm">
                             <div>
                                 <span class="block text-xs font-medium text-zinc-500">Work Email</span>
-                                <a href="mailto:<?php echo htmlspecialchars($emp['email']); ?>" class="text-violet-400 hover:underline font-medium"><?php echo htmlspecialchars($emp['email']); ?></a>
+                                <a href="mailto:<?php echo htmlspecialchars($emp['email']); ?>" class="text-blue-400 hover:underline font-medium"><?php echo htmlspecialchars($emp['email']); ?></a>
                             </div>
                             <div>
                                 <span class="block text-xs font-medium text-zinc-500">Mobile Phone</span>
@@ -121,7 +121,7 @@ if (!$emp) {
                 <div class="space-y-6 lg:col-span-2">
 
                     <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-6">
-                        <h2 class="text-lg font-bold text-white border-b border-white/[0.06] pb-3 mb-4"><i class="fa-solid fa-briefcase text-violet-400 mr-2"></i>Employment Details</h2>
+                        <h2 class="text-lg font-bold text-white border-b border-white/[0.06] pb-3 mb-4"><i class="fa-solid fa-briefcase text-blue-400 mr-2"></i>Employment Details</h2>
                         <div class="grid grid-cols-2 md:grid-cols-3 gap-6">
                             <div>
                                 <span class="block text-xs font-medium text-zinc-500">Department</span>
@@ -151,7 +151,7 @@ if (!$emp) {
                     </div>
 
                     <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-6">
-                        <h2 class="text-lg font-bold text-white border-b border-white/[0.06] pb-3 mb-4"><i class="fa-solid fa-user text-violet-400 mr-2"></i>Personal Information</h2>
+                        <h2 class="text-lg font-bold text-white border-b border-white/[0.06] pb-3 mb-4"><i class="fa-solid fa-user text-blue-400 mr-2"></i>Personal Information</h2>
                         <div class="grid grid-cols-2 md:grid-cols-3 gap-6">
                             <div>
                                 <span class="block text-xs font-medium text-zinc-500">Father's Name</span>

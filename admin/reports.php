@@ -76,7 +76,7 @@ foreach ($annual_data as $r) {
     <link rel="icon" type="image/svg+xml" href="../favicon.svg">
     <?php include "../includes/header.php"; ?>
 </head>
-<body x-data="{ sidebarOpen: false }" class="bg-slate-50 dark:bg-[#09090b] text-slate-900 dark:text-white font-sans antialiased min-h-screen flex">
+<body x-data="{ sidebarOpen: false }" class="bg-slate-50 dark:bg-[#0B1120] text-slate-900 dark:text-white font-sans antialiased min-h-screen flex">
     <?php include "../includes/sidebar.php"; ?>
     <div class="flex-1 flex flex-col min-w-0 main-wrapper">
         <?php
@@ -90,7 +90,7 @@ foreach ($annual_data as $r) {
                 <option value="<?php echo $y; ?>" <?php echo $y == $selected_year ? 'selected' : ''; ?>><?php echo $y; ?></option>
                 <?php endfor; ?>
             </select>
-            <button type="submit" class="rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700 text-white font-semibold text-sm px-5 py-2.5 shadow-sm transition flex items-center gap-2">
+            <button type="submit" class="rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold text-sm px-5 py-2.5 shadow-sm transition flex items-center gap-2">
                 <i class="fa-solid fa-magnifying-glass"></i> View
             </button>
         </form>
@@ -171,7 +171,7 @@ foreach ($annual_data as $r) {
 
             <section class="card-hover glass-strong rounded-2xl overflow-hidden">
                 <div class="p-6 border-b border-white/[0.06] flex items-center justify-between">
-                    <h2 class="font-bold text-white text-lg"><i class="fa-solid fa-file-lines text-violet-400 mr-2"></i>Annual Payroll &mdash; <?php echo $selected_year; ?></h2>
+                    <h2 class="font-bold text-white text-lg"><i class="fa-solid fa-file-lines text-blue-400 mr-2"></i>Annual Payroll &mdash; <?php echo $selected_year; ?></h2>
                     <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold bg-indigo-500/20 text-indigo-400"><?php echo count($annual_data); ?> employees</span>
                 </div>
                 <div class="overflow-x-auto">
@@ -206,7 +206,7 @@ foreach ($annual_data as $r) {
                                     <td class="px-6 py-4 text-right text-amber-400 font-mono">+$<?php echo number_format($r['total_ot'], 2); ?></td>
                                     <td class="px-6 py-4 text-right text-emerald-400 font-mono">+$<?php echo number_format($r['total_bonus'], 2); ?></td>
                                     <td class="px-6 py-4 text-right text-rose-400 font-mono">-$<?php echo number_format($r['total_deduction'], 2); ?></td>
-                                    <td class="px-6 py-4 text-right font-bold text-violet-400 font-mono">$<?php echo number_format($r['net_annual_salary'], 2); ?></td>
+                                    <td class="px-6 py-4 text-right font-bold text-blue-400 font-mono">$<?php echo number_format($r['net_annual_salary'], 2); ?></td>
                                 </tr>
                                 <?php endforeach; ?>
                             <?php endif; ?>

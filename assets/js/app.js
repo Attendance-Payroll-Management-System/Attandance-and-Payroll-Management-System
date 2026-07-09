@@ -1,15 +1,34 @@
 function toggleTheme() {
     var html = document.documentElement;
-    html.classList.add('theme-transitioning');
-    var isDark = html.classList.contains('dark');
-    if (isDark) {
-        html.classList.remove('dark');
-        localStorage.setItem('aura-theme', 'light');
-    } else {
-        html.classList.add('dark');
-        localStorage.setItem('aura-theme', 'dark');
-    }
-    setTimeout(function() { html.classList.remove('theme-transitioning'); }, 500);
+    var body = document.body;
+
+    // Create transition overlay
+    var overlay = document.createElement('div');
+    overlay.className = 'theme-transition-overlay';
+    document.body.appendChild(overlay);
+
+    // Trigger overlay animation
+    requestAnimationFrame(function() {
+        overlay.classList.add('active');
+    });
+
+    // Switch theme after a short delay for the overlay to cover the screen
+    setTimeout(function() {
+        var isDark = html.classList.contains('dark');
+        if (isDark) {
+            html.classList.remove('dark');
+            localStorage.setItem('aura-theme', 'light');
+        } else {
+            html.classList.add('dark');
+            localStorage.setItem('aura-theme', 'dark');
+        }
+
+        // Fade out overlay
+        setTimeout(function() {
+            overlay.classList.remove('active');
+            setTimeout(function() { overlay.remove(); }, 600);
+        }, 150);
+    }, 250);
 }
 
 function animateCounter(el, target, duration) {

@@ -483,26 +483,31 @@ function calculate_attendance_status(mysqli $conn, int $employee_id, string $dat
         return 'awol';
     }
 
-    // Has check-in
+    // Has check-in, determine status based on check-out time
     $is_late = is_late_checkin($check_in);
 
-    // Has check-out
     if ($check_out !== null) {
         $check_out_time = date('H:i:s', strtotime($check_out));
+        $work_end = get_work_end_time(); // 17:00:00
 
-        // Rule 4: Check-out before 12:00 PM → Full-Day Absent
+        // Rule 4: Check-out between 9:00 AM and 12:00 PM → Full-Day Absent
         if (strtotime($check_out_time) < strtotime('12:00:00')) {
             return 'full_absent';
         }
 
-        // Rule 5: Check-out at/after 12:00 PM but incomplete day → Half-Day Absent
-        $standard_hours = (float)get_system_setting($conn, 'payroll_working_hours_per_day', '8');
-        if ($total_hours !== null && $total_hours < $standard_hours) {
+        // Rule 5: Check-out between 12:00 PM and 5:00 PM → Half-Day Absent
+        if (strtotime($check_out_time) < strtotime($work_end)) {
             return 'half_absent';
         }
+
+        // Rule 6: Check-out at or after 5:00 PM → Present (or Late if late check-in)
+        if ($is_late) {
+            return 'late';
+        }
+        return 'present';
     }
 
-    // Rule 3: Late check-in but present
+    // Has check-in but no check-out yet
     if ($is_late) {
         return 'late';
     }

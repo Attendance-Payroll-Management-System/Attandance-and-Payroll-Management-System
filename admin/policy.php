@@ -63,7 +63,7 @@ foreach ($policies as $p) {
     <link rel="icon" type="image/svg+xml" href="../favicon.svg">
     <?php include "../includes/header.php"; ?>
 </head>
-<body x-data="{ sidebarOpen: false }" class="bg-slate-50 dark:bg-[#09090b] text-slate-900 dark:text-white font-sans antialiased">
+<body x-data="{ sidebarOpen: false }" class="bg-slate-50 dark:bg-[#0B1120] text-slate-900 dark:text-white font-sans antialiased">
     <?php include "../includes/sidebar.php"; ?>
     <div class="main-wrapper min-h-screen flex flex-col">
         <?php $page_title = "Company Policies"; $page_subtitle = "Manage company policies and guidelines"; include "../includes/topbar.php"; ?>
@@ -79,8 +79,8 @@ foreach ($policies as $p) {
             <!-- Add/Edit Policy Form -->
             <div class="glass-strong rounded-2xl p-6" x-data="{ showForm: false, editMode: false }">
                 <div class="flex items-center justify-between mb-4">
-                    <h3 class="font-bold text-white text-lg"><i class="fa-solid fa-plus-circle text-violet-400 mr-2"></i>Company Policies</h3>
-                    <button @click="showForm = !showForm; editMode = false" class="bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white font-semibold text-sm px-5 py-2.5 rounded-xl transition-all duration-200 hover:scale-105 active:scale-95 flex items-center gap-2">
+                    <h3 class="font-bold text-white text-lg"><i class="fa-solid fa-plus-circle text-blue-400 mr-2"></i>Company Policies</h3>
+                    <button @click="showForm = !showForm; editMode = false" class="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold text-sm px-5 py-2.5 rounded-xl transition-all duration-200 hover:scale-105 active:scale-95 flex items-center gap-2">
                         <i class="fa-solid" :class="showForm ? 'fa-times' : 'fa-plus'"></i>
                         <span x-text="showForm ? 'Cancel' : 'Add Policy'"></span>
                     </button>
@@ -92,11 +92,11 @@ foreach ($policies as $p) {
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <label class="block text-xs font-semibold text-zinc-400 mb-1.5">Policy Title *</label>
-                                <input type="text" name="title" required class="w-full bg-white/[0.06] border border-white/[0.08] rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50" placeholder="Enter policy title">
+                                <input type="text" name="title" required class="w-full bg-white/[0.06] border border-white/[0.08] rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50" placeholder="Enter policy title">
                             </div>
                             <div>
                                 <label class="block text-xs font-semibold text-zinc-400 mb-1.5">Category</label>
-                                <select name="category" class="w-full bg-white/[0.06] border border-white/[0.08] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50">
+                                <select name="category" class="w-full bg-white/[0.06] border border-white/[0.08] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50">
                                     <option value="General">General</option>
                                     <option value="Attendance">Attendance</option>
                                     <option value="Leave">Leave</option>
@@ -110,10 +110,10 @@ foreach ($policies as $p) {
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-zinc-400 mb-1.5">Policy Content *</label>
-                            <textarea name="content" rows="6" required class="w-full bg-white/[0.06] border border-white/[0.08] rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50 resize-y" placeholder="Enter policy content..."></textarea>
+                            <textarea name="content" rows="6" required class="w-full bg-white/[0.06] border border-white/[0.08] rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-y" placeholder="Enter policy content..."></textarea>
                         </div>
                         <div class="flex gap-3">
-                            <button type="submit" class="bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white font-semibold text-sm px-6 py-2.5 rounded-xl transition-all duration-200 hover:scale-105 active:scale-95">
+                            <button type="submit" class="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold text-sm px-6 py-2.5 rounded-xl transition-all duration-200 hover:scale-105 active:scale-95">
                                 <i class="fa-solid fa-save mr-2"></i>Save Policy
                             </button>
                         </div>
@@ -137,11 +137,11 @@ foreach ($policies as $p) {
                     foreach ($grouped as $cat => $items):
                     ?>
                     <div class="glass-strong rounded-2xl overflow-hidden">
-                        <div class="px-6 py-4 border-b border-white/[0.06] bg-gradient-to-r from-violet-500/10 to-fuchsia-500/10">
+                        <div class="px-6 py-4 border-b border-white/[0.06] bg-gradient-to-r from-blue-500/10 to-indigo-500/10">
                             <h4 class="font-bold text-white flex items-center gap-2">
-                                <i class="fa-solid fa-folder text-violet-400"></i>
+                                <i class="fa-solid fa-folder text-blue-400"></i>
                                 <?php echo htmlspecialchars($cat); ?>
-                                <span class="badge badge-violet text-[10px]"><?php echo count($items); ?></span>
+                                <span class="badge badge-blue text-[10px]"><?php echo count($items); ?></span>
                             </h4>
                         </div>
                         <div class="divide-y divide-white/[0.04]">
@@ -149,7 +149,7 @@ foreach ($policies as $p) {
                             <div class="px-6 py-4 hover:bg-white/[0.02] transition-colors" x-data="{ expanded: false }">
                                 <div class="flex items-center justify-between cursor-pointer" @click="expanded = !expanded">
                                     <div class="flex items-center gap-3">
-                                        <i class="fa-solid fa-file-alt text-violet-400"></i>
+                                        <i class="fa-solid fa-file-alt text-blue-400"></i>
                                         <span class="font-medium text-white text-sm"><?php echo htmlspecialchars($policy['title']); ?></span>
                                     </div>
                                     <div class="flex items-center gap-3">
@@ -160,7 +160,7 @@ foreach ($policies as $p) {
                                 <div x-show="expanded" x-transition class="mt-3 ml-8">
                                     <p class="text-sm text-zinc-300 whitespace-pre-wrap leading-relaxed"><?php echo nl2br(htmlspecialchars($policy['content'])); ?></p>
                                     <div class="mt-4 flex gap-2">
-                                        <button @click="$dispatch('edit-policy', { id: <?php echo $policy['id']; ?>, title: '<?php echo addslashes($policy['title']); ?>', category: '<?php echo addslashes($policy['category']); ?>', content: `<?php echo addslashes($policy['content']); ?>` })" class="text-xs font-semibold text-violet-400 hover:text-violet-300 px-3 py-1.5 rounded-lg bg-violet-500/10 hover:bg-violet-500/20 transition-colors">
+                                        <button @click="$dispatch('edit-policy', { id: <?php echo $policy['id']; ?>, title: '<?php echo addslashes($policy['title']); ?>', category: '<?php echo addslashes($policy['category']); ?>', content: `<?php echo addslashes($policy['content']); ?>` })" class="text-xs font-semibold text-blue-400 hover:text-blue-300 px-3 py-1.5 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 transition-colors">
                                             <i class="fa-solid fa-pen mr-1"></i>Edit
                                         </button>
                                         <a href="policy.php?delete=<?php echo $policy['id']; ?>" onclick="return confirm('Are you sure you want to delete this policy?')" class="text-xs font-semibold text-rose-400 hover:text-rose-300 px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 transition-colors">

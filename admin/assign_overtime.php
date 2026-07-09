@@ -66,7 +66,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['assign_ot'])) {
     <link rel="icon" type="image/svg+xml" href="../favicon.svg">
     <?php include "../includes/header.php"; ?>
 </head>
-<body x-data="{ sidebarOpen: false }" class="bg-slate-50 dark:bg-[#09090b] text-slate-900 dark:text-white font-sans antialiased min-h-screen flex">
+<body x-data="{ sidebarOpen: false }" class="bg-slate-50 dark:bg-[#0B1120] text-slate-900 dark:text-white font-sans antialiased min-h-screen flex">
     <?php include "../includes/sidebar.php"; ?>
     <div class="flex-1 flex flex-col min-w-0 main-wrapper">
         <?php $page_title = "Assign Overtime"; $page_subtitle = "Assign overtime work to employees."; include "../includes/topbar.php"; ?>
@@ -90,12 +90,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['assign_ot'])) {
 
             <div class="max-w-2xl">
                 <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-6">
-                    <h2 class="text-lg font-bold text-white mb-6"><i class="fa-solid fa-clock text-violet-400 mr-2"></i>New Overtime Assignment</h2>
+                    <h2 class="text-lg font-bold text-white mb-6"><i class="fa-solid fa-clock text-blue-400 mr-2"></i>New Overtime Assignment</h2>
                     <form method="POST" class="space-y-5 text-zinc-300">
                     <?php echo csrf_field(); ?>
                         <div>
                             <label class="text-xs font-semibold text-zinc-400 block mb-1.5">Employee</label>
-                            <select name="employee_id" required class="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white placeholder-zinc-500 shadow-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-500/30">
+                            <select name="employee_id" required class="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white placeholder-zinc-500 shadow-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30">
                                 <option value="">-- Select Employee --</option>
                                 <?php foreach ($employees as $emp): ?>
                                     <option value="<?php echo $emp['id']; ?>"><?php echo htmlspecialchars($emp['name'] . ' (' . $emp['employee_code'] . ')'); ?></option>
@@ -104,23 +104,23 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['assign_ot'])) {
                         </div>
                         <div>
                             <label class="text-xs font-semibold text-zinc-400 block mb-1.5">OT Date</label>
-                            <input type="date" name="ot_date" required class="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white placeholder-zinc-500 shadow-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-500/30">
+                            <input type="date" name="ot_date" required class="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white placeholder-zinc-500 shadow-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30">
                         </div>
                         <div class="grid grid-cols-2 gap-4">
                             <div>
                                 <label class="text-xs font-semibold text-zinc-400 block mb-1.5">Start Time</label>
-                                <input type="time" name="start_time" required class="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white placeholder-zinc-500 shadow-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-500/30">
+                                <input type="time" name="start_time" required class="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white placeholder-zinc-500 shadow-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30">
                             </div>
                             <div>
                                 <label class="text-xs font-semibold text-zinc-400 block mb-1.5">End Time</label>
-                                <input type="time" name="end_time" required class="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white placeholder-zinc-500 shadow-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-500/30">
+                                <input type="time" name="end_time" required class="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white placeholder-zinc-500 shadow-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30">
                             </div>
                         </div>
                         <div>
                             <label class="text-xs font-semibold text-zinc-400 block mb-1.5">Reason / Instructions</label>
-                            <textarea name="reason" rows="3" class="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white placeholder-zinc-500 shadow-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-500/30 resize-none" placeholder="Describe the overtime task..."></textarea>
+                            <textarea name="reason" rows="3" class="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white placeholder-zinc-500 shadow-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 resize-none" placeholder="Describe the overtime task..."></textarea>
                         </div>
-                        <button type="submit" name="assign_ot" class="w-full rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700 text-white font-semibold text-sm px-5 py-3 shadow-sm transition flex items-center justify-center gap-2">
+                        <button type="submit" name="assign_ot" class="w-full rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold text-sm px-5 py-3 shadow-sm transition flex items-center justify-center gap-2">
                             <i class="fa-solid fa-clock"></i> Assign Overtime
                         </button>
                     </form>

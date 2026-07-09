@@ -70,7 +70,7 @@ $total_emp = $total_present + $total_absent + $total_late + $total_leave + $tota
     <?php include "../includes/header.php"; ?>
 </head>
 
-<body x-data="{ sidebarOpen: false }" class="bg-slate-50 dark:bg-[#09090b] text-slate-900 dark:text-white font-sans antialiased min-h-screen flex">
+<body x-data="{ sidebarOpen: false }" class="bg-slate-50 dark:bg-[#0B1120] text-slate-900 dark:text-white font-sans antialiased min-h-screen flex">
     <?php include "../includes/sidebar.php"; ?>
     <div class="flex-1 flex flex-col min-w-0 main-wrapper">
         <?php
@@ -92,7 +92,7 @@ $total_emp = $total_present + $total_absent + $total_late + $total_leave + $tota
                 <option value="public_holiday" <?php echo $status_filter == 'public_holiday' ? 'selected' : ''; ?>>Public Holiday</option>
                 <option value="weekend" <?php echo $status_filter == 'weekend' ? 'selected' : ''; ?>>Weekend</option>
             </select>
-            <button type="submit" class="rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700 text-white font-semibold text-sm px-5 py-2.5 shadow-sm transition flex items-center gap-2">
+            <button type="submit" class="rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold text-sm px-5 py-2.5 shadow-sm transition flex items-center gap-2">
                 <i class="fa-solid fa-magnifying-glass"></i> View
             </button>
         </form>
@@ -140,7 +140,7 @@ $total_emp = $total_present + $total_absent + $total_late + $total_leave + $tota
 
             <section class="card-hover glass-strong rounded-2xl overflow-hidden">
                 <div class="p-6 border-b border-white/[0.06] flex items-center justify-between">
-                    <h2 class="font-bold text-white text-lg"><i class="fa-solid fa-calendar-check text-violet-400 mr-2"></i>Attendance &mdash; <?php echo date('F d, Y', strtotime($selected_date)); ?></h2>
+                    <h2 class="font-bold text-white text-lg"><i class="fa-solid fa-calendar-check text-blue-400 mr-2"></i>Attendance &mdash; <?php echo date('F d, Y', strtotime($selected_date)); ?></h2>
                     <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold bg-indigo-500/20 text-indigo-400"><?php echo count($records); ?> records</span>
                 </div>
                 <div class="overflow-x-auto">
