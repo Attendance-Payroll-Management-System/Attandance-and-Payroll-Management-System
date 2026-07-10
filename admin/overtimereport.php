@@ -9,6 +9,8 @@ $status_filter = $_GET['status'] ?? '';
 $from_date = $_GET['from_date'] ?? date('Y-m-01');
 $to_date = $_GET['to_date'] ?? date('Y-m-t');
 
+$has_assigned_by = $conn->query("SHOW COLUMNS FROM overtime_requests LIKE 'assigned_by_id'")->num_rows > 0;
+
 $where = "1=1";
 $params = [];
 $types = '';
@@ -25,10 +27,11 @@ if ($from_date && $to_date) {
     $types .= 'ss';
 }
 
-$sql = "SELECT otr.*, e.name, e.employee_code, d.department_name
+$sql = "SELECT otr.*, e.name as employee_name, e.employee_code, d.department_name, p.position_name
         FROM overtime_requests otr
         JOIN employee e ON otr.employee_id = e.id
         LEFT JOIN departments d ON e.department_id = d.id
+        LEFT JOIN positions p ON e.position_id = p.id
         WHERE $where
         ORDER BY otr.ot_date DESC";
 
@@ -104,17 +107,19 @@ foreach ($records as $r) {
                                 <th class="px-6 py-4">Employee</th>
                                 <th class="px-6 py-4">Code</th>
                                 <th class="px-6 py-4">Department</th>
+                                <th class="px-6 py-4">Position</th>
                                 <th class="px-6 py-4">OT Date</th>
                                 <th class="px-6 py-4">Time</th>
                                 <th class="px-6 py-4">Hours</th>
                                 <th class="px-6 py-4">Reason</th>
+                                <th class="px-6 py-4">Assigned By</th>
                                 <th class="px-6 py-4">Status</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-white/[0.06]">
                             <?php if (empty($records)): ?>
                             <tr>
-                                <td colspan="8" class="px-6 py-12 text-center text-zinc-500">
+                                <td colspan="10" class="px-6 py-12 text-center text-zinc-500">
                                     <p class="text-lg mb-2">No overtime records found for the selected filters.</p>
                                 </td>
                             </tr>
@@ -129,13 +134,26 @@ foreach ($records as $r) {
                                     };
                                 ?>
                                 <tr class="hover:bg-white/[0.02] transition">
-                                    <td class="px-6 py-4 font-medium text-white"><?php echo htmlspecialchars($r['name']); ?></td>
+                                    <td class="px-6 py-4 font-medium text-white"><?php echo htmlspecialchars($r['employee_name']); ?></td>
                                     <td class="px-6 py-4 text-zinc-400 font-mono text-xs"><?php echo htmlspecialchars($r['employee_code']); ?></td>
                                     <td class="px-6 py-4 text-zinc-400"><?php echo htmlspecialchars($r['department_name'] ?? '-'); ?></td>
+                                    <td class="px-6 py-4 text-zinc-400"><?php echo htmlspecialchars($r['position_name'] ?? '-'); ?></td>
                                     <td class="px-6 py-4"><?php echo date('M d, Y', strtotime($r['ot_date'])); ?></td>
                                     <td class="px-6 py-4 font-mono text-sm"><?php echo date('h:i A', strtotime($r['start_time'])); ?> - <?php echo date('h:i A', strtotime($r['end_time'])); ?></td>
                                     <td class="px-6 py-4 font-semibold"><?php echo $r['total_hours']; ?>h</td>
                                     <td class="px-6 py-4 text-zinc-400 max-w-[200px] truncate text-sm" title="<?php echo htmlspecialchars($r['reason']); ?>"><?php echo htmlspecialchars($r['reason']); ?></td>
+                                    <td class="px-6 py-4">
+                                        <?php if ($has_assigned_by && $r['assigned_by_name']): ?>
+                                            <div class="text-xs">
+                                                <span class="text-blue-300 font-medium"><?php echo htmlspecialchars($r['assigned_by_name']); ?></span>
+                                                <span class="text-zinc-500 block"><?php echo htmlspecialchars($r['assigned_by_position'] ?? ''); ?>, <?php echo htmlspecialchars($r['assigned_by_department'] ?? ''); ?></span>
+                                            </div>
+                                        <?php elseif (isset($r['source']) && $r['source'] === 'employee_request'): ?>
+                                            <span class="text-xs text-zinc-500">Self-Requested</span>
+                                        <?php else: ?>
+                                            <span class="text-xs text-zinc-500">-</span>
+                                        <?php endif; ?>
+                                    </td>
                                     <td class="px-6 py-4">
                                         <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold <?php echo $badge; ?>"><?php echo $r['status']; ?></span>
                                     </td>

@@ -21,6 +21,7 @@ $unread_notifications = get_unread_count($conn, $employee_id);
 $is_inactive = validate_employee_active($conn, $employee_id) !== null;
 
 $has_source = $conn->query("SHOW COLUMNS FROM overtime_requests LIKE 'source'")->num_rows > 0;
+$has_assigned_by = $conn->query("SHOW COLUMNS FROM overtime_requests LIKE 'assigned_by_id'")->num_rows > 0;
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['submit_ot'])) {
     if (!validate_csrf_token()) { $message = "Invalid request."; $message_type = "error"; } else {
@@ -193,28 +194,37 @@ $ot_requests->close();
                     </div>
                     <div class="space-y-3">
                         <?php while ($row = $admin_ot_result->fetch_assoc()): ?>
-                            <div class="flex items-center justify-between p-4 bg-amber-500/10 rounded-lg border border-amber-500/20">
-                                <div class="flex-1">
-                                    <div class="flex items-center gap-4 text-sm">
-                                        <span class="font-semibold text-white"><?php echo format_mmt($row['ot_date'], 'M d, Y'); ?></span>
-                                        <span class="text-zinc-400 font-mono"><?php echo date('h:i A', strtotime($row['start_time'])); ?> - <?php echo date('h:i A', strtotime($row['end_time'])); ?></span>
-                                        <span class="text-indigo-400 font-bold"><?php echo $row['total_hours']; ?>h</span>
+                            <div class="p-4 bg-amber-500/10 rounded-lg border border-amber-500/20">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex-1">
+                                        <div class="flex items-center gap-4 text-sm">
+                                            <span class="font-semibold text-white"><?php echo format_mmt($row['ot_date'], 'M d, Y'); ?></span>
+                                            <span class="text-zinc-400 font-mono"><?php echo date('h:i A', strtotime($row['start_time'])); ?> - <?php echo date('h:i A', strtotime($row['end_time'])); ?></span>
+                                            <span class="text-indigo-400 font-bold"><?php echo $row['total_hours']; ?>h</span>
+                                        </div>
+                                        <?php if ($row['reason']): ?>
+                                            <p class="text-xs text-zinc-400 mt-1"><?php echo htmlspecialchars($row['reason']); ?></p>
+                                        <?php endif; ?>
+                                        <?php if ($has_assigned_by && $row['assigned_by_name']): ?>
+                                            <div class="flex items-center gap-3 mt-2 text-xs text-blue-300">
+                                                <span><i class="fa-solid fa-user-check mr-1"></i>Assigned by: <strong><?php echo htmlspecialchars($row['assigned_by_name']); ?></strong></span>
+                                                <span><?php echo htmlspecialchars($row['assigned_by_position'] ?? ''); ?></span>
+                                                <span><?php echo htmlspecialchars($row['assigned_by_department'] ?? ''); ?></span>
+                                            </div>
+                                        <?php endif; ?>
                                     </div>
-                                    <?php if ($row['reason']): ?>
-                                        <p class="text-xs text-zinc-400 mt-1"><?php echo htmlspecialchars($row['reason']); ?></p>
-                                    <?php endif; ?>
+                                    <form method="POST" class="flex gap-2 shrink-0 ml-4">
+                                    <?php echo csrf_field(); ?>
+                                        <input type="hidden" name="request_id" value="<?php echo $row['id']; ?>">
+                                        <button type="submit" name="respond_ot" value="1" onclick="this.form.response.value='accepted'" class="bg-emerald-500 hover:bg-emerald-600 text-white font-medium text-xs px-4 py-2 rounded-lg transition flex items-center gap-1.5">
+                                            <i class="fa-solid fa-check"></i> Accept
+                                        </button>
+                                        <button type="submit" name="respond_ot" value="1" onclick="this.form.response.value='rejected'" class="border border-red-500/20 hover:bg-red-500/10 text-red-400 font-medium text-xs px-4 py-2 rounded-lg transition flex items-center gap-1.5">
+                                            <i class="fa-solid fa-times"></i> Decline
+                                        </button>
+                                        <input type="hidden" name="response" value="">
+                                    </form>
                                 </div>
-                                <form method="POST" class="flex gap-2 shrink-0 ml-4">
-                                <?php echo csrf_field(); ?>
-                                    <input type="hidden" name="request_id" value="<?php echo $row['id']; ?>">
-                                    <button type="submit" name="respond_ot" value="1" onclick="this.form.response.value='accepted'" class="bg-emerald-500 hover:bg-emerald-600 text-white font-medium text-xs px-4 py-2 rounded-lg transition flex items-center gap-1.5">
-                                        <i class="fa-solid fa-check"></i> Accept
-                                    </button>
-                                    <button type="submit" name="respond_ot" value="1" onclick="this.form.response.value='rejected'" class="border border-red-500/20 hover:bg-red-500/10 text-red-400 font-medium text-xs px-4 py-2 rounded-lg transition flex items-center gap-1.5">
-                                        <i class="fa-solid fa-times"></i> Decline
-                                    </button>
-                                    <input type="hidden" name="response" value="">
-                                </form>
                             </div>
                         <?php endwhile; ?>
                     </div>
@@ -266,9 +276,10 @@ $ot_requests->close();
                             <thead class="text-zinc-500 text-xs uppercase tracking-wider border-b border-white/[0.06]">
                                 <tr>
                                     <th class="py-3 font-semibold">Date</th>
-                                    <th class="py-3 font-semibold">Start</th>
-                                    <th class="py-3 font-semibold">End</th>
+                                    <th class="py-3 font-semibold">Time</th>
                                     <th class="py-3 font-semibold">Hours</th>
+                                    <th class="py-3 font-semibold">Reason</th>
+                                    <th class="py-3 font-semibold">Assigned By</th>
                                     <th class="py-3 font-semibold">Status</th>
                                 </tr>
                             </thead>
@@ -276,9 +287,21 @@ $ot_requests->close();
                                 <?php while ($row = $ot_result->fetch_assoc()): ?>
                                     <tr>
                                         <td class="py-3 font-medium text-white"><?php echo format_mmt($row['ot_date'], 'M d, Y'); ?></td>
-                                        <td class="py-3 font-mono"><?php echo date('h:i A', strtotime($row['start_time'])); ?></td>
-                                        <td class="py-3 font-mono"><?php echo date('h:i A', strtotime($row['end_time'])); ?></td>
+                                        <td class="py-3 font-mono text-xs"><?php echo date('h:i A', strtotime($row['start_time'])); ?> - <?php echo date('h:i A', strtotime($row['end_time'])); ?></td>
                                         <td class="py-3 font-semibold"><?php echo $row['total_hours']; ?>h</td>
+                                        <td class="py-3 text-zinc-400 max-w-[120px] truncate text-xs" title="<?php echo htmlspecialchars($row['reason']); ?>"><?php echo htmlspecialchars($row['reason']); ?></td>
+                                        <td class="py-3">
+                                            <?php if ($has_assigned_by && $row['assigned_by_name']): ?>
+                                                <div class="text-xs">
+                                                    <span class="text-blue-300 font-medium"><?php echo htmlspecialchars($row['assigned_by_name']); ?></span>
+                                                    <span class="text-zinc-500 block"><?php echo htmlspecialchars($row['assigned_by_position'] ?? ''); ?>, <?php echo htmlspecialchars($row['assigned_by_department'] ?? ''); ?></span>
+                                                </div>
+                                            <?php elseif ($row['source'] === 'employee_request'): ?>
+                                                <span class="text-xs text-zinc-500">Self-Requested</span>
+                                            <?php else: ?>
+                                                <span class="text-xs text-zinc-500">-</span>
+                                            <?php endif; ?>
+                                        </td>
                                         <td class="py-3">
                                             <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold
                                             <?php echo $row['status'] == 'Approved' ? 'bg-emerald-500/20 text-emerald-400' : ''; ?>
@@ -290,7 +313,7 @@ $ot_requests->close();
                                 <?php endwhile; ?>
                                 <?php if ($ot_result->num_rows == 0): ?>
                                     <tr>
-                                        <td colspan="5" class="py-6 text-center text-zinc-400">No overtime requests yet.</td>
+                                        <td colspan="6" class="py-6 text-center text-zinc-400">No overtime requests yet.</td>
                                     </tr>
                                 <?php endif; ?>
                             </tbody>

@@ -17,7 +17,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (empty($username) || empty($password)) {
         $error = "Please fill in all fields.";
     } else {
-        $stmt = $conn->prepare("SELECT id, email, password, name FROM employee WHERE email=? AND (role='Admin' OR role='admin' OR id=1)");
+        $stmt = $conn->prepare("SELECT e.id, e.email, e.password, e.name, d.department_name, p.position_name FROM employee e LEFT JOIN departments d ON e.department_id = d.id LEFT JOIN positions p ON e.position_id = p.id WHERE e.email=? AND (e.role='Admin' OR e.role='admin' OR e.id=1)");
         $stmt->bind_param('s', $username);
         $stmt->execute();
         $result = $stmt->get_result();
@@ -39,6 +39,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     $_SESSION['admin_id'] = $user['id'];
                     $_SESSION['admin_name'] = $user['name'];
                     $_SESSION['admin_email'] = $user['email'];
+                    $_SESSION['admin_department'] = $user['department_name'] ?? '';
+                    $_SESSION['admin_position'] = $user['position_name'] ?? '';
                     header('Location: dashboard.php');
                     exit;
                 } else {

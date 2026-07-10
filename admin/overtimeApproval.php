@@ -51,19 +51,25 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 }
 
 $has_source = $conn->query("SHOW COLUMNS FROM overtime_requests LIKE 'source'")->num_rows > 0;
+$has_assigned_by = $conn->query("SHOW COLUMNS FROM overtime_requests LIKE 'assigned_by_id'")->num_rows > 0;
+
 if ($has_source) {
     $result = $conn->query("
-        SELECT otr.*, e.name as employee_name, e.employee_code
+        SELECT otr.*, e.name as employee_name, e.employee_code, d.department_name, p.position_name
         FROM overtime_requests otr
         JOIN employee e ON otr.employee_id = e.id
+        LEFT JOIN departments d ON e.department_id = d.id
+        LEFT JOIN positions p ON e.position_id = p.id
         WHERE (otr.source IS NULL OR otr.source = 'employee_request')
         ORDER BY otr.created_at DESC
     ");
 } else {
     $result = $conn->query("
-        SELECT otr.*, e.name as employee_name, e.employee_code
+        SELECT otr.*, e.name as employee_name, e.employee_code, d.department_name, p.position_name
         FROM overtime_requests otr
         JOIN employee e ON otr.employee_id = e.id
+        LEFT JOIN departments d ON e.department_id = d.id
+        LEFT JOIN positions p ON e.position_id = p.id
         ORDER BY otr.created_at DESC
     ");
 }
@@ -120,10 +126,13 @@ foreach ($requests as $r) {
                         <thead class="text-zinc-500 text-xs font-bold uppercase tracking-wider border-b border-white/[0.06]">
                             <tr>
                                 <th class="px-6 py-4">Employee</th>
+                                <th class="px-6 py-4">Department</th>
+                                <th class="px-6 py-4">Position</th>
                                 <th class="px-6 py-4">OT Date</th>
                                 <th class="px-6 py-4">Time</th>
                                 <th class="px-6 py-4">Hours</th>
                                 <th class="px-6 py-4">Reason</th>
+                                <th class="px-6 py-4">Assigned By</th>
                                 <th class="px-6 py-4">Submitted</th>
                                 <th class="px-6 py-4">Status</th>
                                 <th class="px-6 py-4 text-right">Actions</th>
@@ -136,12 +145,24 @@ foreach ($requests as $r) {
                                     <div class="font-medium text-white"><?php echo htmlspecialchars($req['employee_name']); ?></div>
                                     <div class="text-xs text-zinc-500"><?php echo htmlspecialchars($req['employee_code']); ?></div>
                                 </td>
+                                <td class="px-6 py-4 text-zinc-400 text-sm"><?php echo htmlspecialchars($req['department_name'] ?? '-'); ?></td>
+                                <td class="px-6 py-4 text-zinc-400 text-sm"><?php echo htmlspecialchars($req['position_name'] ?? '-'); ?></td>
                                 <td class="px-6 py-4"><?php echo date('M d, Y', strtotime($req['ot_date'])); ?></td>
                                 <td class="px-6 py-4 font-mono text-sm">
                                     <?php echo date('h:i A', strtotime($req['start_time'])); ?> - <?php echo date('h:i A', strtotime($req['end_time'])); ?>
                                 </td>
                                 <td class="px-6 py-4 font-semibold"><?php echo $req['total_hours']; ?>h</td>
                                 <td class="px-6 py-4 text-zinc-400 max-w-[150px] truncate text-sm" title="<?php echo htmlspecialchars($req['reason']); ?>"><?php echo htmlspecialchars($req['reason']); ?></td>
+                                <td class="px-6 py-4">
+                                    <?php if ($has_assigned_by && $req['assigned_by_name']): ?>
+                                        <div class="text-xs">
+                                            <span class="text-blue-300 font-medium"><?php echo htmlspecialchars($req['assigned_by_name']); ?></span>
+                                            <span class="text-zinc-500 block"><?php echo htmlspecialchars($req['assigned_by_position'] ?? ''); ?>, <?php echo htmlspecialchars($req['assigned_by_department'] ?? ''); ?></span>
+                                        </div>
+                                    <?php else: ?>
+                                        <span class="text-xs text-zinc-500">Self-Requested</span>
+                                    <?php endif; ?>
+                                </td>
                                 <td class="px-6 py-4 text-xs text-zinc-500"><?php echo date('M d, h:i A', strtotime($req['created_at'])); ?></td>
                                 <td class="px-6 py-4">
                                     <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold
