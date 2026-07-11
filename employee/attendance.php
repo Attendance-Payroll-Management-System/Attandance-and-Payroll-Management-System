@@ -165,7 +165,10 @@ $stmt = $conn->prepare("SELECT
     COUNT(*) as total_days,
     SUM(CASE WHEN check_in IS NOT NULL THEN 1 ELSE 0 END) as present_days,
     SUM(CASE WHEN status = 'leave' THEN 1 ELSE 0 END) as leave_days,
+    SUM(CASE WHEN status = 'paid_leave' THEN 1 ELSE 0 END) as paid_leave_days,
+    SUM(CASE WHEN status = 'unpaid_leave' THEN 1 ELSE 0 END) as unpaid_leave_days,
     SUM(CASE WHEN status = 'late' THEN 1 ELSE 0 END) as late_days,
+    SUM(CASE WHEN status = 'half_day' THEN 1 ELSE 0 END) as half_days,
     SUM(CASE WHEN status IN ('present', 'late') THEN 1 ELSE 0 END) as effective_present_days,
     SUM(CASE WHEN status IN ('awol', 'absent', 'full_absent', 'half_absent') THEN 1 ELSE 0 END) as absent_days
 FROM attendance WHERE employee_id = ? AND attendance_date BETWEEN ? AND ?");
@@ -175,8 +178,9 @@ $stats = $stmt->get_result()->fetch_assoc();
 $stmt->close();
 
 $present_days = $stats['present_days'] ?? 0;
-$leave_days = $stats['leave_days'] ?? 0;
+$leave_days = ($stats['leave_days'] ?? 0) + ($stats['paid_leave_days'] ?? 0) + ($stats['unpaid_leave_days'] ?? 0);
 $late_days = $stats['late_days'] ?? 0;
+$half_days = $stats['half_days'] ?? 0;
 $effective_present = $stats['effective_present_days'] ?? 0;
 $absent_days = $stats['absent_days'] ?? 0;
 
@@ -280,7 +284,7 @@ $ot_conflict = check_overtime_attendance_conflict($conn, $employee_id, $today);
                 </div>
             <?php endif; ?>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-5">
                 <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-5">
                     <div class="flex items-start justify-between">
                         <div class="flex items-center gap-3">
@@ -296,11 +300,11 @@ $ot_conflict = check_overtime_attendance_conflict($conn, $employee_id, $today);
                 <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-5">
                     <div class="flex items-start justify-between">
                         <div class="flex items-center gap-3">
-                            <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-emerald-500/20 to-teal-500/20 text-emerald-400 flex items-center justify-center text-lg group-hover:scale-110 transition-transform"><i class="fa-solid fa-plane-departure"></i></div>
+                            <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-amber-500/20 to-yellow-500/20 text-amber-400 flex items-center justify-center text-lg group-hover:scale-110 transition-transform"><i class="fa-solid fa-clock"></i></div>
                             <div>
-                                <span class="text-xs font-semibold uppercase tracking-wider text-zinc-400">Leave Days</span>
-                                <div class="text-2xl font-bold text-white mt-0.5"><?php echo $leave_days; ?></div>
-                                <span class="text-xs text-emerald-400 font-medium">This Month</span>
+                                <span class="text-xs font-semibold uppercase tracking-wider text-zinc-400">Late Days</span>
+                                <div class="text-2xl font-bold text-white mt-0.5"><?php echo $late_days; ?></div>
+                                <span class="text-xs text-amber-400 font-medium">This Month</span>
                             </div>
                         </div>
                     </div>
@@ -308,11 +312,23 @@ $ot_conflict = check_overtime_attendance_conflict($conn, $employee_id, $today);
                 <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-5">
                     <div class="flex items-start justify-between">
                         <div class="flex items-center gap-3">
-                            <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-amber-500/20 to-yellow-500/20 text-amber-400 flex items-center justify-center text-lg group-hover:scale-110 transition-transform"><i class="fa-solid fa-clock"></i></div>
+                            <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-teal-500/20 to-cyan-500/20 text-teal-400 flex items-center justify-center text-lg group-hover:scale-110 transition-transform"><i class="fa-solid fa-clock-half-stroke"></i></div>
                             <div>
-                                <span class="text-xs font-semibold uppercase tracking-wider text-zinc-400">Late Days</span>
-                                <div class="text-2xl font-bold text-white mt-0.5"><?php echo $late_days; ?></div>
-                                <span class="text-xs text-amber-400 font-medium">This Month</span>
+                                <span class="text-xs font-semibold uppercase tracking-wider text-zinc-400">Half Days</span>
+                                <div class="text-2xl font-bold text-white mt-0.5"><?php echo $half_days; ?></div>
+                                <span class="text-xs text-teal-400 font-medium">This Month</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-5">
+                    <div class="flex items-start justify-between">
+                        <div class="flex items-center gap-3">
+                            <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-emerald-500/20 to-teal-500/20 text-emerald-400 flex items-center justify-center text-lg group-hover:scale-110 transition-transform"><i class="fa-solid fa-plane-departure"></i></div>
+                            <div>
+                                <span class="text-xs font-semibold uppercase tracking-wider text-zinc-400">Leave Days</span>
+                                <div class="text-2xl font-bold text-white mt-0.5"><?php echo $leave_days; ?></div>
+                                <span class="text-xs text-emerald-400 font-medium">This Month</span>
                             </div>
                         </div>
                     </div>
@@ -490,8 +506,9 @@ $ot_conflict = check_overtime_attendance_conflict($conn, $employee_id, $today);
                 <span class="font-semibold text-zinc-400 mr-1">Status Legend:</span>
                 <span><span class="inline-block w-3 h-3 rounded-full bg-emerald-500/40 align-middle mr-1"></span> Present</span>
                 <span><span class="inline-block w-3 h-3 rounded-full bg-amber-400/40 align-middle mr-1"></span> Late</span>
-                <span><span class="inline-block w-3 h-3 rounded-full bg-blue-500/40 align-middle mr-1"></span> Approved Leave</span>
-                <span><span class="inline-block w-3 h-3 rounded-full bg-orange-500/40 align-middle mr-1"></span> Half-Day Absent</span>
+                <span><span class="inline-block w-3 h-3 rounded-full bg-teal-500/40 align-middle mr-1"></span> Half Day</span>
+                <span><span class="inline-block w-3 h-3 rounded-full bg-sky-500/40 align-middle mr-1"></span> Paid Leave</span>
+                <span><span class="inline-block w-3 h-3 rounded-full bg-orange-500/40 align-middle mr-1"></span> Unpaid Leave</span>
                 <span><span class="inline-block w-3 h-3 rounded-full bg-rose-500/40 align-middle mr-1"></span> Full-Day Absent</span>
                 <span><span class="inline-block w-3 h-3 rounded-full bg-red-600/40 align-middle mr-1"></span> AWOL</span>
                 <span><span class="inline-block w-3 h-3 rounded-full bg-pink-500/40 align-middle mr-1"></span> Public Holiday</span>

@@ -23,7 +23,7 @@ $annual->execute();
 $annual_data = $annual->get_result()->fetch_assoc();
 $annual->close();
 
-$totals = ['basic' => 0, 'ot' => 0, 'bonus' => 0, 'ded' => 0, 'gross' => 0, 'net' => 0, 'allowance' => 0, 'tax' => 0, 'leave_ded' => 0];
+$totals = ['basic' => 0, 'ot' => 0, 'bonus' => 0, 'ded' => 0, 'gross' => 0, 'net' => 0, 'allowance' => 0, 'tax' => 0, 'leave_ded' => 0, 'late_ded' => 0, 'unpaid_leave_ded' => 0];
 foreach ($payroll_data as $p) {
     $totals['basic'] += $p['basic_salary'];
     $totals['ot'] += $p['ot_amount'];
@@ -34,6 +34,8 @@ foreach ($payroll_data as $p) {
     $totals['allowance'] += $p['allowance_amount'] ?? 0;
     $totals['tax'] += $p['tax_amount'] ?? 0;
     $totals['leave_ded'] += $p['leave_deduction'] ?? 0;
+    $totals['late_ded'] += $p['late_deduction'] ?? 0;
+    $totals['unpaid_leave_ded'] += $p['unpaid_leave_deduction'] ?? 0;
 }
 
 $latest_payroll = !empty($payroll_data) ? $payroll_data[0] : null;

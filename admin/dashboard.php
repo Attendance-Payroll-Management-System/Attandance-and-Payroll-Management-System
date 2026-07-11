@@ -239,7 +239,7 @@ $attendance_rate = $monthly_att['total_records'] > 0 ? round(($monthly_att['pres
             </div>
 
             <!-- ═══ Quick Actions ═══ -->
-            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 animate-fade-in-up stagger-1">
+            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 animate-fade-in-up stagger-1">
                 <a href="insert1.php" class="group glass-strong rounded-2xl p-5 card-hover text-center">
                     <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500/20 to-indigo-500/20 text-blue-400 flex items-center justify-center text-xl mx-auto group-hover:scale-110 transition-transform duration-300"><i class="fa-solid fa-user-plus"></i></div>
                     <span class="text-xs font-bold text-zinc-300 mt-3 block">Add Employee</span>
@@ -247,6 +247,10 @@ $attendance_rate = $monthly_att['total_records'] > 0 ? round(($monthly_att['pres
                 <a href="dailyattendance.php" class="group glass-strong rounded-2xl p-5 card-hover text-center">
                     <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500/20 to-teal-500/20 text-emerald-400 flex items-center justify-center text-xl mx-auto group-hover:scale-110 transition-transform duration-300"><i class="fa-solid fa-calendar-check"></i></div>
                     <span class="text-xs font-bold text-zinc-300 mt-3 block">Attendance</span>
+                </a>
+                <a href="attendance_summary.php" class="group glass-strong rounded-2xl p-5 card-hover text-center">
+                    <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-500/20 to-blue-500/20 text-cyan-400 flex items-center justify-center text-xl mx-auto group-hover:scale-110 transition-transform duration-300"><i class="fa-solid fa-chart-simple"></i></div>
+                    <span class="text-xs font-bold text-zinc-300 mt-3 block">Att. Summary</span>
                 </a>
                 <a href="leaveApproval.php" class="group glass-strong rounded-2xl p-5 card-hover text-center relative">
                     <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500/20 to-orange-500/20 text-amber-400 flex items-center justify-center text-xl mx-auto group-hover:scale-110 transition-transform duration-300"><i class="fa-solid fa-check-double"></i></div>

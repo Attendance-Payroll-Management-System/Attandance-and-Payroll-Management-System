@@ -9,7 +9,7 @@ set_mmt_timezone();
 $today = mmt_date();
 $month_start = date('Y-m-01');
 $month_end = date('Y-m-t');
-$att = $conn->prepare("SELECT COUNT(*) as total_days, SUM(CASE WHEN check_in IS NOT NULL THEN 1 ELSE 0 END) as present_days, SUM(CASE WHEN status = 'late' THEN 1 ELSE 0 END) as late_days, SUM(CASE WHEN status IN ('present', 'late') THEN 1 ELSE 0 END) as effective_present FROM attendance WHERE employee_id = ? AND attendance_date BETWEEN ? AND ?");
+$att = $conn->prepare("SELECT COUNT(*) as total_days, SUM(CASE WHEN check_in IS NOT NULL THEN 1 ELSE 0 END) as present_days, SUM(CASE WHEN status = 'late' THEN 1 ELSE 0 END) as late_days, SUM(CASE WHEN status = 'half_day' THEN 1 ELSE 0 END) as half_days, SUM(CASE WHEN status IN ('present', 'late') THEN 1 ELSE 0 END) as effective_present FROM attendance WHERE employee_id = ? AND attendance_date BETWEEN ? AND ?");
 $att->bind_param("iss", $employee_id, $month_start, $month_end);
 $att->execute();
 $att_data = $att->get_result()->fetch_assoc();
@@ -17,6 +17,7 @@ $att->close();
 $total_days = $att_data['total_days'] ?? 0;
 $present_days = $att_data['present_days'] ?? 0;
 $late_days = $att_data['late_days'] ?? 0;
+$half_days = $att_data['half_days'] ?? 0;
 $effective_present = $att_data['effective_present'] ?? 0;
 $attendance_rate = $total_days > 0 ? round(($effective_present / $total_days) * 100, 1) : 0;
 $leave = $conn->prepare("SELECT COUNT(*) as total, SUM(CASE WHEN status = 'Approved' THEN 1 ELSE 0 END) as approved, SUM(CASE WHEN status = 'Pending' THEN 1 ELSE 0 END) as pending FROM leave_requests WHERE employee_id = ? AND created_at BETWEEN ? AND ?");
@@ -182,7 +183,7 @@ elseif ($hour < 17) $greeting = "Good Afternoon";
                 <div class="glass-strong rounded-2xl p-6 card-hover animate-fade-in-up stagger-1">
                     <div class="flex items-center justify-between border-b border-white/[0.06] pb-4 mb-4">
                         <h3 class="font-bold text-white"><i class="fa-solid fa-chart-simple text-sky-400 mr-2"></i>Attendance Overview</h3>
-                        <a href="attendanceall.php" class="text-xs font-semibold text-sky-400 hover:text-sky-300 transition-colors"><i class="fa-regular fa-eye mr-1"></i>View All</a>
+                        <a href="attendance_summary.php" class="text-xs font-semibold text-sky-400 hover:text-sky-300 transition-colors"><i class="fa-regular fa-eye mr-1"></i>Full Summary</a>
                     </div>
                     <div class="space-y-4">
                         <div class="flex items-center justify-between text-sm">
@@ -190,7 +191,7 @@ elseif ($hour < 17) $greeting = "Good Afternoon";
                             <span class="font-bold text-white"><?php echo $present_days; ?> / <?php echo $total_days; ?> days</span>
                         </div>
                         <div class="progress-bar"><div class="progress-bar-fill" style="width: <?php echo $attendance_rate; ?>%"></div></div>
-                        <div class="grid grid-cols-3 gap-3 pt-2">
+                        <div class="grid grid-cols-4 gap-3 pt-2">
                             <div class="bg-blue-500/10 rounded-xl p-3 text-center ring-1 ring-blue-500/10 glow-navy">
                                 <span class="text-lg font-bold text-sky-400"><?php echo $present_days; ?></span>
                                 <p class="text-[10px] text-sky-400/60 font-medium uppercase tracking-wider">Present</p>
@@ -198,6 +199,10 @@ elseif ($hour < 17) $greeting = "Good Afternoon";
                             <div class="bg-amber-500/10 rounded-xl p-3 text-center ring-1 ring-amber-500/10 glow-amber">
                                 <span class="text-lg font-bold text-amber-400"><?php echo $late_days; ?></span>
                                 <p class="text-[10px] text-amber-400/60 font-medium uppercase tracking-wider">Late</p>
+                            </div>
+                            <div class="bg-teal-500/10 rounded-xl p-3 text-center ring-1 ring-teal-500/10">
+                                <span class="text-lg font-bold text-teal-400"><?php echo $half_days; ?></span>
+                                <p class="text-[10px] text-teal-400/60 font-medium uppercase tracking-wider">Half</p>
                             </div>
                             <div class="bg-rose-500/10 rounded-xl p-3 text-center ring-1 ring-rose-500/10 glow-rose">
                                 <span class="text-lg font-bold text-rose-400"><?php echo max(0, $total_days - $present_days); ?></span>

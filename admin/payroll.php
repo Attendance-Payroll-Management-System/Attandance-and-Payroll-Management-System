@@ -19,86 +19,52 @@ $month_end = date('Y-m-t', strtotime($month_start));
 // Run batch payroll calculation
 if (isset($_POST['run_payroll'])) {
     $emp_query = $conn->query("SELECT id, basic_salary FROM employee WHERE status = 'active'");
-    $working_days = get_working_days_in_month($selected_year, $selected_month);
-
-    // Get company policies
-    $working_hours_per_day = (float)get_company_policy($conn, 'payroll_working_hours_per_day', 8);
-    $standard_monthly_hours = $working_days * $working_hours_per_day;
     $inserted = 0;
 
     while ($emp = $emp_query->fetch_assoc()) {
         $eid = $emp['id'];
-        $basic = (float)($emp['basic_salary'] ?: 0);
-        $hourly_rate = $standard_monthly_hours > 0 ? $basic / $standard_monthly_hours : 0;
+        $payroll = calculate_payroll_for_employee($conn, $eid, $selected_month, $selected_year);
 
-        // ── Attendance-based calculation ──
-        $att_summary = get_attendance_summary_for_payroll($conn, $eid, $month_start, $month_end);
-        $present_days = (int)($att_summary['present_days'] ?? 0);
-        $absent_days = (int)($att_summary['absent_days'] ?? 0);
-        $late_days = (int)($att_summary['late_days'] ?? 0);
-        $leave_days = (int)($att_summary['leave_days'] ?? 0);
-        // Include new statuses in absent count
-        $absent_days += (int)($att_summary['absent_days_total'] ?? 0);
-        $effective_present = (int)($att_summary['effective_present_days'] ?? 0);
-
-        // Calculate salary based on present days
-        $daily_rate = $working_days > 0 ? $basic / $working_days : 0;
-
-        // Late penalty: deduct configurable % of basic salary per late occurrence
-        $late_deduction_percent = (float)get_company_policy($conn, 'late_deduction_percent', '1');
-        $late_deduction_rate = $late_deduction_percent / 100; // Convert % to decimal
-        $late_deduction = $basic * $late_deduction_rate * $late_days;
-
-        // Absent deduction: full day salary per absent day
-        $absent_deduction = $daily_rate * $absent_days;
-
-        // Paid leave - full salary, no deduction
-        // Unpaid leave (if any) would deduct salary
-
-        $adjusted_basic = $basic - $late_deduction - $absent_deduction;
-
-        // ── Overtime calculation ──
-        $ot_amount = calculate_overtime_amount_for_payroll($conn, $eid, $month_start, $month_end, $hourly_rate);
-
-        // ── Bonuses and deductions ──
-        $bonus_stmt = $conn->prepare("SELECT COALESCE(SUM(amount), 0) as total FROM bonuses WHERE employee_id = ? AND bonus_date BETWEEN ? AND ?");
-        $bonus_stmt->bind_param('iss', $eid, $month_start, $month_end);
-        $bonus_stmt->execute();
-        $bonus_row = $bonus_stmt->get_result()->fetch_assoc();
-        $bonus_amount = (float)$bonus_row['total'];
-        $bonus_stmt->close();
-
-        $ded_stmt = $conn->prepare("SELECT COALESCE(SUM(amount), 0) as total FROM deductions WHERE employee_id = ? AND deduction_date BETWEEN ? AND ?");
-        $ded_stmt->bind_param('iss', $eid, $month_start, $month_end);
-        $ded_stmt->execute();
-        $ded_row = $ded_stmt->get_result()->fetch_assoc();
-        $deduction_amount = (float)$ded_row['total'];
-        $ded_stmt->close();
-
-        $gross = $adjusted_basic + $ot_amount + $bonus_amount;
-        $net = $gross - $deduction_amount;
-
-        // Upsert into payrolls
-        $upsert = $conn->prepare("INSERT INTO payrolls (employee_id, payroll_month, payroll_year, basic_salary, ot_amount, bonus_amount, deduction_amount, gross_salary, net_salary, generated_date)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURDATE())
-            ON DUPLICATE KEY UPDATE basic_salary=VALUES(basic_salary), ot_amount=VALUES(ot_amount), bonus_amount=VALUES(bonus_amount),
-            deduction_amount=VALUES(deduction_amount), gross_salary=VALUES(gross_salary), net_salary=VALUES(net_salary), generated_date=CURDATE()");
-        $upsert->bind_param('iiidddddd', $eid, $selected_month, $selected_year, $adjusted_basic, $ot_amount, $bonus_amount, $deduction_amount, $gross, $net);
+        // Upsert into payrolls with all new columns
+        $upsert = $conn->prepare("INSERT INTO payrolls (employee_id, payroll_month, payroll_year, basic_salary, ot_amount, allowance_amount, bonus_amount, deduction_amount, tax_amount, leave_deduction, late_deduction, unpaid_leave_deduction, gross_salary, net_salary, working_days, present_days, half_days, late_days, absent_days, paid_leave_days, unpaid_leave_days, overtime_hours, generated_date)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURDATE())
+            ON DUPLICATE KEY UPDATE basic_salary=VALUES(basic_salary), ot_amount=VALUES(ot_amount), allowance_amount=VALUES(allowance_amount),
+            bonus_amount=VALUES(bonus_amount), deduction_amount=VALUES(deduction_amount), leave_deduction=VALUES(leave_deduction),
+            late_deduction=VALUES(late_deduction), unpaid_leave_deduction=VALUES(unpaid_leave_deduction),
+            gross_salary=VALUES(gross_salary), net_salary=VALUES(net_salary), working_days=VALUES(working_days),
+            present_days=VALUES(present_days), half_days=VALUES(half_days), late_days=VALUES(late_days),
+            absent_days=VALUES(absent_days), paid_leave_days=VALUES(paid_leave_days), unpaid_leave_days=VALUES(unpaid_leave_days),
+            overtime_hours=VALUES(overtime_hours), generated_date=CURDATE()");
+        $total_deductions = $payroll['total_attendance_deduction'] + $payroll['other_deductions'];
+        $upsert->bind_param('iiidddddddddddiiiiiiid', 
+            $eid, $selected_month, $selected_year, $payroll['basic_salary'], $payroll['ot_amount'],
+            $payroll['allowance_amount'], $payroll['bonus_amount'], $total_deductions,
+            $payroll['unpaid_leave_deduction'], $payroll['late_deduction'], $payroll['unpaid_leave_deduction'],
+            $payroll['gross_salary'], $payroll['net_salary'], $payroll['working_days'],
+            $payroll['present_days'], $payroll['half_days'], $payroll['late_days'],
+            $payroll['absent_days'], $payroll['paid_leave_days'], $payroll['unpaid_leave_days'],
+            $payroll['overtime_hours']
+        );
         $upsert->execute();
         $upsert->close();
 
         // Insert payroll details for audit trail
         $payroll_id = $conn->insert_id;
         if ($payroll_id > 0) {
-            $detail_stmt = $conn->prepare("INSERT IGNORE INTO payroll_details (payroll_id, component_type, component_name, amount) VALUES (?, ?, ?, ?)");
+            // Clear existing details for re-run
+            $conn->query("DELETE FROM payroll_details WHERE payroll_id = $payroll_id");
+            $detail_stmt = $conn->prepare("INSERT INTO payroll_details (payroll_id, component_type, component_name, amount) VALUES (?, ?, ?, ?)");
 
             $components = [
-                ['earning', 'Basic Salary', $adjusted_basic],
-                ['earning', 'Overtime Pay', $ot_amount],
-                ['earning', 'Bonuses', $bonus_amount],
-                ['deduction', 'Late Deduction', $late_deduction],
-                ['deduction', 'Absent Deduction', $absent_deduction],
-                ['deduction', 'Other Deductions', $deduction_amount],
+                ['earning', 'Basic Salary', $payroll['basic_salary']],
+                ['earning', 'Allowance', $payroll['allowance_amount']],
+                ['earning', 'Overtime Pay', $payroll['ot_amount']],
+                ['earning', 'Bonuses', $payroll['bonus_amount']],
+                ['deduction', 'Absent Deduction (' . $payroll['absent_days'] . ' days)', $payroll['absent_deduction']],
+                ['deduction', 'Half-Day Deduction (' . $payroll['half_days'] . ' days)', $payroll['half_day_deduction']],
+                ['deduction', 'Unpaid Leave Deduction (' . $payroll['unpaid_leave_days'] . ' days)', $payroll['unpaid_leave_deduction']],
+                ['deduction', 'Late Deduction (' . $payroll['late_days'] . ' occurrences)', $payroll['late_deduction']],
+                ['deduction', 'Other Deductions', $payroll['other_deductions']],
             ];
 
             foreach ($components as $comp) {
@@ -113,7 +79,7 @@ if (isset($_POST['run_payroll'])) {
         $inserted++;
     }
     $emp_query->close();
-    $message = "Payroll calculated for $inserted employees. (Working days: $working_days)";
+    $message = "Payroll calculated for $inserted employees. (Working days: " . get_working_days_in_month($selected_year, $selected_month) . ")";
     $message_type = "success";
 }
 
@@ -135,12 +101,18 @@ $total_net = 0;
 $total_ot = 0;
 $total_bonus = 0;
 $total_ded = 0;
+$total_allowance = 0;
+$total_tax = 0;
+$total_leave_ded = 0;
 $emp_count = count($payroll_data);
 foreach ($payroll_data as $p) {
     $total_net += $p['net_salary'];
     $total_ot += $p['ot_amount'];
     $total_bonus += $p['bonus_amount'];
     $total_ded += $p['deduction_amount'];
+    $total_allowance += $p['allowance_amount'] ?? 0;
+    $total_tax += $p['tax_amount'] ?? 0;
+    $total_leave_ded += ($p['leave_deduction'] ?? 0) + ($p['late_deduction'] ?? 0) + ($p['unpaid_leave_deduction'] ?? 0);
 }
 ?>
 <!DOCTYPE html>
@@ -460,19 +432,26 @@ foreach ($payroll_data as $p) {
                         <thead class="text-white text-xs font-bold uppercase tracking-wider">
                             <tr>
                                 <th class="px-6 py-4">Employee</th>
-                                <th class="px-6 py-4 text-right">Base Salary</th>
-                                <th class="px-6 py-4 text-right">OT Amount</th>
-                                <th class="px-6 py-4 text-right">Bonuses</th>
-                                <th class="px-6 py-4 text-right">Deductions</th>
-                                <th class="px-6 py-4 text-right">Gross Salary</th>
-                                <th class="px-6 py-4 text-right font-bold">Net Salary</th>
+                                <th class="px-4 py-4 text-center" title="Present Days"><i class="fa-solid fa-calendar-check text-emerald-400"></i></th>
+                                <th class="px-4 py-4 text-center" title="Half Days"><i class="fa-solid fa-clock text-teal-400"></i></th>
+                                <th class="px-4 py-4 text-center" title="Late Days"><i class="fa-solid fa-hourglass-half text-amber-400"></i></th>
+                                <th class="px-4 py-4 text-center" title="Absent Days"><i class="fa-solid fa-calendar-xmark text-red-400"></i></th>
+                                <th class="px-4 py-4 text-center" title="Leave Days"><i class="fa-solid fa-plane-departure text-blue-400"></i></th>
+                                <th class="px-4 py-4 text-center" title="OT Hours"><i class="fa-solid fa-stopwatch text-purple-400"></i></th>
+                                <th class="px-6 py-4 text-right">Basic</th>
+                                <th class="px-6 py-4 text-right">Allow.</th>
+                                <th class="px-6 py-4 text-right">OT</th>
+                                <th class="px-6 py-4 text-right">Bonus</th>
+                                <th class="px-6 py-4 text-right">Ded.</th>
+                                <th class="px-6 py-4 text-right">Tax</th>
+                                <th class="px-6 py-4 text-right font-bold">Net</th>
                                 <th class="px-6 py-4 text-center">Status</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-white/[0.06]">
                             <?php if (empty($payroll_data)): ?>
                             <tr>
-                                <td colspan="8" class="px-6 py-16 text-center">
+                                <td colspan="15" class="px-6 py-16 text-center">
                                     <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500/10 to-indigo-500/10 flex items-center justify-center mx-auto mb-4">
                                         <i class="fa-solid fa-file-invoice-dollar text-2xl text-zinc-500"></i>
                                     </div>
@@ -494,7 +473,20 @@ foreach ($payroll_data as $p) {
                                             </div>
                                         </div>
                                     </td>
+                                    <td class="px-4 py-4 text-center"><span class="text-xs font-bold text-emerald-400"><?php echo $p['present_days'] ?? 0; ?></span></td>
+                                    <td class="px-4 py-4 text-center"><span class="text-xs font-bold text-teal-400"><?php echo $p['half_days'] ?? 0; ?></span></td>
+                                    <td class="px-4 py-4 text-center"><span class="text-xs font-bold text-amber-400"><?php echo $p['late_days'] ?? 0; ?></span></td>
+                                    <td class="px-4 py-4 text-center"><span class="text-xs font-bold text-red-400"><?php echo $p['absent_days'] ?? 0; ?></span></td>
+                                    <td class="px-4 py-4 text-center"><span class="text-xs font-bold text-blue-400"><?php echo ($p['paid_leave_days'] ?? 0) + ($p['unpaid_leave_days'] ?? 0); ?></span></td>
+                                    <td class="px-4 py-4 text-center"><span class="text-xs font-bold text-purple-400"><?php echo number_format($p['overtime_hours'] ?? 0, 1); ?>h</span></td>
                                     <td class="px-6 py-4 text-right font-mono text-white font-medium">$<?php echo number_format($p['basic_salary'], 2); ?></td>
+                                    <td class="px-6 py-4 text-right">
+                                        <?php if (($p['allowance_amount'] ?? 0) > 0): ?>
+                                            <span class="amount-positive font-mono font-medium">$<?php echo number_format($p['allowance_amount'], 2); ?></span>
+                                        <?php else: ?>
+                                            <span class="font-mono text-zinc-600">—</span>
+                                        <?php endif; ?>
+                                    </td>
                                     <td class="px-6 py-4 text-right">
                                         <?php if ($p['ot_amount'] > 0): ?>
                                             <span class="amount-positive font-mono font-medium">$<?php echo number_format($p['ot_amount'], 2); ?></span>
@@ -518,7 +510,13 @@ foreach ($payroll_data as $p) {
                                             <span class="font-mono text-zinc-600">—</span>
                                         <?php endif; ?>
                                     </td>
-                                    <td class="px-6 py-4 text-right font-mono text-white font-bold">$<?php echo number_format($p['gross_salary'], 2); ?></td>
+                                    <td class="px-6 py-4 text-right">
+                                        <?php if (($p['tax_amount'] ?? 0) > 0): ?>
+                                            <span class="amount-deduction font-mono font-medium">$<?php echo number_format($p['tax_amount'], 2); ?></span>
+                                        <?php else: ?>
+                                            <span class="font-mono text-zinc-600">—</span>
+                                        <?php endif; ?>
+                                    </td>
                                     <td class="px-6 py-4 text-right">
                                         <span class="net-highlight">$<?php echo number_format($p['net_salary'], 2); ?></span>
                                     </td>

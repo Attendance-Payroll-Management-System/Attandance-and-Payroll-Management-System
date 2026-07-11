@@ -186,6 +186,7 @@ function nav_section($label, $icon, $children, $current_page, $badge = null, $co
             <?php echo nav_section('Attendance', 'calendar-check', [
                 ['page' => 'attendance.php', 'href' => 'attendance.php', 'label' => 'Monthly Attendance'],
                 ['page' => 'dailyattendance.php', 'href' => 'dailyattendance.php', 'label' => 'Daily Attendance'],
+                ['page' => 'attendance_summary.php', 'href' => 'attendance_summary.php', 'label' => 'Attendance Summary'],
                 ['page' => 'process_daily_attendance.php', 'href' => 'process_daily_attendance.php', 'label' => 'Process Attendance'],
             ], $current_page, null, 'emerald'); ?>
             <?php echo nav_section('Leave Management', 'paper-plane', [
@@ -238,6 +239,7 @@ function nav_section($label, $icon, $children, $current_page, $badge = null, $co
             </div>
             <?php echo nav_item('dashboard.php', 'Dashboard', 'house-chimney', $current_page, null, null, 'sky'); ?>
             <?php echo nav_item('attendance.php', 'Attendance', 'calendar-check', $current_page, null, null, 'emerald'); ?>
+            <?php echo nav_item('attendance_summary.php', 'Attendance Summary', 'chart-simple', $current_page, null, null, 'cyan'); ?>
             <?php echo nav_item('leaverequest.php', 'Leave Request', 'paper-plane', $current_page, null, null, 'amber'); ?>
             <?php echo nav_item('overtimerequest.php', 'Overtime Request', 'stopwatch', $current_page, null, null, 'orange'); ?>
             <?php echo nav_item('attendanceall.php', 'My Records', 'folder-open', $current_page, null, null, 'cyan'); ?>

@@ -334,9 +334,13 @@ function get_attendance_summary_for_payroll(mysqli $conn, int $employee_id, stri
             SUM(CASE WHEN status = 'absent' THEN 1 ELSE 0 END) as absent_days,
             SUM(CASE WHEN status = 'late' THEN 1 ELSE 0 END) as late_days,
             SUM(CASE WHEN status = 'leave' THEN 1 ELSE 0 END) as leave_days,
+            SUM(CASE WHEN status = 'paid_leave' THEN 1 ELSE 0 END) as paid_leave_days,
+            SUM(CASE WHEN status = 'unpaid_leave' THEN 1 ELSE 0 END) as unpaid_leave_days,
+            SUM(CASE WHEN status = 'half_day' THEN 1 ELSE 0 END) as half_days,
             SUM(CASE WHEN status IN ('present', 'late') THEN 1 ELSE 0 END) as effective_present_days,
             SUM(CASE WHEN status IN ('awol', 'absent', 'full_absent', 'half_absent') THEN 1 ELSE 0 END) as absent_days_total,
-            SUM(CASE WHEN status IN ('weekend', 'public_holiday') THEN 1 ELSE 0 END) as non_working_days
+            SUM(CASE WHEN status IN ('weekend', 'public_holiday') THEN 1 ELSE 0 END) as non_working_days,
+            COALESCE(SUM(total_working_hours), 0) as total_hours_worked
          FROM attendance 
          WHERE employee_id = ? AND attendance_date BETWEEN ? AND ?"
     );
@@ -344,7 +348,12 @@ function get_attendance_summary_for_payroll(mysqli $conn, int $employee_id, stri
     $stmt->execute();
     $result = $stmt->get_result()->fetch_assoc();
     $stmt->close();
-    return $result ?: ['total_days' => 0, 'present_days' => 0, 'absent_days' => 0, 'late_days' => 0, 'leave_days' => 0, 'effective_present_days' => 0, 'absent_days_total' => 0, 'non_working_days' => 0];
+    return $result ?: [
+        'total_days' => 0, 'present_days' => 0, 'absent_days' => 0, 'late_days' => 0,
+        'leave_days' => 0, 'paid_leave_days' => 0, 'unpaid_leave_days' => 0, 'half_days' => 0,
+        'effective_present_days' => 0, 'absent_days_total' => 0, 'non_working_days' => 0,
+        'total_hours_worked' => 0
+    ];
 }
 
 function calculate_overtime_amount_for_payroll(mysqli $conn, int $employee_id, string $month_start, string $month_end, float $hourly_rate): float {
@@ -473,9 +482,9 @@ function calculate_attendance_status(mysqli $conn, int $employee_id, string $dat
         return 'public_holiday';
     }
 
-    // Rule 3: Approved Leave
+    // Rule 3: Approved Leave (distinguish paid vs unpaid)
     if (has_approved_leave_on_date($conn, $employee_id, $date)) {
-        return 'leave';
+        return get_leave_status_for_date($conn, $employee_id, $date);
     }
 
     // No check-in at all
@@ -483,36 +492,59 @@ function calculate_attendance_status(mysqli $conn, int $employee_id, string $dat
         return 'awol';
     }
 
-    // Has check-in, determine status based on check-out time
+    // Hours-based status calculation
+    $half_day_min = (float)get_company_policy($conn, 'half_day_min_hours', 4);
+    $full_day_min = (float)get_company_policy($conn, 'full_day_min_hours', 8);
     $is_late = is_late_checkin($check_in);
 
-    if ($check_out !== null) {
-        $check_out_time = date('H:i:s', strtotime($check_out));
-        $work_end = get_work_end_time(); // 17:00:00
-
-        // Rule 4: Check-out between 9:00 AM and 12:00 PM → Full-Day Absent
-        if (strtotime($check_out_time) < strtotime('12:00:00')) {
+    if ($check_out !== null && $total_hours !== null) {
+        // Hours-based classification
+        if ($total_hours >= $full_day_min) {
+            return $is_late ? 'late' : 'present';
+        } elseif ($total_hours >= $half_day_min) {
+            return 'half_day';
+        } else {
             return 'full_absent';
         }
-
-        // Rule 5: Check-out between 12:00 PM and 5:00 PM → Half-Day Absent
-        if (strtotime($check_out_time) < strtotime($work_end)) {
-            return 'half_absent';
-        }
-
-        // Rule 6: Check-out at or after 5:00 PM → Present (or Late if late check-in)
-        if ($is_late) {
-            return 'late';
-        }
-        return 'present';
     }
 
-    // Has check-in but no check-out yet
+    // Has check-in but no check-out yet — use time-based estimation
+    $current_time = mmt_time();
+    $hours_so_far = (strtotime($current_time) - strtotime($check_in)) / 3600;
+
+    if ($hours_so_far >= $full_day_min) {
+        return $is_late ? 'late' : 'present';
+    } elseif ($hours_so_far >= $half_day_min) {
+        return 'half_day';
+    }
+
     if ($is_late) {
         return 'late';
     }
-
     return 'present';
+}
+
+function get_leave_status_for_date(mysqli $conn, int $employee_id, string $date): string {
+    $stmt = $conn->prepare(
+        "SELECT lr.leave_type, lr.is_paid, lr.leave_duration 
+         FROM leave_requests lr 
+         WHERE lr.employee_id = ? AND lr.status = 'Approved' 
+         AND lr.start_date <= ? AND lr.end_date >= ? 
+         LIMIT 1"
+    );
+    $stmt->bind_param('iss', $employee_id, $date, $date);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $leave = $result->fetch_assoc();
+    $stmt->close();
+
+    if ($leave) {
+        if ($leave['is_paid'] == 1 || strtolower($leave['leave_type']) === 'sick leave') {
+            return 'paid_leave';
+        }
+        return 'unpaid_leave';
+    }
+    return 'leave';
 }
 
 function get_system_setting(mysqli $conn, string $key, $default = null) {
@@ -569,6 +601,8 @@ function auto_mark_daily_attendance(mysqli $conn, string $date): array {
         'awol' => 0,
         'weekend' => 0,
         'holiday' => 0,
+        'paid_leave' => 0,
+        'unpaid_leave' => 0,
         'errors' => [],
     ];
 
@@ -606,12 +640,33 @@ function auto_mark_daily_attendance(mysqli $conn, string $date): array {
             $stmt->execute();
             $stmt->close();
             $result['holiday']++;
-        } elseif (!has_approved_leave_on_date($conn, $eid, $date) && !has_pending_leave_on_date($conn, $eid, $date)) {
-            $stmt = $conn->prepare("INSERT INTO attendance (employee_id, attendance_date, status, auto_calculated) VALUES (?, ?, 'awol', 1)");
-            $stmt->bind_param('is', $eid, $date);
-            $stmt->execute();
-            $stmt->close();
-            $result['awol']++;
+        } else {
+            // Check for approved leave and distinguish paid vs unpaid
+            $leave_stmt = $conn->prepare(
+                "SELECT leave_type, is_paid FROM leave_requests 
+                 WHERE employee_id = ? AND status = 'Approved' 
+                 AND start_date <= ? AND end_date >= ? LIMIT 1"
+            );
+            $leave_stmt->bind_param('iss', $eid, $date, $date);
+            $leave_stmt->execute();
+            $leave_result = $leave_stmt->get_result();
+            $leave = $leave_result->fetch_assoc();
+            $leave_stmt->close();
+
+            if ($leave) {
+                $status = ($leave['is_paid'] == 1 || strtolower($leave['leave_type']) === 'sick leave') ? 'paid_leave' : 'unpaid_leave';
+                $stmt = $conn->prepare("INSERT INTO attendance (employee_id, attendance_date, status, auto_calculated) VALUES (?, ?, ?, 1)");
+                $stmt->bind_param('iss', $eid, $date, $status);
+                $stmt->execute();
+                $stmt->close();
+                $result[$status]++;
+            } elseif (!has_pending_leave_on_date($conn, $eid, $date)) {
+                $stmt = $conn->prepare("INSERT INTO attendance (employee_id, attendance_date, status, auto_calculated) VALUES (?, ?, 'awol', 1)");
+                $stmt->bind_param('is', $eid, $date);
+                $stmt->execute();
+                $stmt->close();
+                $result['awol']++;
+            }
         }
     }
 
@@ -698,12 +753,15 @@ function get_attendance_status_label(string $status): string {
         'absent' => 'Absent',
         'late' => 'Late',
         'leave' => 'Approved Leave',
+        'paid_leave' => 'Paid Leave',
+        'unpaid_leave' => 'Unpaid Leave',
+        'half_day' => 'Half Day',
         'half_absent' => 'Half-Day Absent',
         'full_absent' => 'Full-Day Absent',
         'awol' => 'AWOL',
         'public_holiday' => 'Public Holiday',
         'weekend' => 'Weekend',
-        default => ucfirst($status),
+        default => ucfirst(str_replace('_', ' ', $status)),
     };
 }
 
@@ -713,6 +771,9 @@ function get_attendance_status_badge_class(string $status): string {
         'absent' => 'bg-red-500/20 text-red-400',
         'late' => 'bg-amber-500/20 text-amber-400',
         'leave' => 'bg-blue-500/20 text-blue-400',
+        'paid_leave' => 'bg-sky-500/20 text-sky-400',
+        'unpaid_leave' => 'bg-orange-500/20 text-orange-400',
+        'half_day' => 'bg-teal-500/20 text-teal-400',
         'half_absent' => 'bg-orange-500/20 text-orange-400',
         'full_absent' => 'bg-rose-600/20 text-rose-400',
         'awol' => 'bg-red-700/20 text-red-500',
@@ -723,7 +784,7 @@ function get_attendance_status_badge_class(string $status): string {
 }
 
 function is_present_status(string $status): bool {
-    return in_array($status, ['present', 'late']);
+    return in_array($status, ['present', 'late', 'half_day']);
 }
 
 function is_absent_status(string $status): bool {
@@ -731,7 +792,7 @@ function is_absent_status(string $status): bool {
 }
 
 function is_non_working_status(string $status): bool {
-    return in_array($status, ['weekend', 'public_holiday', 'leave']);
+    return in_array($status, ['weekend', 'public_holiday', 'paid_leave', 'leave']);
 }
 
 // ─── NRC (National Registration Card) Helpers ────────────────────
@@ -859,6 +920,130 @@ function log_activity($conn, $emp_id, $action, $description = '') {
  * @param string $action   Filter by action type (null for all)
  * @return array  Activity logs
  */
+// ─── Payroll Calculation Helpers ─────────────────────────────
+
+function calculate_daily_salary(float $basic_salary, int $working_days): float {
+    return $working_days > 0 ? round($basic_salary / $working_days, 2) : 0;
+}
+
+function calculate_hourly_rate(float $basic_salary, int $working_days, float $hours_per_day = 8): float {
+    $monthly_hours = $working_days * $hours_per_day;
+    return $monthly_hours > 0 ? round($basic_salary / $monthly_hours, 2) : 0;
+}
+
+function get_monthly_attendance_summary(mysqli $conn, int $employee_id, string $month_start, string $month_end): array {
+    $stmt = $conn->prepare(
+        "SELECT 
+            COUNT(*) as total_days,
+            SUM(CASE WHEN status = 'present' THEN 1 ELSE 0 END) as present_days,
+            SUM(CASE WHEN status = 'late' THEN 1 ELSE 0 END) as late_days,
+            SUM(CASE WHEN status = 'half_day' THEN 1 ELSE 0 END) as half_days,
+            SUM(CASE WHEN status IN ('paid_leave', 'leave') THEN 1 ELSE 0 END) as paid_leave_days,
+            SUM(CASE WHEN status = 'unpaid_leave' THEN 1 ELSE 0 END) as unpaid_leave_days,
+            SUM(CASE WHEN status IN ('awol', 'absent', 'full_absent', 'half_absent') THEN 1 ELSE 0 END) as absent_days,
+            SUM(CASE WHEN status = 'weekend' THEN 1 ELSE 0 END) as weekend_days,
+            SUM(CASE WHEN status = 'public_holiday' THEN 1 ELSE 0 END) as holiday_days,
+            COALESCE(SUM(total_working_hours), 0) as total_hours_worked,
+            SUM(CASE WHEN status IN ('present', 'late', 'half_day') THEN 1 ELSE 0 END) as working_days_present
+         FROM attendance 
+         WHERE employee_id = ? AND attendance_date BETWEEN ? AND ?"
+    );
+    $stmt->bind_param('iss', $employee_id, $month_start, $month_end);
+    $stmt->execute();
+    $result = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    return $result ?: [
+        'total_days' => 0, 'present_days' => 0, 'late_days' => 0, 'half_days' => 0,
+        'paid_leave_days' => 0, 'unpaid_leave_days' => 0, 'absent_days' => 0,
+        'weekend_days' => 0, 'holiday_days' => 0, 'total_hours_worked' => 0,
+        'working_days_present' => 0
+    ];
+}
+
+function calculate_payroll_for_employee(mysqli $conn, int $employee_id, int $month, int $year): array {
+    $month_start = sprintf('%04d-%02d-01', $year, $month);
+    $month_end = date('Y-m-t', strtotime($month_start));
+    $working_days = get_working_days_in_month($year, $month);
+
+    // Get employee data
+    $emp_stmt = $conn->prepare("SELECT basic_salary FROM employee WHERE id = ?");
+    $emp_stmt->bind_param('i', $employee_id);
+    $emp_stmt->execute();
+    $emp = $emp_stmt->get_result()->fetch_assoc();
+    $emp_stmt->close();
+
+    $basic = (float)($emp['basic_salary'] ?? 0);
+    $daily_rate = calculate_daily_salary($basic, $working_days);
+    $hourly_rate = calculate_hourly_rate($basic, $working_days);
+
+    // Get attendance summary
+    $att = get_monthly_attendance_summary($conn, $employee_id, $month_start, $month_end);
+
+    // Get allowance from personal info
+    $allow_stmt = $conn->prepare("SELECT COALESCE(epi.allowance, 0) as allowance FROM employee_personal_info epi WHERE epi.employee_id = ?");
+    $allow_stmt->bind_param('i', $employee_id);
+    $allow_stmt->execute();
+    $allow_row = $allow_stmt->get_result()->fetch_assoc();
+    $allow_stmt->close();
+    $allowance = (float)($allow_row['allowance'] ?? 0);
+
+    // Calculate deductions
+    $absent_deduction = $daily_rate * (int)$att['absent_days'];
+    $half_day_deduction = $daily_rate * 0.5 * (int)$att['half_days'];
+    $unpaid_leave_deduction = $daily_rate * (int)$att['unpaid_leave_days'];
+    $late_penalty_rate = (float)get_company_policy($conn, 'late_penalty_per_occurrence', 0);
+    $late_deduction = $late_penalty_rate * (int)$att['late_days'];
+
+    // Total attendance-based deduction
+    $total_attendance_deduction = $absent_deduction + $half_day_deduction + $unpaid_leave_deduction + $late_deduction;
+
+    // Overtime
+    $ot_amount = calculate_overtime_amount_for_payroll($conn, $employee_id, $month_start, $month_end, $hourly_rate);
+
+    // Bonuses
+    $bonus_stmt = $conn->prepare("SELECT COALESCE(SUM(amount), 0) as total FROM bonuses WHERE employee_id = ? AND bonus_date BETWEEN ? AND ?");
+    $bonus_stmt->bind_param('iss', $employee_id, $month_start, $month_end);
+    $bonus_stmt->execute();
+    $bonus_amount = (float)$bonus_stmt->get_result()->fetch_assoc()['total'];
+    $bonus_stmt->close();
+
+    // Other deductions
+    $ded_stmt = $conn->prepare("SELECT COALESCE(SUM(amount), 0) as total FROM deductions WHERE employee_id = ? AND deduction_date BETWEEN ? AND ?");
+    $ded_stmt->bind_param('iss', $employee_id, $month_start, $month_end);
+    $ded_stmt->execute();
+    $other_deductions = (float)$ded_stmt->get_result()->fetch_assoc()['total'];
+    $ded_stmt->close();
+
+    // Net salary calculation
+    $gross = $basic + $allowance + $ot_amount + $bonus_amount;
+    $net = $gross - $total_attendance_deduction - $other_deductions;
+
+    return [
+        'basic_salary' => $basic,
+        'allowance_amount' => $allowance,
+        'ot_amount' => $ot_amount,
+        'bonus_amount' => $bonus_amount,
+        'absent_deduction' => $absent_deduction,
+        'half_day_deduction' => $half_day_deduction,
+        'unpaid_leave_deduction' => $unpaid_leave_deduction,
+        'late_deduction' => $late_deduction,
+        'total_attendance_deduction' => $total_attendance_deduction,
+        'other_deductions' => $other_deductions,
+        'gross_salary' => $gross,
+        'net_salary' => $net,
+        'working_days' => $working_days,
+        'present_days' => (int)$att['present_days'],
+        'half_days' => (int)$att['half_days'],
+        'late_days' => (int)$att['late_days'],
+        'absent_days' => (int)$att['absent_days'],
+        'paid_leave_days' => (int)$att['paid_leave_days'],
+        'unpaid_leave_days' => (int)$att['unpaid_leave_days'],
+        'overtime_hours' => (float)($att['total_hours_worked'] ?? 0),
+        'daily_rate' => $daily_rate,
+        'hourly_rate' => $hourly_rate,
+    ];
+}
+
 function get_activity_logs($conn, $limit = 50, $emp_id = null, $action = null) {
     $res = $conn->query("SHOW TABLES LIKE 'activity_logs'");
     if (!$res || $res->num_rows === 0) {

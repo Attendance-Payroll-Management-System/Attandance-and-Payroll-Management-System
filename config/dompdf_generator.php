@@ -95,6 +95,39 @@ body {
     font-weight: bold;
     color: #1e293b;
 }
+.attendance-bar {
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 10px 16px;
+    margin-bottom: 16px;
+}
+.attendance-bar h3 {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #64748b;
+    margin: 0 0 8px;
+}
+.att-grid {
+    width: 100%;
+    border-collapse: collapse;
+}
+.att-grid td {
+    text-align: center;
+    padding: 4px 8px;
+    font-size: 10px;
+}
+.att-grid .att-num {
+    font-weight: bold;
+    font-size: 14px;
+    color: #1e293b;
+}
+.att-grid .att-label {
+    color: #64748b;
+    font-size: 9px;
+    text-transform: uppercase;
+}
 .table-section {
     width: 100%;
     border-collapse: collapse;
@@ -216,6 +249,20 @@ body {
         </table>
     </div>
 
+    <div class="attendance-bar">
+        <h3>Attendance Summary</h3>
+        <table class="att-grid">
+            <tr>
+                <td><div class="att-num">' . ($data['working_days'] ?? 0) . '</div><div class="att-label">Working Days</div></td>
+                <td><div class="att-num" style="color:#16a34a">' . ($data['present_days'] ?? 0) . '</div><div class="att-label">Present</div></td>
+                <td><div class="att-num" style="color:#0d9488">' . ($data['half_days'] ?? 0) . '</div><div class="att-label">Half Day</div></td>
+                <td><div class="att-num" style="color:#d97706">' . ($data['late_days'] ?? 0) . '</div><div class="att-label">Late</div></td>
+                <td><div class="att-num" style="color:#dc2626">' . ($data['absent_days'] ?? 0) . '</div><div class="att-label">Absent</div></td>
+                <td><div class="att-num" style="color:#7c3aed">' . number_format($data['overtime_hours'] ?? 0, 1) . 'h</div><div class="att-label">OT Hours</div></td>
+            </tr>
+        </table>
+    </div>
+
     <div class="earnings">
         <table class="table-section">
             <thead>
@@ -237,10 +284,12 @@ body {
                 <tr><th>DEDUCTIONS</th><th class="amount">Amount</th></tr>
             </thead>
             <tbody>
-                <tr><td>Deductions</td><td class="amount">-$' . $deduction . '</td></tr>
-                <tr><td>Leave Deduction</td><td class="amount">-$' . $leave_ded . '</td></tr>
+                <tr><td>Absent Deduction</td><td class="amount">-$' . number_format(($data['late_deduction'] ?? 0) + ($data['unpaid_leave_deduction'] ?? 0), 2) . '</td></tr>
+                <tr><td>Late Deduction</td><td class="amount">-$' . number_format($data['late_deduction'] ?? 0, 2) . '</td></tr>
+                <tr><td>Unpaid Leave Ded.</td><td class="amount">-$' . number_format($data['unpaid_leave_deduction'] ?? 0, 2) . '</td></tr>
+                <tr><td>Other Deductions</td><td class="amount">-$' . $deduction . '</td></tr>
                 <tr><td>Tax</td><td class="amount">-$' . $tax . '</td></tr>
-                <tr class="total-row"><td>TOTAL DEDUCTIONS</td><td class="amount">-$' . number_format(($data['deduction_amount'] ?? 0) + ($data['leave_deduction'] ?? 0) + ($data['tax_amount'] ?? 0), 2) . '</td></tr>
+                <tr class="total-row"><td>TOTAL DEDUCTIONS</td><td class="amount">-$' . number_format(($data['deduction_amount'] ?? 0) + ($data['late_deduction'] ?? 0) + ($data['unpaid_leave_deduction'] ?? 0) + ($data['tax_amount'] ?? 0), 2) . '</td></tr>
             </tbody>
         </table>
     </div>

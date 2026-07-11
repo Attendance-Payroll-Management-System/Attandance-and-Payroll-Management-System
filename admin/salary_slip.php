@@ -266,6 +266,11 @@ $emp_count = count($payroll_data);
                                 <thead class="text-white text-xs font-bold uppercase tracking-wider">
                                     <tr>
                                         <th class="px-6 py-4">Employee</th>
+                                        <th class="px-4 py-4 text-center" title="Present"><span class="text-emerald-400">Prs</span></th>
+                                        <th class="px-4 py-4 text-center" title="Half Days"><span class="text-teal-400">Hlf</span></th>
+                                        <th class="px-4 py-4 text-center" title="Late"><span class="text-amber-400">Lat</span></th>
+                                        <th class="px-4 py-4 text-center" title="Absent"><span class="text-red-400">Abs</span></th>
+                                        <th class="px-4 py-4 text-center" title="OT Hours"><span class="text-purple-400">OT</span></th>
                                         <th class="px-6 py-4 text-right">Basic</th>
                                         <th class="px-6 py-4 text-right">OT</th>
                                         <th class="px-6 py-4 text-right">Bonus</th>
@@ -288,6 +293,11 @@ $emp_count = count($payroll_data);
                                                     </div>
                                                 </div>
                                             </td>
+                                            <td class="px-4 py-4 text-center"><span class="text-xs font-bold text-emerald-400"><?php echo $p['present_days'] ?? 0; ?></span></td>
+                                            <td class="px-4 py-4 text-center"><span class="text-xs font-bold text-teal-400"><?php echo $p['half_days'] ?? 0; ?></span></td>
+                                            <td class="px-4 py-4 text-center"><span class="text-xs font-bold text-amber-400"><?php echo $p['late_days'] ?? 0; ?></span></td>
+                                            <td class="px-4 py-4 text-center"><span class="text-xs font-bold text-red-400"><?php echo $p['absent_days'] ?? 0; ?></span></td>
+                                            <td class="px-4 py-4 text-center"><span class="text-xs font-bold text-purple-400"><?php echo number_format($p['overtime_hours'] ?? 0, 1); ?>h</span></td>
                                             <td class="px-6 py-4 text-right font-mono text-white font-medium">$<?php echo number_format($p['basic_salary'], 2); ?></td>
                                             <td class="px-6 py-4 text-right">
                                                 <?php if ($p['ot_amount'] > 0): ?>
