@@ -70,9 +70,27 @@ if (isset($conn) && $conn) {
 }
 
 $short_name = explode(' ', $admin_name)[0];
+
+// Employee desktop navigation items
+$emp_desktop_nav = [
+    ['label' => 'Dashboard',      'icon' => 'gauge-high',        'href' => 'dashboard.php',         'pages' => ['dashboard.php']],
+    ['label' => 'Attendance',     'icon' => 'calendar-check',    'href' => 'attendance.php',        'pages' => ['attendance.php', 'attendance_summary.php', 'attendanceall.php']],
+    ['label' => 'Leave',          'icon' => 'paper-plane',       'href' => 'leaverequest.php',      'pages' => ['leaverequest.php']],
+    ['label' => 'Overtime',       'icon' => 'stopwatch',         'href' => 'overtimerequest.php',   'pages' => ['overtimerequest.php']],
+    ['label' => 'Notifications',  'icon' => 'bell',              'href' => 'dashboard.php',         'pages' => [], 'action' => 'notifications'],
+    ['label' => 'Profile',        'icon' => 'circle-user',       'href' => 'profile.php',           'pages' => ['profile.php', 'payroll.php', 'change_password.php']],
+    ['label' => 'Settings',       'icon' => 'gear',              'href' => 'settings.php',          'pages' => ['settings.php']],
+];
 ?>
-<header class="sticky top-0 z-20 bg-white/80 dark:bg-[#0F172A]/80 backdrop-blur-xl border-b border-slate-200 dark:border-blue-500/10">
-    <div class="flex items-center justify-between px-4 lg:px-8 h-16">
+<?php if ($is_admin): ?>
+<!-- Spacer for fixed admin topbar -->
+<div aria-hidden="true" class="h-16 w-full flex-shrink-0"></div>
+<?php else: ?>
+<!-- Spacer for fixed employee topbar -->
+<div aria-hidden="true" class="emp-header-spacer" style="<?php echo !empty($use_sidebar) ? 'height:4rem' : ''; ?>"></div>
+<?php endif; ?>
+<header class="<?php echo $is_admin ? 'fixed top-0 right-0 z-30 admin-topbar' : 'emp-header'; ?> bg-white/80 dark:bg-[#0F172A]/80 backdrop-blur-xl border-b border-slate-200 dark:border-blue-500/10">
+    <div class="flex items-center justify-between <?php echo $is_admin ? 'pl-16' : 'pl-4'; ?> pr-4 md:pl-4 lg:px-8 h-16">
         <div class="min-w-0 flex-1">
             <h1 class="text-xl font-bold tracking-tight text-slate-900 dark:text-white truncate"><?php echo htmlspecialchars($page_title); ?></h1>
             <?php if (!empty($page_subtitle)): ?>
@@ -96,7 +114,7 @@ $short_name = explode(' ', $admin_name)[0];
                      x-transition:leave="transition-all duration-200 ease-in"
                      x-transition:leave-start="opacity-100 scale-100 translate-y-0"
                      x-transition:leave-end="opacity-0 scale-95 -translate-y-2"
-                     class="absolute right-0 mt-2 w-80 lg:w-96 glass-strong rounded-xl shadow-xl border border-black/10 dark:border-white/10 z-50" style="display: none;">
+                     class="absolute right-0 mt-2 w-[calc(100vw-2rem)] max-w-80 lg:w-96 glass-strong rounded-xl shadow-xl border border-black/10 dark:border-white/10 z-50" style="display: none;">
                     <div class="p-3 border-b border-black/[0.06] dark:border-white/[0.06] flex items-center justify-between">
                         <h4 class="text-sm font-bold text-slate-900 dark:text-white"><i class="fa-regular fa-bell mr-1.5 text-blue-400"></i>Notifications</h4>
                         <?php if ($unread_count > 0): ?>
@@ -130,12 +148,18 @@ $short_name = explode(' ', $admin_name)[0];
                 <i class="fa-solid fa-moon icon-moon text-base"></i>
             </button>
 
-            <!-- Settings -->
+            <!-- Settings (hidden on mobile for employee, shown on desktop) -->
+            <?php if ($is_admin): ?>
             <a href="settings.php" class="p-2.5 text-slate-500 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-white bg-slate-100 dark:bg-white/[0.06] hover:bg-slate-200 dark:hover:bg-white/[0.1] rounded-xl transition-all duration-200">
                 <i class="fa-solid fa-gear text-lg"></i>
             </a>
+            <?php else: ?>
+            <a href="settings.php" class="hidden lg:flex p-2.5 text-slate-500 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-white bg-slate-100 dark:bg-white/[0.06] hover:bg-slate-200 dark:hover:bg-white/[0.1] rounded-xl transition-all duration-200">
+                <i class="fa-solid fa-gear text-lg"></i>
+            </a>
+            <?php endif; ?>
 
-            <!-- Admin Profile Dropdown -->
+            <!-- Profile Dropdown -->
             <div class="relative" x-data="{ open: false }">
                 <button @click="open = !open" class="flex items-center gap-2 pl-1.5 pr-3 py-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-white/[0.06] transition-all duration-200">
                     <?php if (!empty($admin_photo)): ?>
@@ -156,7 +180,7 @@ $short_name = explode(' ', $admin_name)[0];
                      x-transition:leave="transition-all duration-150 ease-in"
                      x-transition:leave-start="opacity-100 scale-100 translate-y-0"
                      x-transition:leave-end="opacity-0 scale-95 -translate-y-2"
-                     class="absolute right-0 mt-2 w-64 glass-strong rounded-2xl shadow-2xl border border-black/10 dark:border-white/10 z-50 overflow-hidden" style="display: none;">
+                     class="absolute right-0 mt-2 w-[calc(100vw-2rem)] max-w-64 glass-strong rounded-2xl shadow-2xl border border-black/10 dark:border-white/10 z-50 overflow-hidden" style="display: none;">
 
                     <div class="p-4 bg-gradient-to-r from-blue-500/10 to-indigo-500/10 border-b border-black/[0.06] dark:border-white/[0.06]">
                         <div class="flex items-center gap-3">
@@ -193,6 +217,36 @@ $short_name = explode(' ', $admin_name)[0];
 
         </div>
     </div>
+
+    <?php if (!$is_admin && empty($use_sidebar)): ?>
+    <!-- Employee Desktop Navbar — visible on lg+ screens only (hidden when sidebar is used) -->
+    <nav class="emp-desktop-nav border-t border-slate-200/60 dark:border-white/[0.06]">
+        <div class="max-w-7xl mx-auto px-8">
+            <div class="flex items-center gap-1">
+                <?php foreach ($emp_desktop_nav as $nav):
+                    $is_nav_active = in_array($current_page, $nav['pages']);
+                ?>
+                <?php if (($nav['action'] ?? '') === 'notifications'): ?>
+                <!-- Notifications nav item — triggers the dropdown above -->
+                <button onclick="event.preventDefault(); document.querySelector('[x-data] button[aria-label]')?.click();"
+                    class="emp-desktop-nav-item relative <?php echo $is_nav_active ? 'active' : ''; ?>">
+                    <i class="fa-solid fa-<?php echo $nav['icon']; ?> text-sm"></i>
+                    <span><?php echo $nav['label']; ?></span>
+                    <?php if ($unread_count > 0): ?>
+                    <span class="absolute -top-1 right-1 w-4 h-4 bg-rose-500 text-white text-[8px] font-bold rounded-full flex items-center justify-center shadow-lg shadow-rose-500/30"><?php echo $unread_count; ?></span>
+                    <?php endif; ?>
+                </button>
+                <?php else: ?>
+                <a href="<?php echo $nav['href']; ?>" class="emp-desktop-nav-item <?php echo $is_nav_active ? 'active' : ''; ?>">
+                    <i class="fa-solid fa-<?php echo $nav['icon']; ?> text-sm"></i>
+                    <span><?php echo $nav['label']; ?></span>
+                </a>
+                <?php endif; ?>
+                <?php endforeach; ?>
+            </div>
+        </div>
+    </nav>
+    <?php endif; ?>
 </header>
 
 <?php if (!empty($page_actions)): ?>

@@ -231,4 +231,44 @@ function getChartColors() {
 /* -- Scrollbar -- */
 :root:not(.dark) ::-webkit-scrollbar-thumb { background: #CBD5E1; }
 :root:not(.dark) ::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+
+/* -- Admin Mobile Menu Light Mode -- */
+:root:not(.dark) #adminMobileMenu {
+  background: #FFFFFF;
+  box-shadow: 4px 0 40px rgba(30,58,138,0.12);
+}
+:root:not(.dark) #adminMobileMenu nav a {
+  color: #475569;
+}
+:root:not(.dark) #adminMobileMenu nav a:hover {
+  background-color: #F1F5F9;
+  color: #1E293B;
+}
+:root:not(.dark) #adminMobileMenu nav a.active,
+:root:not(.dark) #adminMobileMenu nav a[href] .bg-indigo-500 {
+  background-color: rgba(79,70,229,0.12);
+  color: #4F46E5;
+}
+
+/* -- Employee Bottom Nav Light Mode -- */
+:root:not(.dark) .emp-bottom-nav {
+  background: rgba(255,255,255,0.95);
+  border-top-color: rgba(30,58,138,0.06);
+  box-shadow: 0 -4px 24px rgba(30,58,138,0.06);
+}
+:root:not(.dark) .emp-bottom-nav-icon {
+  color: #94A3B8;
+}
+:root:not(.dark) .emp-bottom-nav-item.active .emp-bottom-nav-icon {
+  color: #FFFFFF;
+}
+:root:not(.dark) .emp-bottom-nav-label {
+  color: #94A3B8;
+}
+:root:not(.dark) .emp-bottom-nav-item.active .emp-bottom-nav-label {
+  color: #4F46E5;
+}
+:root:not(.dark) .emp-bottom-nav-item:hover .emp-bottom-nav-icon-wrap {
+  background: rgba(79,70,229,0.06);
+}
 </style>

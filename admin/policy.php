@@ -63,7 +63,7 @@ foreach ($policies as $p) {
     <link rel="icon" type="image/svg+xml" href="../favicon.svg">
     <?php include "../includes/header.php"; ?>
 </head>
-<body x-data="{ sidebarOpen: false }" class="bg-slate-50 dark:bg-[#0B1120] text-slate-900 dark:text-white font-sans antialiased">
+<body x-data="{}" class="bg-slate-50 dark:bg-[#0B1120] text-slate-900 dark:text-white font-sans antialiased">
     <?php include "../includes/sidebar.php"; ?>
     <div class="main-wrapper min-h-screen flex flex-col">
         <?php $page_title = "Company Policies"; $page_subtitle = "Manage company policies and guidelines"; include "../includes/topbar.php"; ?>

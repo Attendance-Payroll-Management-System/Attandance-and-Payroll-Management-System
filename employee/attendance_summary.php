@@ -61,9 +61,10 @@ foreach ($records as $r) {
     <link rel="icon" type="image/svg+xml" href="../favicon.svg">
     <?php include "../includes/header.php"; ?>
 </head>
-<body x-data="{ sidebarOpen: false }" class="bg-slate-50 dark:bg-[#0B1120] text-slate-900 dark:text-white font-sans antialiased min-h-screen flex">
-    <?php $sidebar_role = 'employee'; include "../includes/sidebar.php"; ?>
-    <div class="flex-1 flex flex-col min-w-0 main-wrapper">
+<body class="bg-slate-50 dark:bg-[#0B1120] text-slate-900 dark:text-white font-sans antialiased emp-page-wrapper">
+    <?php $use_sidebar = true; ?>
+    <?php include "../includes/sidebar.php"; ?>
+    <div class="main-wrapper flex flex-col min-h-screen">
         <?php
         $page_title = "Attendance Summary";
         $page_subtitle = "Your monthly attendance breakdown";
@@ -245,5 +246,6 @@ foreach ($records as $r) {
             </div>
         </main>
     </div>
+    <?php include "../includes/employee_bottom_nav.php"; ?>
 </body>
 </html>

@@ -70,7 +70,7 @@ $total_emp = $total_present + $total_absent + $total_late + $total_leave + $tota
     <?php include "../includes/header.php"; ?>
 </head>
 
-<body x-data="{ sidebarOpen: false }" class="bg-slate-50 dark:bg-[#0B1120] text-slate-900 dark:text-white font-sans antialiased min-h-screen flex">
+<body x-data="{}" class="bg-slate-50 dark:bg-[#0B1120] text-slate-900 dark:text-white font-sans antialiased min-h-screen flex">
     <?php include "../includes/sidebar.php"; ?>
     <div class="flex-1 flex flex-col min-w-0 main-wrapper">
         <?php
@@ -97,7 +97,7 @@ $total_emp = $total_present + $total_absent + $total_late + $total_leave + $tota
             </button>
         </form>
         <?php $page_actions = ob_get_clean(); include "../includes/topbar.php"; ?>
-        <main class="flex-1 p-8 overflow-y-auto">
+        <main class="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">
 
             <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
                 <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-5">

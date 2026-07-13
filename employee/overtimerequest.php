@@ -119,58 +119,13 @@ $ot_requests->close();
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 </head>
-<body class="bg-slate-50 dark:bg-[#0B1120] text-slate-900 dark:text-white font-sans antialiased flex h-screen overflow-hidden" x-data="{ sidebarOpen: false }">
+<body class="bg-slate-50 dark:bg-[#0B1120] text-slate-900 dark:text-white font-sans antialiased emp-page-wrapper">
+    <?php $use_sidebar = true; ?>
     <?php include "../includes/sidebar.php"; ?>
-    <div class="flex-1 flex flex-col h-full overflow-y-auto lg:ml-64">
-        <header class="glass-strong px-8 py-4 flex items-center justify-between shrink-0 sticky top-0 z-20">
-            <div class="animate-fade-in-up">
-                <h2 class="text-xl font-bold text-white">Overtime Request</h2>
-                <p class="text-xs text-zinc-400"><?php echo format_mmt(mmt_date(), 'l, F j, Y'); ?> (MMT)</p>
-            </div>
-            <div class="flex items-center gap-4">
-                <div class="relative" x-data="{ notifOpen: false }">
-                    <button @click="notifOpen = !notifOpen" class="relative p-2 text-zinc-400 hover:text-white glass rounded-full transition">
-                        <i class="fa-solid fa-bell text-lg"></i>
-                        <?php if ($unread_notifications > 0): ?>
-                            <span class="absolute -top-1 -right-1 w-5 h-5 bg-rose-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-lg shadow-rose-500/30 animate-scale-in"><?php echo $unread_notifications; ?></span>
-                        <?php endif; ?>
-                    </button>
-                    <div x-show="notifOpen" @click.outside="notifOpen = false" class="absolute right-0 mt-2 w-96 glass-strong rounded-xl shadow-xl border border-white/10 z-50" style="display: none;">
-                        <div class="p-3 border-b border-white/[0.06] flex items-center justify-between">
-                            <h4 class="text-sm font-bold text-white"><i class="fa-regular fa-bell mr-1.5 text-sky-400"></i>Notifications</h4>
-                            <?php if ($unread_notifications > 0): ?>
-                            <a href="mark_notifications_read.php" class="text-[10px] text-sky-400 hover:text-sky-300 font-semibold transition-colors">Mark all read</a>
-                            <?php endif; ?>
-                        </div>
-                        <div class="max-h-96 overflow-y-auto">
-                            <?php if (empty($notifications)): ?>
-                                <p class="p-4 text-xs text-zinc-500 text-center">No notifications</p>
-                            <?php else: ?>
-                                <?php foreach ($notifications as $noti): ?>
-                                    <a href="<?php echo $noti['link'] ?: '#'; ?>" class="block px-4 py-3 border-b border-white/[0.04] hover:bg-white/[0.02] transition <?php echo !$noti['is_read'] ? 'bg-sky-500/5' : ''; ?>">
-                                        <p class="text-xs text-zinc-300"><?php echo htmlspecialchars($noti['message']); ?></p>
-                                        <p class="text-[10px] text-zinc-500 mt-1"><?php echo htmlspecialchars($employee_name) . ' - '; ?><?php echo date('M d, h:i A', strtotime($noti['created_at'])); ?></p>
-                                    </a>
-                                <?php endforeach; ?>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-                </div>
-                <button onclick="toggleTheme()" class="theme-toggle-btn">
-                    <i class="fa-solid fa-sun icon-sun text-base"></i>
-                    <i class="fa-solid fa-moon icon-moon text-base"></i>
-                </button>
-                <div class="flex items-center gap-3 border-l border-white/10 pl-4">
-                    <div class="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center text-sm font-bold shadow-inner"><?php echo strtoupper(substr($employee_name, 0, 2)); ?></div>
-                    <div class="text-right">
-                        <h4 class="text-sm font-semibold text-white"><?php echo htmlspecialchars($employee_name); ?></h4>
-                        <span class="text-xs text-zinc-400">Employee</span>
-                    </div>
-                </div>
-            </div>
-        </header>
+    <div class="main-wrapper flex flex-col min-h-screen">
+        <?php $page_title = "Overtime Request"; $page_subtitle = format_mmt(mmt_date(), 'l, F j, Y') . ' (MMT)'; include "../includes/topbar.php"; ?>
 
-        <main class="p-8 space-y-8 flex-1 max-w-[1400px] w-full mx-auto">
+        <main class="p-4 sm:p-6 lg:p-8 space-y-6 flex-1 page-content w-full">
             <?php if ($is_inactive): ?>
                 <div class="px-4 py-3 rounded-lg border bg-red-500/10 border-red-500/20 text-red-400">
                     <i class="fa-solid fa-ban mr-2"></i> Your account is inactive. You cannot submit overtime requests.
@@ -346,5 +301,6 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 </script>
+<?php include "../includes/employee_bottom_nav.php"; ?>
 </body>
 </html>

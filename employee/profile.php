@@ -95,9 +95,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <link rel="icon" type="image/svg+xml" href="../favicon.svg">
     <?php include "../includes/header.php"; ?>
 </head>
-<body x-data="{ sidebarOpen: false }" class="bg-slate-50 dark:bg-[#0B1120] text-slate-900 dark:text-white font-sans antialiased min-h-screen flex">
-    <?php $sidebar_role = 'employee'; include "../includes/sidebar.php"; ?>
-    <div class="flex-1 flex flex-col min-w-0 main-wrapper">
+<body class="bg-slate-50 dark:bg-[#0B1120] text-slate-900 dark:text-white font-sans antialiased emp-page-wrapper">
+    <?php $use_sidebar = true; ?>
+    <?php include "../includes/sidebar.php"; ?>
+    <div class="main-wrapper flex flex-col min-h-screen">
         <?php $page_title = "My Profile"; $page_subtitle = "Manage your personal information and account details."; include "../includes/topbar.php"; ?>
         <main class="flex-1 p-6 lg:p-8 overflow-y-auto page-content w-full">
 
@@ -324,5 +325,6 @@ document.addEventListener('DOMContentLoaded', function() {
     <?php endif; ?>
 });
 </script>
+<?php include "../includes/employee_bottom_nav.php"; ?>
 </body>
 </html>

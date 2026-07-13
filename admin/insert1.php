@@ -159,14 +159,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <?php include "../includes/header.php"; ?>
 </head>
 
-<body x-data="{ sidebarOpen: false }" class="bg-slate-50 dark:bg-[#0B1120] text-slate-900 dark:text-white font-sans antialiased min-h-screen flex">
+<body x-data="{}" class="bg-slate-50 dark:bg-[#0B1120] text-slate-900 dark:text-white font-sans antialiased min-h-screen flex">
     <?php include "../includes/sidebar.php"; ?>
     <div class="flex-1 flex flex-col min-w-0 main-wrapper">
         <?php $page_title = "Add Employee";
         $page_subtitle = "Create a new employee record with personal, company, and financial details.";
         $page_actions = '<span class="inline-flex items-center gap-2 rounded-full bg-card-custom px-3 py-1 border border-body text-sm text-body-secondary"><i class="fa-solid fa-calendar-days text-blue-400"></i> ' . date('d M Y') . '</span>';
         include "../includes/topbar.php"; ?>
-        <main class="flex-1 p-8 overflow-y-auto">
+        <main class="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">
             <?php if ($message): ?>
                 <div class="mb-6 rounded-2xl px-6 py-4 shadow-sm border <?php echo $message_type === 'success' ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400' : 'bg-red-500/20 border-red-500/30 text-red-400'; ?>">
                     <div class="flex items-center gap-3">
@@ -227,8 +227,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-zinc-400 mb-1.5">National Registration Card</label>
-                            <div class="grid grid-cols-12 gap-2" id="nrc-container">
-                                <div class="col-span-3">
+                            <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-12 gap-2" id="nrc-container">
+                                <div class="col-span-2 sm:col-span-1 lg:col-span-3">
                                     <select name="nrc_state" id="nrc_state" class="w-full rounded-xl border border-white/10 bg-white/[0.06] px-2 py-3 text-sm text-white outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30">
                                         <option value="">State</option>
                                         <?php foreach (get_nrc_state_codes() as $val => $label): ?>
@@ -236,20 +236,20 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                         <?php endforeach; ?>
                                     </select>
                                 </div>
-                                <span class="col-span-1 flex items-center justify-center text-zinc-500 text-lg font-bold">/</span>
-                                <div class="col-span-4">
+                                <span class="hidden sm:hidden lg:flex col-span-1 items-center justify-center text-zinc-500 text-lg font-bold">/</span>
+                                <div class="col-span-2 sm:col-span-1 lg:col-span-4">
                                     <select name="nrc_township" id="nrc_township" class="w-full rounded-xl border border-white/10 bg-white/[0.06] px-2 py-3 text-sm text-white outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30">
                                         <option value="">Township</option>
                                     </select>
                                 </div>
-                                <div class="col-span-2">
+                                <div class="col-span-1 sm:col-span-1 lg:col-span-2">
                                     <select name="nrc_citizenship" id="nrc_citizenship" class="w-full rounded-xl border border-white/10 bg-white/[0.06] px-2 py-3 text-sm text-white outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30">
                                         <?php foreach (get_nrc_citizenship_types() as $val => $label): ?>
                                             <option value="<?php echo $val; ?>" <?php echo (isset($_POST['nrc_citizenship']) && $_POST['nrc_citizenship'] === $val) ? 'selected' : ''; ?>><?php echo $val; ?></option>
                                         <?php endforeach; ?>
                                     </select>
                                 </div>
-                                <div class="col-span-2">
+                                <div class="col-span-1 sm:col-span-1 lg:col-span-2">
                                     <input type="text" name="nrc_number" id="nrc_number" value="<?php echo isset($_POST['nrc_number']) ? htmlspecialchars($_POST['nrc_number']) : ''; ?>" maxlength="6" placeholder="123456" class="w-full rounded-xl border border-white/10 bg-white/[0.06] px-2 py-3 text-sm text-white placeholder-zinc-500 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30">
                                 </div>
                             </div>

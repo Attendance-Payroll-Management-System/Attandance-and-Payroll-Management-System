@@ -63,7 +63,7 @@ $attendance_rate = $monthly_att['total_records'] > 0 ? round(($monthly_att['pres
     <link rel="icon" type="image/svg+xml" href="../favicon.svg">
     <?php include "../includes/header.php"; ?>
 </head>
-<body x-data="{ sidebarOpen: false }" class="bg-slate-50 dark:bg-[#0B1120] text-slate-900 dark:text-white font-sans antialiased min-h-screen">
+<body x-data="{}" class="bg-slate-50 dark:bg-[#0B1120] text-slate-900 dark:text-white font-sans antialiased min-h-screen">
     <?php include "../includes/sidebar.php"; ?>
     <div class="main-wrapper flex flex-col min-h-screen">
         <?php include "../includes/topbar.php"; ?>
@@ -224,7 +224,7 @@ $attendance_rate = $monthly_att['total_records'] > 0 ? round(($monthly_att['pres
                         <span><i class="fa-solid fa-chart-line text-blue-400 mr-2"></i>Payroll Trend (<?php echo date('Y'); ?>)</span>
                         <span class="badge badge-slate text-[9px]">Annual</span>
                     </h3>
-                    <div class="relative" style="height: 260px;">
+                    <div class="relative h-48 sm:h-56 lg:h-64">
                         <canvas id="payrollChart"></canvas>
                     </div>
                 </div>
@@ -232,7 +232,7 @@ $attendance_rate = $monthly_att['total_records'] > 0 ? round(($monthly_att['pres
                 <!-- Department Distribution -->
                 <div class="glass-strong rounded-2xl p-6 card-hover animate-fade-in-up stagger-2">
                     <h3 class="font-bold text-white text-base mb-4 border-b border-white/[0.06] pb-3"><i class="fa-solid fa-chart-pie text-blue-400 mr-2"></i>Employee by Department</h3>
-                    <div class="relative" style="height: 260px;">
+                    <div class="relative h-48 sm:h-56 lg:h-64">
                         <canvas id="deptChart"></canvas>
                     </div>
                 </div>

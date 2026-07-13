@@ -79,29 +79,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <?php include "../includes/header.php"; ?>
 </head>
 
-<body x-data="{ sidebarOpen: false }" class="bg-slate-50 dark:bg-[#0B1120] text-slate-900 dark:text-white font-sans antialiased flex h-screen overflow-hidden">
-
+<body class="bg-slate-50 dark:bg-[#0B1120] text-slate-900 dark:text-white font-sans antialiased emp-page-wrapper">
+    <?php $use_sidebar = true; ?>
     <?php include "../includes/sidebar.php"; ?>
-    <div class="flex-1 flex flex-col h-full overflow-y-auto lg:ml-64">
-        <header class="glass-strong px-8 py-4 flex items-center justify-between shrink-0">
-            <div class="animate-fade-in-up">
-                <h2 class="text-xl font-bold text-white">Change Password</h2>
-                <p class="text-xs text-zinc-400"><?php echo date('l, F j, Y'); ?></p>
-            </div>
-            <button onclick="toggleTheme()" class="theme-toggle-btn">
-                <i class="fa-solid fa-sun icon-sun text-base"></i>
-                <i class="fa-solid fa-moon icon-moon text-base"></i>
-            </button>
-            <div class="flex items-center gap-3 border-l border-white/10 pl-4">
-                <div class="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center text-sm font-bold shadow-inner"><?php echo strtoupper(substr($employee_name, 0, 2)); ?></div>
-                <div class="text-right">
-                    <h4 class="text-sm font-semibold text-white"><?php echo htmlspecialchars($employee_name); ?></h4>
-                    <span class="text-xs text-zinc-400">Employee</span>
-                </div>
-            </div>
-        </header>
+    <div class="main-wrapper flex flex-col min-h-screen">
+        <?php $page_title = "Change Password"; $page_subtitle = date('l, F j, Y'); include "../includes/topbar.php"; ?>
 
-        <main class="p-8 flex-1 max-w-[1400px] w-full mx-auto">
+        <main class="p-4 sm:p-6 lg:p-8 flex-1 page-content w-full">
             <?php if ($message): ?>
                 <div class="mb-6 px-4 py-3 rounded-lg border <?php echo $message_type == 'success' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-red-500/10 border-red-500/20 text-red-400'; ?>">
                     <?php echo htmlspecialchars($message); ?>
@@ -154,6 +138,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             </div>
         </main>
     </div>
+    <?php include "../includes/employee_bottom_nav.php"; ?>
 </body>
 
 </html>

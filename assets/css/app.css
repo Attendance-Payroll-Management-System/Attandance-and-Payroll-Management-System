@@ -120,11 +120,42 @@ body {
   background: var(--bg-primary);
   color: var(--text-primary);
   transition: background-color 0.4s cubic-bezier(0.4, 0, 0.2, 1), color 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow-x: hidden;
 }
+
+/* Prevent any element from causing horizontal scroll */
+html { overflow-x: hidden; }
 
 .dark body,
 body.dark {
   background-color: #0B1120 !important;
+}
+
+/* Responsive content padding — mobile-first */
+@media (max-width: 639px) {
+  .page-content { padding: 1rem !important; }
+  .main-wrapper main { padding: 1rem !important; }
+}
+@media (min-width: 640px) and (max-width: 1023px) {
+  .page-content { padding: 1.25rem !important; }
+  .main-wrapper main { padding: 1.25rem !important; }
+}
+
+/* Responsive chart height */
+@media (max-width: 639px) {
+  .chart-container { height: 200px !important; }
+}
+
+/* Responsive tables — card-like layout on very small screens */
+@media (max-width: 479px) {
+  table { font-size: 0.7rem; }
+  table th, table td { padding: 0.4rem 0.5rem; }
+}
+
+/* Touch-friendly tap targets on mobile */
+@media (max-width: 767px) {
+  .nav-item { min-height: 44px; }
+  button, a.nav-item { min-height: 44px; }
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -346,13 +377,156 @@ body.dark {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   LAYOUT
+   LAYOUT — Sidebar responsive
+   Tablet (768-1023px): collapsible sidebar
+   Desktop (>=1024px): full expanded sidebar, always
    ═══════════════════════════════════════════════════════════════ */
-@media (min-width: 1024px) {
-  .main-wrapper { margin-left: 16rem; }
+@media (min-width: 768px) and (max-width: 1023px) {
+  .main-wrapper { margin-left: 16rem; transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
   .main-wrapper .page-content { max-width: 1400px; margin: 0 auto; }
+  body.sidebar-collapsed .main-wrapper { margin-left: 5rem; }
 }
+@media (min-width: 1024px) {
+  .main-wrapper { margin-left: 16rem; transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+  .main-wrapper .page-content { max-width: 1400px; margin: 0 auto; }
+  body.sidebar-collapsed .main-wrapper { margin-left: 5rem; }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   ADMIN FIXED TOPBAR — Independent of sidebar
+   ═══════════════════════════════════════════════════════════════ */
+.admin-topbar {
+  position: fixed !important;
+  top: 0;
+  right: 0;
+  z-index: 30 !important;
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .admin-topbar {
+    left: 16rem;
+    transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  body.sidebar-collapsed .admin-topbar {
+    left: 5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .admin-topbar {
+    left: 16rem;
+    transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  body.sidebar-collapsed .admin-topbar {
+    left: 5rem;
+  }
+}
+
+@media (max-width: 767px) {
+  .admin-topbar {
+    left: 0;
+  }
+}
+
 .sidebar-nav::-webkit-scrollbar { display: none; }
+
+/* Sidebar collapse */
+aside.collapsed { width: 5rem !important; }
+aside.collapsed .nav-text { opacity: 0; width: 0; max-width: 0; overflow: hidden; pointer-events: none; }
+aside.collapsed .nav-badge { display: none; }
+aside.collapsed .nav-item { justify-content: center; padding-left: 0; padding-right: 0; }
+aside.collapsed .nav-item > div:first-child { margin: 0; }
+aside.collapsed .sidebar-logo { margin: 0 auto; }
+aside.collapsed .nav-section .nav-item { justify-content: center; }
+aside.collapsed .nav-item:hover { background: rgba(16, 185, 129, 0.08) !important; }
+.dark aside.collapsed .nav-item:hover { background: rgba(16, 185, 129, 0.12) !important; }
+aside.collapsed .mx-3 { margin-left: 0.5rem; margin-right: 0.5rem; padding: 0.5rem; }
+aside.collapsed .mx-3 .relative { display: flex; justify-content: center; }
+
+/* ═══════════════════════════════════════════════════════════════
+   EMPLOYEE SIDEBAR — Pure CSS (no Tailwind dependency)
+   ═══════════════════════════════════════════════════════════════ */
+.emp-sidebar {
+  position: fixed !important;
+  top: 0 !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  z-index: 40 !important;
+  width: 16rem !important;
+  display: none !important;
+  flex-direction: column;
+  background: rgba(255,255,255,0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-right: 1px solid rgba(30,58,138,0.06);
+  box-shadow: 4px 0 24px rgba(0,0,0,0.08);
+  overflow-y: auto;
+}
+.dark .emp-sidebar {
+  background: rgba(15,23,42,0.95);
+  border-right-color: rgba(148,163,184,0.06);
+  box-shadow: 4px 0 24px rgba(0,0,0,0.4);
+}
+@media (min-width: 768px) {
+  .emp-sidebar {
+    display: flex !important;
+  }
+}
+
+/* Sidebar collapse button */
+.sidebar-collapse-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(100% - 1.5rem);
+  margin: 0.5rem 0.75rem 0.75rem;
+  padding: 0.625rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(30,58,138,0.08);
+  background: rgba(255,255,255,0.6);
+  color: #64748B;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.sidebar-collapse-btn:hover {
+  background: rgba(79,70,229,0.06);
+  color: #4F46E5;
+  border-color: rgba(79,70,229,0.15);
+}
+.dark .sidebar-collapse-btn {
+  background: rgba(255,255,255,0.04);
+  border-color: rgba(148,163,184,0.08);
+  color: #94A3B8;
+}
+.dark .sidebar-collapse-btn:hover {
+  background: rgba(99,102,241,0.1);
+  color: #818CF8;
+  border-color: rgba(99,102,241,0.2);
+}
+.sidebar-collapse-btn i {
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+aside.collapsed .sidebar-collapse-btn {
+  width: calc(100% - 1rem);
+  margin: 0.5rem;
+  padding: 0.5rem;
+}
+aside.collapsed .sidebar-collapse-btn i {
+  transform: rotate(180deg);
+}
+
+/* Sidebar tooltip */
+.sidebar-tooltip {
+  position: fixed; z-index: 9999; padding: 6px 12px; border-radius: 8px;
+  background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(12px);
+  color: #F1F5F9; font-size: 12px; font-weight: 600; white-space: nowrap;
+  pointer-events: none; opacity: 0; transform: translateX(8px);
+  transition: opacity 0.2s, transform 0.2s;
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+.sidebar-tooltip.visible { opacity: 1; transform: translateX(0); }
 
 /* ═══════════════════════════════════════════════════════════════
    NAV ITEM
@@ -616,6 +790,12 @@ img.loaded, img[src] { opacity: 1; }
 }
 .sidebar-icon-emerald:hover { box-shadow: 0 6px 25px rgba(16,185,129,0.50); animation: iconGlow 1.5s ease-in-out infinite; }
 
+.sidebar-icon-teal {
+  background: linear-gradient(135deg, #14B8A6, #06B6D4) !important;
+  box-shadow: 0 4px 15px rgba(20,184,166,0.40);
+}
+.sidebar-icon-teal:hover { box-shadow: 0 6px 25px rgba(20,184,166,0.50); animation: iconGlow 1.5s ease-in-out infinite; }
+
 .sidebar-icon-amber {
   background: linear-gradient(135deg, #F59E0B, #F97316) !important;
   box-shadow: 0 4px 15px rgba(245,158,11,0.40);
@@ -655,10 +835,11 @@ img.loaded, img[src] { opacity: 1; }
 /* Active sidebar icon animation */
 .nav-item:hover .sidebar-icon-navy, .nav-item:hover .sidebar-icon-indigo,
 .nav-item:hover .sidebar-icon-blue, .nav-item:hover .sidebar-icon-sky,
-.nav-item:hover .sidebar-icon-emerald, .nav-item:hover .sidebar-icon-amber,
-.nav-item:hover .sidebar-icon-orange, .nav-item:hover .sidebar-icon-cyan,
-.nav-item:hover .sidebar-icon-purple, .nav-item:hover .sidebar-icon-rose,
-.nav-item:hover .sidebar-icon-slate, .nav-item:hover .sidebar-icon-violet {
+.nav-item:hover .sidebar-icon-emerald, .nav-item:hover .sidebar-icon-teal,
+.nav-item:hover .sidebar-icon-amber, .nav-item:hover .sidebar-icon-orange,
+.nav-item:hover .sidebar-icon-cyan, .nav-item:hover .sidebar-icon-purple,
+.nav-item:hover .sidebar-icon-rose, .nav-item:hover .sidebar-icon-slate,
+.nav-item:hover .sidebar-icon-violet {
   animation: iconFloat 0.6s ease-in-out;
 }
 
@@ -754,10 +935,11 @@ html { scroll-behavior: smooth; }
 
 :root:not(.dark) .sidebar-icon-navy, :root:not(.dark) .sidebar-icon-indigo,
 :root:not(.dark) .sidebar-icon-blue, :root:not(.dark) .sidebar-icon-sky,
-:root:not(.dark) .sidebar-icon-emerald, :root:not(.dark) .sidebar-icon-amber,
-:root:not(.dark) .sidebar-icon-orange, :root:not(.dark) .sidebar-icon-cyan,
-:root:not(.dark) .sidebar-icon-purple, :root:not(.dark) .sidebar-icon-rose,
-:root:not(.dark) .sidebar-icon-slate, :root:not(.dark) .sidebar-icon-violet {
+:root:not(.dark) .sidebar-icon-emerald, :root:not(.dark) .sidebar-icon-teal,
+:root:not(.dark) .sidebar-icon-amber, :root:not(.dark) .sidebar-icon-orange,
+:root:not(.dark) .sidebar-icon-cyan, :root:not(.dark) .sidebar-icon-purple,
+:root:not(.dark) .sidebar-icon-rose, :root:not(.dark) .sidebar-icon-slate,
+:root:not(.dark) .sidebar-icon-violet {
   box-shadow: 0 4px 12px rgba(0,0,0,0.18);
 }
 
@@ -786,10 +968,11 @@ html { scroll-behavior: smooth; }
 
 :root:not(.dark) .sidebar-icon-navy, :root:not(.dark) .sidebar-icon-indigo,
 :root:not(.dark) .sidebar-icon-blue, :root:not(.dark) .sidebar-icon-sky,
-:root:not(.dark) .sidebar-icon-emerald, :root:not(.dark) .sidebar-icon-amber,
-:root:not(.dark) .sidebar-icon-orange, :root:not(.dark) .sidebar-icon-cyan,
-:root:not(.dark) .sidebar-icon-purple, :root:not(.dark) .sidebar-icon-rose,
-:root:not(.dark) .sidebar-icon-slate, :root:not(.dark) .sidebar-icon-violet {
+:root:not(.dark) .sidebar-icon-emerald, :root:not(.dark) .sidebar-icon-teal,
+:root:not(.dark) .sidebar-icon-amber, :root:not(.dark) .sidebar-icon-orange,
+:root:not(.dark) .sidebar-icon-cyan, :root:not(.dark) .sidebar-icon-purple,
+:root:not(.dark) .sidebar-icon-rose, :root:not(.dark) .sidebar-icon-slate,
+:root:not(.dark) .sidebar-icon-violet {
   box-shadow: 0 4px 12px rgba(0,0,0,0.18);
 }
 
@@ -797,3 +980,580 @@ html { scroll-behavior: smooth; }
 :root:not(.dark) aside ~ .fixed.bg-black\/70 { background: rgba(0,0,0,0.4) !important; }
 :root:not(.dark) .sidebar-scrollbar::-webkit-scrollbar-thumb { background: rgba(30,58,138,0.20); }
 :root:not(.dark) .sidebar-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(30,58,138,0.35); }
+
+/* ═══════════════════════════════════════════════════════════════
+   EMPLOYEE BOTTOM NAVIGATION — Mobile Only (pure CSS, no Tailwind)
+   ═══════════════════════════════════════════════════════════════ */
+.emp-bottom-nav {
+  position: fixed !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  z-index: 40 !important;
+  background: rgba(255,255,255,0.95);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-top: 1px solid rgba(30,58,138,0.06);
+  padding-bottom: env(safe-area-inset-bottom, 0);
+  box-shadow: 0 -4px 24px rgba(0,0,0,0.06);
+}
+.dark .emp-bottom-nav {
+  background: rgba(15,23,42,0.95);
+  border-top-color: rgba(148,163,184,0.06);
+  box-shadow: 0 -4px 24px rgba(0,0,0,0.3);
+}
+
+/* Hide bottom nav on desktop (lg+) */
+@media (min-width: 1024px) {
+  .emp-bottom-nav {
+    display: none !important;
+  }
+}
+
+.emp-bottom-nav-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  gap: 0;
+  padding: 4px 8px 6px;
+  max-width: 500px;
+  margin: 0 auto;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   EMPLOYEE PAGE STRUCTURE — Pure CSS fallbacks
+   ═══════════════════════════════════════════════════════════════ */
+.emp-page-wrapper {
+  padding-bottom: 80px;
+  font-family: 'Inter', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+@media (min-width: 1024px) {
+  .emp-page-wrapper {
+    padding-bottom: 0;
+  }
+}
+
+/* Page flex wrapper */
+.emp-page-wrapper > div {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Main content area */
+.emp-page-wrapper main {
+  flex: 1;
+  width: 100%;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   EMPLOYEE TOPBAR — Pure CSS (no Tailwind dependency)
+   ═══════════════════════════════════════════════════════════════ */
+.emp-header {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  z-index: 30 !important;
+  background: rgba(255,255,255,0.88);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-bottom: 1px solid rgba(30,58,138,0.08);
+}
+.dark .emp-header {
+  background: rgba(15,23,42,0.88);
+  border-bottom-color: rgba(148,163,184,0.06);
+}
+.emp-header .h-16 {
+  height: 4rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-right: 1rem;
+}
+@media (min-width: 768px) {
+  .emp-header .h-16 {
+    padding-left: 1rem;
+  }
+}
+@media (min-width: 1024px) {
+  .emp-header .h-16 {
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+}
+
+/* Header inner layout */
+.emp-header .min-w-0 {
+  min-width: 0;
+  flex: 1;
+}
+.emp-header h1 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  color: #1E293B;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dark .emp-header h1 {
+  color: #FFFFFF;
+}
+.emp-header p.text-xs {
+  font-size: 0.75rem;
+  color: #64748B;
+  margin-top: 0.125rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dark .emp-header p.text-xs {
+  color: #94A3B8;
+}
+
+/* Header action buttons area */
+.emp-header .flex.items-center.space-x-2 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+@media (min-width: 1024px) {
+  .emp-header .flex.items-center.space-x-2 {
+    gap: 0.75rem;
+  }
+}
+
+/* Header action buttons */
+.emp-header button,
+.emp-header a {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   EMPLOYEE TOPBAR SPACER — Pure CSS (no Tailwind dependency)
+   ═══════════════════════════════════════════════════════════════ */
+.emp-header-spacer {
+  width: 100%;
+  flex-shrink: 0;
+  height: 4rem;
+}
+@media (min-width: 1024px) {
+  .emp-header-spacer {
+    height: 104px;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   EMPLOYEE DESKTOP NAVBAR — Desktop Only (lg+)
+   ═══════════════════════════════════════════════════════════════ */
+.emp-desktop-nav {
+  display: none !important;
+}
+@media (min-width: 1024px) {
+  .emp-desktop-nav {
+    display: block !important;
+  }
+}
+
+/* Desktop nav container layout */
+.emp-desktop-nav > div {
+  max-width: 80rem;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 2rem;
+  padding-right: 2rem;
+}
+.emp-desktop-nav > div > div {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.emp-desktop-nav {
+  background: rgba(255,255,255,0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.dark .emp-desktop-nav {
+  background: rgba(15,23,42,0.6);
+}
+
+.emp-desktop-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748B;
+  text-decoration: none;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  white-space: nowrap;
+  position: relative;
+}
+.dark .emp-desktop-nav-item {
+  color: #94A3B8;
+}
+
+.emp-desktop-nav-item:hover {
+  color: #4F46E5;
+  background: rgba(79,70,229,0.06);
+}
+.dark .emp-desktop-nav-item:hover {
+  color: #818CF8;
+  background: rgba(99,102,241,0.1);
+}
+
+.emp-desktop-nav-item.active {
+  color: #4F46E5;
+  background: rgba(79,70,229,0.08);
+}
+.dark .emp-desktop-nav-item.active {
+  color: #818CF8;
+  background: rgba(99,102,241,0.12);
+}
+
+.emp-desktop-nav-item.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 16px;
+  right: 16px;
+  height: 2px;
+  background: linear-gradient(90deg, #4F46E5, #6366F1);
+  border-radius: 2px;
+}
+.dark .emp-desktop-nav-item.active::after {
+  background: linear-gradient(90deg, #818CF8, #A78BFA);
+}
+
+.emp-bottom-nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 6px 10px;
+  border-radius: 16px;
+  text-decoration: none;
+  position: relative;
+  -webkit-tap-highlight-color: transparent;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  min-width: 56px;
+  flex-shrink: 0;
+  scroll-snap-align: center;
+}
+
+.emp-bottom-nav-item:active {
+  transform: scale(0.92);
+}
+
+.emp-bottom-nav-icon-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 28px;
+  border-radius: 14px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.emp-bottom-nav-item:hover .emp-bottom-nav-icon-wrap {
+  background: rgba(79,70,229,0.08);
+}
+.dark .emp-bottom-nav-item:hover .emp-bottom-nav-icon-wrap {
+  background: rgba(99,102,241,0.15);
+}
+
+.emp-bottom-nav-active-bg {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, #4F46E5, #6366F1);
+  border-radius: 14px;
+  box-shadow: 0 4px 16px rgba(79,70,229,0.35);
+  animation: navItemActivate 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes navItemActivate {
+  0% { transform: scale(0.6); opacity: 0; }
+  60% { transform: scale(1.08); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.emp-bottom-nav-icon {
+  position: relative;
+  z-index: 1;
+  font-size: 16px;
+  line-height: 1;
+  transition: all 0.25s ease;
+  color: #64748B;
+}
+.dark .emp-bottom-nav-icon {
+  color: #94A3B8;
+}
+
+.emp-bottom-nav-item.active .emp-bottom-nav-icon {
+  color: #FFFFFF;
+  transform: translateY(-1px);
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.2));
+}
+
+.emp-bottom-nav-label {
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: #94A3B8;
+  transition: all 0.25s ease;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+.dark .emp-bottom-nav-label {
+  color: #64748B;
+}
+
+.emp-bottom-nav-item.active .emp-bottom-nav-label {
+  color: #4F46E5;
+  font-weight: 700;
+}
+.dark .emp-bottom-nav-item.active .emp-bottom-nav-label {
+  color: #818CF8;
+}
+
+/* Bottom padding for employee pages — only on mobile where bottom nav is visible */
+.emp-page-wrapper {
+  padding-bottom: 80px;
+}
+@media (min-width: 1024px) {
+  .emp-page-wrapper {
+    padding-bottom: 0;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   ADMIN MOBILE MENU SCROLLBAR
+   ═══════════════════════════════════════════════════════════════ */
+.admin-mobile-scrollbar::-webkit-scrollbar { width: 3px; }
+.admin-mobile-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.admin-mobile-scrollbar::-webkit-scrollbar-thumb { background: rgba(100,116,139,0.2); border-radius: 10px; }
+.admin-mobile-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(100,116,139,0.35); }
+
+/* Hide admin hamburger on tablet and desktop (sidebar handles navigation) */
+@media (min-width: 768px) {
+  #adminMobileMenuBtn { display: none !important; }
+}
+
+/* Admin pages: no sidebar margin on mobile (slide menu handles nav) */
+@media (max-width: 767px) {
+  .admin-main-content .main-wrapper,
+  .main-wrapper {
+    margin-left: 0 !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   EMPLOYEE DASHBOARD — PAGE TRANSITION ANIMATIONS
+   Smooth content transitions when navigating between pages
+   ═══════════════════════════════════════════════════════════════ */
+@keyframes empPageEnter {
+  from { opacity: 0; transform: translateY(16px) scale(0.99); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.emp-page-transition {
+  animation: empPageEnter 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Stagger children for cascade effect */
+.emp-page-transition > section:nth-child(1) { animation-delay: 0s; }
+.emp-page-transition > section:nth-child(2) { animation-delay: 0.06s; }
+.emp-page-transition > section:nth-child(3) { animation-delay: 0.12s; }
+.emp-page-transition > section:nth-child(4) { animation-delay: 0.18s; }
+.emp-page-transition > section:nth-child(5) { animation-delay: 0.24s; }
+
+/* Section fade-in for staggered reveal */
+.emp-section-reveal {
+  opacity: 0;
+  animation: empSectionFadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+@keyframes empSectionFadeIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.emp-section-reveal:nth-child(1) { animation-delay: 0.05s; }
+.emp-section-reveal:nth-child(2) { animation-delay: 0.12s; }
+.emp-section-reveal:nth-child(3) { animation-delay: 0.19s; }
+.emp-section-reveal:nth-child(4) { animation-delay: 0.26s; }
+
+/* ═══════════════════════════════════════════════════════════════
+   EMPLOYEE BOTTOM NAV — ENHANCED MOBILE ANIMATIONS
+   ═══════════════════════════════════════════════════════════════ */
+.emp-bottom-nav {
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.3s ease;
+}
+
+/* Slide up entrance on page load */
+@keyframes bottomNavSlideUp {
+  from { transform: translateY(100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+.emp-bottom-nav {
+  opacity: 0;
+  animation: bottomNavSlideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) 0.15s forwards;
+}
+
+/* Active item ripple effect on tap */
+.emp-bottom-nav-item.active::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 18px;
+  background: rgba(79, 70, 229, 0.08);
+  z-index: -1;
+  animation: navRipple 0.4s ease-out;
+}
+@keyframes navRipple {
+  from { transform: scale(0.5); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+/* Smooth label transition */
+.emp-bottom-nav-label {
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.emp-bottom-nav-item.active .emp-bottom-nav-label {
+  animation: labelPop 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes labelPop {
+  0% { transform: scale(0.8); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   EMPLOYEE DESKTOP NAV — HOVER ENHANCEMENTS
+   ═══════════════════════════════════════════════════════════════ */
+.emp-desktop-nav-item {
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Subtle hover glow */
+.emp-desktop-nav-item::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  opacity: 0;
+  background: radial-gradient(circle at center, rgba(79, 70, 229, 0.06), transparent 70%);
+  transition: opacity 0.3s;
+}
+.emp-desktop-nav-item:hover::before {
+  opacity: 1;
+}
+
+/* Notification badge on nav items */
+.emp-desktop-nav-item span:last-child:only-child {
+  /* No special treatment needed */
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   EMPLOYEE CONTENT — BOTTOM PADDING (Mobile)
+   Prevents content overlap with fixed bottom nav
+   ═══════════════════════════════════════════════════════════════ */
+@media (max-width: 1023px) {
+  .emp-page-wrapper .page-content,
+  .emp-page-wrapper main {
+    padding-bottom: 100px !important;
+    min-height: calc(100vh - 64px);
+  }
+  /* Flex-layout pages (attendance, leave, overtime) with scrollable container */
+  .emp-page-wrapper .overflow-y-auto {
+    padding-bottom: 100px !important;
+  }
+}
+
+/* Tablet-specific spacing */
+@media (min-width: 640px) and (max-width: 1023px) {
+  .emp-page-wrapper .page-content,
+  .emp-page-wrapper main {
+    padding-bottom: 100px !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   EMPLOYEE DASHBOARD — RESPONSIVE GRID IMPROVEMENTS
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Small phone: stack everything, compact spacing */
+@media (max-width: 479px) {
+  .emp-page-wrapper .grid {
+    gap: 0.5rem;
+  }
+}
+
+/* Phone: 2-column grid for stat cards */
+@media (min-width: 480px) and (max-width: 639px) {
+  .emp-page-wrapper .grid-cols-2 {
+    gap: 0.625rem;
+  }
+}
+
+/* Tablet landscape: comfortable 3-column */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .emp-page-wrapper .grid-cols-3 {
+    gap: 0.875rem;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   EMPLOYEE DASHBOARD — HERO RESPONSIVE TWEAKS
+   ═══════════════════════════════════════════════════════════════ */
+@media (max-width: 639px) {
+  .hero-float {
+    animation-duration: 5s;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   EMPLOYEE DASHBOARD — SAFE AREA SUPPORT (iPhone notch)
+   ═══════════════════════════════════════════════════════════════ */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .emp-bottom-nav {
+    padding-bottom: calc(4px + env(safe-area-inset-bottom));
+  }
+  .emp-page-wrapper {
+    padding-bottom: calc(80px + env(safe-area-inset-bottom));
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   EMPLOYEE DASHBOARD — SMOOTH SCROLL BEHAVIOR
+   ═══════════════════════════════════════════════════════════════ */
+@media (max-width: 1023px) {
+  .emp-page-wrapper {
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   EMPLOYEE DASHBOARD — TOUCH-FRIENDLY TARGETS
+   ═══════════════════════════════════════════════════════════════ */
+@media (max-width: 767px) {
+  .emp-bottom-nav-item {
+    min-height: 48px;
+    min-width: 52px;
+  }
+  /* Ensure action cards are tap-friendly */
+  .action-card {
+    min-height: 80px;
+  }
+}

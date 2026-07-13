@@ -442,9 +442,17 @@ function is_working_day(mysqli $conn, string $date): bool {
 
 // ─── Late Check-in Detection ───────────────────────────────────
 
+function get_check_in_start_time(): string {
+    return '08:30:00'; // Earliest allowed check-in time
+}
+
 function is_late_checkin(string $check_in_time): bool {
     $threshold = '09:00:00';
     return strtotime($check_in_time) > strtotime($threshold);
+}
+
+function is_before_check_in_start(string $time): bool {
+    return strtotime($time) < strtotime(get_check_in_start_time());
 }
 
 function get_late_threshold(): string {

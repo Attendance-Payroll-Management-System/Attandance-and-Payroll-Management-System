@@ -62,7 +62,7 @@ if (!$emp) {
     <?php include "../includes/header.php"; ?>
 </head>
 
-<body x-data="{ sidebarOpen: false }" class="bg-slate-50 dark:bg-[#0B1120] text-slate-900 dark:text-white font-sans antialiased min-h-screen flex">
+<body x-data="{}" class="bg-slate-50 dark:bg-[#0B1120] text-slate-900 dark:text-white font-sans antialiased min-h-screen flex">
     <?php include "../includes/sidebar.php"; ?>
     <div class="flex-1 flex flex-col min-w-0 main-wrapper">
         <?php $page_title = "Employee Profile"; $page_subtitle = "Detailed information about " . htmlspecialchars($emp['name']); $page_actions = '<a href="edit_employee.php?id=' . $emp['id'] . '" class="rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold text-sm px-5 py-2.5 shadow-sm transition flex items-center gap-2"><i class="fa-solid fa-pen"></i> Edit Profile</a><a href="employee.php" class="rounded-xl border border-white/10 glass-strong hover:bg-white/[0.06] text-zinc-300 font-semibold text-sm px-5 py-2.5 shadow-sm transition flex items-center gap-2"><i class="fa-solid fa-arrow-left"></i> Back to List</a>'; include "../includes/topbar.php"; ?>

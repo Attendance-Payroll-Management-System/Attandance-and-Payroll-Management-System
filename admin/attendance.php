@@ -260,7 +260,7 @@ foreach ($weeks as $week) {
                     <h2 class="font-bold text-white text-base"><i class="fa-solid fa-calendar-days text-blue-400 mr-2"></i>Weekly Attendance Matrix</h2>
                     <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold bg-indigo-500/20 text-indigo-400"><?php echo $month_name . ' ' . $selected_year; ?></span>
                 </div>
-                <div class="overflow-x-auto" style="max-height: 600px; overflow-y: auto;">
+                <div class="overflow-x-auto max-h-[50vh] sm:max-h-[60vh] lg:max-h-[600px]">
                     <table class="w-full text-left text-xs border-collapse">
                         <thead class="bg-white/[0.04] sticky top-0 z-10">
                             <tr class="border-b border-white/[0.06]">
