@@ -15,6 +15,27 @@ $current_page = basename($_SERVER['SCRIPT_NAME'] ?? 'index.php');
 $admin_name  = $admin_name  ?? ($_SESSION['admin_name'] ?? 'Admin');
 $admin_title = $admin_title ?? 'HR Administrator';
 $emp_name    = $emp_name    ?? ($_SESSION['employee_name'] ?? 'Employee');
+$emp_position_name = $emp_position_name ?? 'Employee';
+$emp_photo_path = $emp_photo_path ?? '';
+$emp_department_name = $emp_department_name ?? '';
+
+// Fetch employee details for sidebar profile card
+if ($sidebar_role === 'employee' && isset($conn) && $conn && empty($emp_photo_path)) {
+    $emp_id = $_SESSION['employee_id'] ?? null;
+    if ($emp_id) {
+        $emp_q = $conn->prepare("SELECT e.name, e.profile_photo, e.employee_code, p.position_name, d.department_name FROM employee e LEFT JOIN positions p ON e.position_id = p.id LEFT JOIN departments d ON e.department_id = d.id WHERE e.id = ?");
+        $emp_q->bind_param("i", $emp_id);
+        $emp_q->execute();
+        $emp_row = $emp_q->get_result()->fetch_assoc();
+        $emp_q->close();
+        if ($emp_row) {
+            $emp_name = $emp_row['name'] ?? $emp_name;
+            $emp_photo_path = $emp_row['profile_photo'] ?? '';
+            $emp_position_name = $emp_row['position_name'] ?? 'Employee';
+            $emp_department_name = $emp_row['department_name'] ?? '';
+        }
+    }
+}
 
 $pending_leaves = 0;
 $pending_ot = 0;
@@ -39,81 +60,86 @@ function nav_active($pages, $current)
     return in_array($current, (array)$pages);
 }
 
-function nav_item($href, $label, $icon, $current, $pages = null, $badge = null, $color = 'emerald')
+function nav_item($href, $label, $icon, $current, $pages = null, $badge = null, $color = 'indigo')
 {
     $active = $pages ? nav_active($pages, $current) : ($href === $current);
 
     $colors = [
-        'emerald' => ['css' => 'sidebar-icon-emerald', 'active_bg' => 'from-emerald-500/15 to-teal-500/10', 'hover_bg' => 'hover:bg-emerald-50/80', 'dark_hover_bg' => 'dark:hover:bg-emerald-500/10'],
-        'teal'    => ['css' => 'sidebar-icon-teal', 'active_bg' => 'from-teal-500/15 to-cyan-500/10', 'hover_bg' => 'hover:bg-teal-50/80', 'dark_hover_bg' => 'dark:hover:bg-teal-500/10'],
-        'sky'     => ['css' => 'sidebar-icon-sky', 'active_bg' => 'from-sky-500/15 to-cyan-500/10', 'hover_bg' => 'hover:bg-sky-50/80', 'dark_hover_bg' => 'dark:hover:bg-sky-500/10'],
-        'indigo'  => ['css' => 'sidebar-icon-indigo', 'active_bg' => 'from-indigo-500/15 to-purple-500/10', 'hover_bg' => 'hover:bg-indigo-50/80', 'dark_hover_bg' => 'dark:hover:bg-indigo-500/10'],
-        'amber'   => ['css' => 'sidebar-icon-amber', 'active_bg' => 'from-amber-500/15 to-orange-500/10', 'hover_bg' => 'hover:bg-amber-50/80', 'dark_hover_bg' => 'dark:hover:bg-amber-500/10'],
-        'rose'    => ['css' => 'sidebar-icon-rose', 'active_bg' => 'from-rose-500/15 to-pink-500/10', 'hover_bg' => 'hover:bg-rose-50/80', 'dark_hover_bg' => 'dark:hover:bg-rose-500/10'],
-        'cyan'    => ['css' => 'sidebar-icon-cyan', 'active_bg' => 'from-cyan-500/15 to-blue-500/10', 'hover_bg' => 'hover:bg-cyan-50/80', 'dark_hover_bg' => 'dark:hover:bg-cyan-500/10'],
-        'purple'  => ['css' => 'sidebar-icon-purple', 'active_bg' => 'from-purple-500/15 to-indigo-500/10', 'hover_bg' => 'hover:bg-purple-50/80', 'dark_hover_bg' => 'dark:hover:bg-purple-500/10'],
-        'orange'  => ['css' => 'sidebar-icon-orange', 'active_bg' => 'from-orange-500/15 to-red-500/10', 'hover_bg' => 'hover:bg-orange-50/80', 'dark_hover_bg' => 'dark:hover:bg-orange-500/10'],
-        'slate'   => ['css' => 'sidebar-icon-slate', 'active_bg' => 'from-slate-500/15 to-gray-500/10', 'hover_bg' => 'hover:bg-slate-50/80', 'dark_hover_bg' => 'dark:hover:bg-slate-500/10'],
+        'indigo'  => ['icon_bg' => 'bg-indigo-500', 'icon_hover' => 'group-hover:bg-indigo-600', 'active_bg' => 'bg-indigo-50 dark:bg-indigo-500/10', 'active_text' => 'text-indigo-700 dark:text-indigo-300', 'active_border' => 'border-indigo-500', 'hover_bg' => 'hover:bg-slate-50 dark:hover:bg-white/[0.03]'],
+        'emerald' => ['icon_bg' => 'bg-emerald-500', 'icon_hover' => 'group-hover:bg-emerald-600', 'active_bg' => 'bg-emerald-50 dark:bg-emerald-500/10', 'active_text' => 'text-emerald-700 dark:text-emerald-300', 'active_border' => 'border-emerald-500', 'hover_bg' => 'hover:bg-slate-50 dark:hover:bg-white/[0.03]'],
+        'teal'    => ['icon_bg' => 'bg-teal-500', 'icon_hover' => 'group-hover:bg-teal-600', 'active_bg' => 'bg-teal-50 dark:bg-teal-500/10', 'active_text' => 'text-teal-700 dark:text-teal-300', 'active_border' => 'border-teal-500', 'hover_bg' => 'hover:bg-slate-50 dark:hover:bg-white/[0.03]'],
+        'sky'     => ['icon_bg' => 'bg-sky-500', 'icon_hover' => 'group-hover:bg-sky-600', 'active_bg' => 'bg-sky-50 dark:bg-sky-500/10', 'active_text' => 'text-sky-700 dark:text-sky-300', 'active_border' => 'border-sky-500', 'hover_bg' => 'hover:bg-slate-50 dark:hover:bg-white/[0.03]'],
+        'amber'   => ['icon_bg' => 'bg-amber-500', 'icon_hover' => 'group-hover:bg-amber-600', 'active_bg' => 'bg-amber-50 dark:bg-amber-500/10', 'active_text' => 'text-amber-700 dark:text-amber-300', 'active_border' => 'border-amber-500', 'hover_bg' => 'hover:bg-slate-50 dark:hover:bg-white/[0.03]'],
+        'rose'    => ['icon_bg' => 'bg-rose-500', 'icon_hover' => 'group-hover:bg-rose-600', 'active_bg' => 'bg-rose-50 dark:bg-rose-500/10', 'active_text' => 'text-rose-700 dark:text-rose-300', 'active_border' => 'border-rose-500', 'hover_bg' => 'hover:bg-slate-50 dark:hover:bg-white/[0.03]'],
+        'orange'  => ['icon_bg' => 'bg-orange-500', 'icon_hover' => 'group-hover:bg-orange-600', 'active_bg' => 'bg-orange-50 dark:bg-orange-500/10', 'active_text' => 'text-orange-700 dark:text-orange-300', 'active_border' => 'border-orange-500', 'hover_bg' => 'hover:bg-slate-50 dark:hover:bg-white/[0.03]'],
+        'cyan'    => ['icon_bg' => 'bg-cyan-500', 'icon_hover' => 'group-hover:bg-cyan-600', 'active_bg' => 'bg-cyan-50 dark:bg-cyan-500/10', 'active_text' => 'text-cyan-700 dark:text-cyan-300', 'active_border' => 'border-cyan-500', 'hover_bg' => 'hover:bg-slate-50 dark:hover:bg-white/[0.03]'],
+        'purple'  => ['icon_bg' => 'bg-purple-500', 'icon_hover' => 'group-hover:bg-purple-600', 'active_bg' => 'bg-purple-50 dark:bg-purple-500/10', 'active_text' => 'text-purple-700 dark:text-purple-300', 'active_border' => 'border-purple-500', 'hover_bg' => 'hover:bg-slate-50 dark:hover:bg-white/[0.03]'],
+        'slate'   => ['icon_bg' => 'bg-slate-500', 'icon_hover' => 'group-hover:bg-slate-600', 'active_bg' => 'bg-slate-50 dark:bg-slate-500/10', 'active_text' => 'text-slate-700 dark:text-slate-300', 'active_border' => 'border-slate-500', 'hover_bg' => 'hover:bg-slate-50 dark:hover:bg-white/[0.03]'],
     ];
 
-    $c = $colors[$color] ?? $colors['emerald'];
+    $c = $colors[$color] ?? $colors['indigo'];
 
-    $classes = $active
-        ? 'flex items-center gap-3 px-3 py-2.5 rounded-xl bg-gradient-to-r ' . $c['active_bg'] . ' text-slate-900 dark:text-white border border-emerald-200/50 dark:border-white/[0.08] shadow-sm'
-        : 'flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white ' . $c['hover_bg'] . ' ' . $c['dark_hover_bg'] . ' transition-all duration-200';
+    $base = 'group nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 relative';
 
-    $html = '<a href="' . $href . '" class="group nav-item ' . $classes . '">';
-    $html .= '<div class="w-8 h-8 rounded-xl flex items-center justify-center ' . $c['css'] . ' text-white transition-all duration-300 group-hover:scale-110 shrink-0">';
+    if ($active) {
+        $classes = $base . ' ' . $c['active_bg'] . ' ' . $c['active_text'] . ' font-semibold border-l-[3px] ' . $c['active_border'] . ' ml-0';
+    } else {
+        $classes = $base . ' text-slate-600 dark:text-slate-400 ' . $c['hover_bg'] . ' hover:text-slate-900 dark:hover:text-white';
+    }
+
+    $html = '<a href="' . $href . '" class="' . $classes . '" title="' . htmlspecialchars($label) . '">';
+    $html .= '<div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-all duration-200 ' . ($active ? $c['icon_bg'] . ' text-white shadow-sm' : 'bg-slate-100 dark:bg-white/[0.06] text-slate-500 dark:text-slate-400 ' . $c['icon_hover'] . ' group-hover:text-white') . '">';
     $html .= '<i class="fas fa-' . $icon . ' text-sm"></i></div>';
-    $html .= '<span class="nav-text text-sm font-medium whitespace-nowrap overflow-hidden">' . $label . '</span>';
+    $html .= '<span class="nav-text text-sm whitespace-nowrap overflow-hidden">' . $label . '</span>';
     if ($badge !== null && $badge > 0) {
-        $html .= '<span class="nav-badge ml-auto bg-gradient-to-r from-rose-500 to-pink-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full min-w-[20px] text-center shadow-lg shadow-rose-500/30 animate-pulse-soft">' . $badge . '</span>';
+        $html .= '<span class="nav-badge ml-auto bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center shrink-0">' . $badge . '</span>';
     }
     $html .= '</a>';
     return $html;
 }
 
-function nav_section($label, $icon, $children, $current_page, $badge = null, $color = 'emerald')
+function nav_section($label, $icon, $children, $current_page, $badge = null, $color = 'indigo')
 {
     $child_pages = array_column($children, 'page');
     $open = nav_active($child_pages, $current_page);
 
     $colors = [
-        'emerald' => ['css' => 'sidebar-icon-emerald', 'active_text' => 'text-emerald-600 dark:text-emerald-300', 'active_bg' => 'bg-emerald-500/10', 'border' => 'border-emerald-400', 'dot' => 'bg-emerald-400', 'hover_bg' => 'hover:bg-emerald-50/80', 'dark_hover_bg' => 'dark:hover:bg-emerald-500/10'],
-        'teal'    => ['css' => 'sidebar-icon-teal', 'active_text' => 'text-teal-600 dark:text-teal-300', 'active_bg' => 'bg-teal-500/10', 'border' => 'border-teal-400', 'dot' => 'bg-teal-400', 'hover_bg' => 'hover:bg-teal-50/80', 'dark_hover_bg' => 'dark:hover:bg-teal-500/10'],
-        'sky'     => ['css' => 'sidebar-icon-sky', 'active_text' => 'text-sky-600 dark:text-sky-300', 'active_bg' => 'bg-sky-500/10', 'border' => 'border-sky-400', 'dot' => 'bg-sky-400', 'hover_bg' => 'hover:bg-sky-50/80', 'dark_hover_bg' => 'dark:hover:bg-sky-500/10'],
-        'indigo'  => ['css' => 'sidebar-icon-indigo', 'active_text' => 'text-indigo-600 dark:text-indigo-300', 'active_bg' => 'bg-indigo-500/10', 'border' => 'border-indigo-400', 'dot' => 'bg-indigo-400', 'hover_bg' => 'hover:bg-indigo-50/80', 'dark_hover_bg' => 'dark:hover:bg-indigo-500/10'],
-        'amber'   => ['css' => 'sidebar-icon-amber', 'active_text' => 'text-amber-600 dark:text-amber-300', 'active_bg' => 'bg-amber-500/10', 'border' => 'border-amber-400', 'dot' => 'bg-amber-400', 'hover_bg' => 'hover:bg-amber-50/80', 'dark_hover_bg' => 'dark:hover:bg-amber-500/10'],
-        'rose'    => ['css' => 'sidebar-icon-rose', 'active_text' => 'text-rose-600 dark:text-rose-300', 'active_bg' => 'bg-rose-500/10', 'border' => 'border-rose-400', 'dot' => 'bg-rose-400', 'hover_bg' => 'hover:bg-rose-50/80', 'dark_hover_bg' => 'dark:hover:bg-rose-500/10'],
-        'cyan'    => ['css' => 'sidebar-icon-cyan', 'active_text' => 'text-cyan-600 dark:text-cyan-300', 'active_bg' => 'bg-cyan-500/10', 'border' => 'border-cyan-400', 'dot' => 'bg-cyan-400', 'hover_bg' => 'hover:bg-cyan-50/80', 'dark_hover_bg' => 'dark:hover:bg-cyan-500/10'],
-        'purple'  => ['css' => 'sidebar-icon-purple', 'active_text' => 'text-purple-600 dark:text-purple-300', 'active_bg' => 'bg-purple-500/10', 'border' => 'border-purple-400', 'dot' => 'bg-purple-400', 'hover_bg' => 'hover:bg-purple-50/80', 'dark_hover_bg' => 'dark:hover:bg-purple-500/10'],
-        'orange'  => ['css' => 'sidebar-icon-orange', 'active_text' => 'text-orange-600 dark:text-orange-300', 'active_bg' => 'bg-orange-500/10', 'border' => 'border-orange-400', 'dot' => 'bg-orange-400', 'hover_bg' => 'hover:bg-orange-50/80', 'dark_hover_bg' => 'dark:hover:bg-orange-500/10'],
-        'slate'   => ['css' => 'sidebar-icon-slate', 'active_text' => 'text-slate-600 dark:text-slate-300', 'active_bg' => 'bg-slate-500/10', 'border' => 'border-slate-400', 'dot' => 'bg-slate-400', 'hover_bg' => 'hover:bg-slate-50/80', 'dark_hover_bg' => 'dark:hover:bg-slate-500/10'],
+        'indigo'  => ['icon_bg' => 'bg-indigo-500', 'icon_hover' => 'group-hover:bg-indigo-600', 'active_bg' => 'bg-indigo-50 dark:bg-indigo-500/10', 'active_text' => 'text-indigo-700 dark:text-indigo-300', 'active_border' => 'border-indigo-500', 'child_active' => 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10', 'child_dot' => 'bg-indigo-500', 'hover_bg' => 'hover:bg-slate-50 dark:hover:bg-white/[0.03]'],
+        'emerald' => ['icon_bg' => 'bg-emerald-500', 'icon_hover' => 'group-hover:bg-emerald-600', 'active_bg' => 'bg-emerald-50 dark:bg-emerald-500/10', 'active_text' => 'text-emerald-700 dark:text-emerald-300', 'active_border' => 'border-emerald-500', 'child_active' => 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10', 'child_dot' => 'bg-emerald-500', 'hover_bg' => 'hover:bg-slate-50 dark:hover:bg-white/[0.03]'],
+        'teal'    => ['icon_bg' => 'bg-teal-500', 'icon_hover' => 'group-hover:bg-teal-600', 'active_bg' => 'bg-teal-50 dark:bg-teal-500/10', 'active_text' => 'text-teal-700 dark:text-teal-300', 'active_border' => 'border-teal-500', 'child_active' => 'text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-500/10', 'child_dot' => 'bg-teal-500', 'hover_bg' => 'hover:bg-slate-50 dark:hover:bg-white/[0.03]'],
+        'sky'     => ['icon_bg' => 'bg-sky-500', 'icon_hover' => 'group-hover:bg-sky-600', 'active_bg' => 'bg-sky-50 dark:bg-sky-500/10', 'active_text' => 'text-sky-700 dark:text-sky-300', 'active_border' => 'border-sky-500', 'child_active' => 'text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-sky-500/10', 'child_dot' => 'bg-sky-500', 'hover_bg' => 'hover:bg-slate-50 dark:hover:bg-white/[0.03]'],
+        'amber'   => ['icon_bg' => 'bg-amber-500', 'icon_hover' => 'group-hover:bg-amber-600', 'active_bg' => 'bg-amber-50 dark:bg-amber-500/10', 'active_text' => 'text-amber-700 dark:text-amber-300', 'active_border' => 'border-amber-500', 'child_active' => 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10', 'child_dot' => 'bg-amber-500', 'hover_bg' => 'hover:bg-slate-50 dark:hover:bg-white/[0.03]'],
+        'rose'    => ['icon_bg' => 'bg-rose-500', 'icon_hover' => 'group-hover:bg-rose-600', 'active_bg' => 'bg-rose-50 dark:bg-rose-500/10', 'active_text' => 'text-rose-700 dark:text-rose-300', 'active_border' => 'border-rose-500', 'child_active' => 'text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-500/10', 'child_dot' => 'bg-rose-500', 'hover_bg' => 'hover:bg-slate-50 dark:hover:bg-white/[0.03]'],
+        'orange'  => ['icon_bg' => 'bg-orange-500', 'icon_hover' => 'group-hover:bg-orange-600', 'active_bg' => 'bg-orange-50 dark:bg-orange-500/10', 'active_text' => 'text-orange-700 dark:text-orange-300', 'active_border' => 'border-orange-500', 'child_active' => 'text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-500/10', 'child_dot' => 'bg-orange-500', 'hover_bg' => 'hover:bg-slate-50 dark:hover:bg-white/[0.03]'],
+        'cyan'    => ['icon_bg' => 'bg-cyan-500', 'icon_hover' => 'group-hover:bg-cyan-600', 'active_bg' => 'bg-cyan-50 dark:bg-cyan-500/10', 'active_text' => 'text-cyan-700 dark:text-cyan-300', 'active_border' => 'border-cyan-500', 'child_active' => 'text-cyan-600 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-500/10', 'child_dot' => 'bg-cyan-500', 'hover_bg' => 'hover:bg-slate-50 dark:hover:bg-white/[0.03]'],
+        'purple'  => ['icon_bg' => 'bg-purple-500', 'icon_hover' => 'group-hover:bg-purple-600', 'active_bg' => 'bg-purple-50 dark:bg-purple-500/10', 'active_text' => 'text-purple-700 dark:text-purple-300', 'active_border' => 'border-purple-500', 'child_active' => 'text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-500/10', 'child_dot' => 'bg-purple-500', 'hover_bg' => 'hover:bg-slate-50 dark:hover:bg-white/[0.03]'],
+        'slate'   => ['icon_bg' => 'bg-slate-500', 'icon_hover' => 'group-hover:bg-slate-600', 'active_bg' => 'bg-slate-50 dark:bg-slate-500/10', 'active_text' => 'text-slate-700 dark:text-slate-300', 'active_border' => 'border-slate-500', 'child_active' => 'text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-500/10', 'child_dot' => 'bg-slate-500', 'hover_bg' => 'hover:bg-slate-50 dark:hover:bg-white/[0.03]'],
     ];
 
-    $c = $colors[$color] ?? $colors['emerald'];
+    $c = $colors[$color] ?? $colors['indigo'];
+    $section_active = nav_active($child_pages, $current_page);
 
-    $html = '<div x-data="{ open: ' . ($open ? 'true' : 'false') . ' }" class="space-y-0.5">';
-    $html .= '<button @click="open = !open" class="nav-item w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white ' . $c['hover_bg'] . ' ' . $c['dark_hover_bg'] . ' transition-all duration-200 group">';
+    $html = '<div x-data="{ open: ' . ($open ? 'true' : 'false') . ' }" class="nav-section">';
+    $html .= '<button @click="open = !open" class="group w-full flex items-center justify-between px-3 py-2 rounded-lg transition-all duration-200 ' . ($section_active ? $c['active_bg'] . ' ' . $c['active_text'] . ' font-semibold border-l-[3px] ' . $c['active_border'] . ' ml-0' : 'text-slate-600 dark:text-slate-400 ' . $c['hover_bg'] . ' hover:text-slate-900 dark:hover:text-white') . '">';
     $html .= '<span class="flex items-center gap-3">';
-    $html .= '<div class="w-8 h-8 rounded-xl flex items-center justify-center ' . $c['css'] . ' text-white group-hover:scale-110 transition-all duration-300 shrink-0">';
+    $html .= '<div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-all duration-200 ' . ($section_active ? $c['icon_bg'] . ' text-white shadow-sm' : 'bg-slate-100 dark:bg-white/[0.06] text-slate-500 dark:text-slate-400 ' . $c['icon_hover'] . ' group-hover:text-white') . '">';
     $html .= '<i class="fas fa-' . $icon . ' text-sm"></i></div>';
-    $html .= '<span class="nav-text text-sm font-medium text-slate-700 dark:text-zinc-300 group-hover:text-slate-900 dark:group-hover:text-white transition-colors whitespace-nowrap overflow-hidden">' . $label . '</span></span>';
+    $html .= '<span class="nav-text text-sm whitespace-nowrap overflow-hidden">' . $label . '</span></span>';
     $html .= '<span class="nav-badge flex items-center gap-1.5">';
     if ($badge !== null && $badge > 0) {
-        $html .= '<span class="bg-gradient-to-r from-rose-500 to-pink-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-lg shadow-rose-500/30">' . $badge . '</span>';
+        $html .= '<span class="bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0">' . $badge . '</span>';
     }
-    $html .= '<i class="nav-text fas fa-chevron-down text-xs transition-transform duration-200" :class="{ \'rotate-180\': open }"></i></span>';
+    $html .= '<i class="nav-text fas fa-chevron-down text-[10px] transition-transform duration-200" :class="{ \'rotate-180\': open }"></i></span>';
     $html .= '</button>';
-    $html .= '<div x-show="open" x-transition:enter="transition-all duration-200" x-transition:enter-start="opacity-0 -translate-y-1" x-transition:enter-end="opacity-100 translate-y-0" x-transition:leave="transition-all duration-150" x-transition:leave-start="opacity-100 translate-y-0" x-transition:leave-end="opacity-0 -translate-y-1" class="nav-text ml-3 pl-3 border-l-2 border-slate-200/60 dark:border-white/[0.08]">';
-    $html .= '<div class="py-1 space-y-0.5">';
+    $html .= '<div x-show="open" x-transition:enter="transition-all duration-200 ease-out" x-transition:enter-start="opacity-0 -translate-y-1" x-transition:enter-end="opacity-100 translate-y-0" x-transition:leave="transition-all duration-150 ease-in" x-transition:leave-start="opacity-100 translate-y-0" x-transition:leave-end="opacity-0 -translate-y-1" class="nav-text">';
+    $html .= '<div class="ml-3 pl-3 border-l border-slate-200 dark:border-white/[0.06] py-1 space-y-0.5">';
     foreach ($children as $child) {
         $child_active = $child['page'] === $current_page;
         if ($child_active) {
-            $html .= '<a href="' . $child['href'] . '" class="flex items-center gap-2.5 px-3 py-2 rounded-lg ' . $c['active_text'] . ' ' . $c['active_bg'] . ' text-sm font-medium border-l-2 ' . $c['border'] . ' ml-[-1px]">';
-            $html .= '<span class="w-2 h-2 rounded-full ' . $c['dot'] . ' animate-ping-soft"></span>' . $child['label'] . '</a>';
+            $html .= '<a href="' . $child['href'] . '" class="flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium ' . $c['child_active'] . '">';
+            $html .= '<span class="w-1.5 h-1.5 rounded-full ' . $c['child_dot'] . ' shrink-0"></span>' . $child['label'] . '</a>';
         } else {
-            $html .= '<a href="' . $child['href'] . '" class="block px-3 py-2 rounded-lg text-slate-400 dark:text-zinc-500 hover:text-slate-700 dark:hover:text-zinc-200 ' . $c['hover_bg'] . ' ' . $c['dark_hover_bg'] . ' text-sm transition-all duration-150 ml-[-1px]">' . $child['label'] . '</a>';
+            $html .= '<a href="' . $child['href'] . '" class="block px-3 py-1.5 rounded-md text-sm text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/[0.03] transition-colors duration-150">' . $child['label'] . '</a>';
         }
     }
     $html .= '</div></div></div>';
@@ -122,63 +148,58 @@ function nav_section($label, $icon, $children, $current_page, $badge = null, $co
 ?>
 
 <?php
-// Include Telegram-style mobile menu for admin
+// Include mobile menu for admin
 if ($sidebar_role === 'admin') {
     include __DIR__ . '/admin_mobile_menu.php';
 }
 ?>
 
 <!-- Sidebar (desktop & tablet) -->
-<aside class="emp-sidebar fixed inset-y-0 left-0 z-40 w-64 bg-white/95 dark:bg-[#0F172A]/95 backdrop-blur-xl text-slate-900 dark:text-white flex-col border-r border-slate-200/60 dark:border-white/[0.08] shadow-[4px_0_24px_rgba(0,0,0,0.08)] dark:shadow-[4px_0_24px_rgba(0,0,0,0.4)]">
+<aside class="emp-sidebar fixed inset-y-0 left-0 z-40 w-64 bg-white dark:bg-[#0F172A] text-slate-900 dark:text-white flex-col border-r border-slate-200 dark:border-white/[0.06]">
 
-    <!-- Logo -->
-    <div class="relative overflow-hidden px-5 py-5 border-b border-slate-200/50 dark:border-white/[0.06]">
-        <div class="absolute -inset-20 bg-gradient-to-br from-emerald-500/40 via-teal-500/20 to-cyan-500/10 blur-3xl opacity-80 dark:opacity-100"></div>
-        <div class="absolute top-0 right-0 w-32 h-32 bg-emerald-400/15 dark:bg-emerald-400/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/4"></div>
-        <div class="absolute bottom-0 left-0 w-24 h-24 bg-teal-400/15 dark:bg-teal-400/10 rounded-full blur-3xl translate-y-1/2 -translate-x-1/4"></div>
-        <div class="relative flex items-center gap-3">
-            <div class="w-11 h-11 rounded-2xl bg-gradient-to-br from-emerald-600 via-teal-500 to-cyan-500 flex items-center justify-center shadow-xl shadow-emerald-600/40 ring-2 ring-white/20 dark:ring-white/10 shrink-0 animate-float">
-                <i class="fas fa-bolt text-white text-lg"></i>
-            </div>
-            <div class="flex-1 min-w-0">
-                <h1 class="text-sm font-extrabold tracking-tight bg-gradient-to-r from-emerald-700 via-teal-600 to-cyan-600 dark:from-emerald-400 dark:via-teal-400 dark:to-cyan-400 bg-clip-text text-transparent truncate">HNIN AKARI NWE</h1>
-                <p class="text-[8px] font-bold text-emerald-500/60 dark:text-emerald-400/60 tracking-[0.2em] uppercase truncate">Payroll Management</p>
-            </div>
-            <!-- Collapse toggle (tablet only, hidden on desktop) -->
-            <button id="sidebarToggleBtn" class="hidden md:flex lg:hidden w-8 h-8 rounded-xl items-center justify-center text-slate-400 dark:text-zinc-500 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 transition-all duration-200 shrink-0 border border-transparent hover:border-emerald-200 dark:hover:border-emerald-500/20" title="Toggle sidebar">
-                <i id="sidebarToggleIcon" class="fas fa-chevron-left text-xs transition-transform duration-300"></i>
-            </button>
+    <!-- Logo / Brand -->
+    <div class="flex items-center gap-3 px-5 h-16 border-b border-slate-200 dark:border-white/[0.06] shrink-0">
+        <div class="w-9 h-9 rounded-lg bg-indigo-600 flex items-center justify-center shrink-0">
+            <i class="fas fa-bolt text-white text-sm"></i>
+        </div>
+        <div class="sidebar-brand-text min-w-0 flex-1 overflow-hidden">
+            <h1 class="text-sm font-bold text-slate-900 dark:text-white truncate leading-tight">HNIN AKARI NWE</h1>
+            <p class="text-[10px] text-slate-400 dark:text-slate-500 font-medium truncate leading-tight">Payroll Management</p>
         </div>
     </div>
 
-    <!-- User profile -->
-    <div class="mx-3 mt-3 mb-1 px-3 py-3 rounded-xl bg-gradient-to-r from-emerald-50/80 via-teal-50/50 to-cyan-50/80 dark:from-emerald-500/10 dark:via-teal-500/5 dark:to-cyan-500/10 border border-emerald-100/50 dark:border-emerald-500/10">
+    <!-- User Profile -->
+    <div class="sidebar-profile mx-3 mt-3 mb-1 px-3 py-2.5 rounded-lg bg-slate-50 dark:bg-white/[0.03] border border-slate-200 dark:border-white/[0.06]">
         <div class="flex items-center gap-3">
-            <div class="relative">
-                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-500 flex items-center justify-center text-xs font-bold text-white shadow-lg shadow-emerald-500/30 shrink-0 ring-2 ring-white dark:ring-[#0F172A]">
+            <div class="relative shrink-0">
+                <?php if ($sidebar_role === 'employee' && !empty($emp_photo_path)): ?>
+                <img src="../<?php echo htmlspecialchars($emp_photo_path); ?>" alt="" class="w-9 h-9 rounded-lg object-cover border border-slate-200 dark:border-white/[0.06]">
+                <?php else: ?>
+                <div class="w-9 h-9 rounded-lg bg-indigo-600 flex items-center justify-center text-xs font-bold text-white">
                     <?php echo strtoupper(substr($sidebar_role === 'admin' ? $admin_name : $emp_name, 0, 2)); ?>
                 </div>
-                <div class="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-400 rounded-full border-2 border-white dark:border-[#0F172A] shadow-sm"></div>
+                <?php endif; ?>
+                <div class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-white dark:border-[#0F172A]"></div>
             </div>
-            <div class="nav-text min-w-0 flex-1 overflow-hidden">
-                <p class="text-sm font-bold text-slate-900 dark:text-white truncate"><?php echo htmlspecialchars($sidebar_role === 'admin' ? $admin_name : $emp_name); ?></p>
-                <p class="text-[10px] text-emerald-500 dark:text-emerald-400 font-semibold truncate"><?php echo $sidebar_role === 'admin' ? 'Administrator' : 'Employee'; ?></p>
+            <div class="sidebar-profile-text min-w-0 flex-1 overflow-hidden">
+                <p class="text-sm font-semibold text-slate-900 dark:text-white truncate leading-tight"><?php echo htmlspecialchars($sidebar_role === 'admin' ? $admin_name : $emp_name); ?></p>
+                <p class="text-[10px] text-slate-500 dark:text-slate-400 font-medium truncate leading-tight"><?php echo $sidebar_role === 'admin' ? 'Administrator' : htmlspecialchars($emp_position_name); ?></p>
             </div>
         </div>
     </div>
 
     <!-- Navigation -->
-    <nav class="flex-1 overflow-y-auto px-3 py-4 space-y-0.5 sidebar-scrollbar">
+    <nav class="flex-1 overflow-y-auto px-3 py-3 space-y-0.5 sidebar-scrollbar">
 
         <?php if ($sidebar_role === 'admin'): ?>
 
-            <div class="nav-text px-3 pb-2 pt-1">
-                <p class="text-[10px] font-bold text-emerald-400/80 dark:text-emerald-400/60 tracking-[0.15em] uppercase whitespace-nowrap">Main Menu</p>
+            <div class="nav-text px-3 pb-1.5 pt-1">
+                <p class="text-[10px] font-semibold text-slate-400 dark:text-slate-500 tracking-wider uppercase">Main Menu</p>
             </div>
-            <?php echo nav_item('dashboard.php', 'Dashboard', 'gauge-high', $current_page, null, null, 'emerald'); ?>
+            <?php echo nav_item('dashboard.php', 'Dashboard', 'gauge-high', $current_page, null, null, 'indigo'); ?>
 
-            <div class="nav-text px-3 pt-4 pb-1">
-                <p class="text-[10px] font-bold text-emerald-400/80 dark:text-emerald-400/60 tracking-[0.15em] uppercase whitespace-nowrap">Management</p>
+            <div class="nav-text px-3 pt-4 pb-1.5">
+                <p class="text-[10px] font-semibold text-slate-400 dark:text-slate-500 tracking-wider uppercase">Management</p>
             </div>
             <?php echo nav_section('Employees', 'users-gear', [
                 ['page' => 'employee.php', 'href' => 'employee.php', 'label' => 'Employee List'],
@@ -192,7 +213,7 @@ if ($sidebar_role === 'admin') {
                 ['page' => 'attendance_summary.php', 'href' => 'attendance_summary.php', 'label' => 'Attendance Summary'],
                 ['page' => 'process_daily_attendance.php', 'href' => 'process_daily_attendance.php', 'label' => 'Process Attendance'],
             ], $current_page, null, 'emerald'); ?>
-            <?php echo nav_section('Leave Management', 'paper-plane', [
+            <?php echo nav_section('Leave', 'paper-plane', [
                 ['page' => 'leaveApproval.php', 'href' => 'leaveApproval.php', 'label' => 'Leave Approvals'],
                 ['page' => 'leavereport.php', 'href' => 'leavereport.php', 'label' => 'Leave Report'],
             ], $current_page, $pending_leaves, 'amber'); ?>
@@ -209,8 +230,8 @@ if ($sidebar_role === 'admin') {
                 ['page' => 'deduction.php', 'href' => 'deduction.php', 'label' => 'Deductions'],
             ], $current_page, null, 'sky'); ?>
 
-            <div class="nav-text px-3 pt-4 pb-1">
-                <p class="text-[10px] font-bold text-emerald-400/80 dark:text-emerald-400/60 tracking-[0.15em] uppercase whitespace-nowrap">Organization</p>
+            <div class="nav-text px-3 pt-4 pb-1.5">
+                <p class="text-[10px] font-semibold text-slate-400 dark:text-slate-500 tracking-wider uppercase">Organization</p>
             </div>
             <?php echo nav_item('department.php', 'Departments', 'building', $current_page, null, null, 'indigo'); ?>
             <?php echo nav_item('position.php', 'Positions', 'briefcase', $current_page, null, null, 'orange'); ?>
@@ -225,23 +246,23 @@ if ($sidebar_role === 'admin') {
                 ['page' => 'overtimereport.php', 'href' => 'overtimereport.php', 'label' => 'OT Report'],
             ], $current_page, null, 'rose'); ?>
 
-            <div class="nav-text px-3 pt-4 pb-1">
-                <p class="text-[10px] font-bold text-emerald-400/80 dark:text-emerald-400/60 tracking-[0.15em] uppercase whitespace-nowrap">Account</p>
+            <div class="nav-text px-3 pt-4 pb-1.5">
+                <p class="text-[10px] font-semibold text-slate-400 dark:text-slate-500 tracking-wider uppercase">Account</p>
             </div>
-            <?php echo nav_item('profile.php', 'My Profile', 'circle-user', $current_page, null, null, 'emerald'); ?>
+            <?php echo nav_item('profile.php', 'My Profile', 'circle-user', $current_page, null, null, 'slate'); ?>
 
-            <div class="nav-text px-3 pt-4 pb-1">
-                <p class="text-[10px] font-bold text-emerald-400/80 dark:text-emerald-400/60 tracking-[0.15em] uppercase whitespace-nowrap">System</p>
+            <div class="nav-text px-3 pt-4 pb-1.5">
+                <p class="text-[10px] font-semibold text-slate-400 dark:text-slate-500 tracking-wider uppercase">System</p>
             </div>
             <?php echo nav_item('settings.php', 'Settings', 'sliders', $current_page, null, null, 'slate'); ?>
             <?php echo nav_item('logout.php', 'Logout', 'right-from-bracket', $current_page, null, null, 'rose'); ?>
 
         <?php elseif ($sidebar_role === 'employee'): ?>
 
-            <div class="nav-text px-3 pb-2 pt-1">
-                <p class="text-[10px] font-bold text-emerald-400/80 dark:text-emerald-400/60 tracking-[0.15em] uppercase whitespace-nowrap">Main Menu</p>
+            <div class="nav-text px-3 pb-1.5 pt-1">
+                <p class="text-[10px] font-semibold text-slate-400 dark:text-slate-500 tracking-wider uppercase">Main Menu</p>
             </div>
-            <?php echo nav_item('dashboard.php', 'Dashboard', 'house-chimney', $current_page, null, null, 'teal'); ?>
+            <?php echo nav_item('dashboard.php', 'Dashboard', 'house-chimney', $current_page, null, null, 'indigo'); ?>
             <?php echo nav_item('attendance.php', 'Attendance', 'calendar-check', $current_page, null, null, 'emerald'); ?>
             <?php echo nav_item('attendance_summary.php', 'Attendance Summary', 'chart-simple', $current_page, null, null, 'cyan'); ?>
             <?php echo nav_item('leaverequest.php', 'Leave Request', 'paper-plane', $current_page, null, null, 'amber'); ?>
@@ -249,8 +270,8 @@ if ($sidebar_role === 'admin') {
             <?php echo nav_item('attendanceall.php', 'My Records', 'folder-open', $current_page, null, null, 'cyan'); ?>
             <?php echo nav_item('company_policy.php', 'Company Policy', 'file-contract', $current_page, null, null, 'purple'); ?>
 
-            <div class="nav-text px-3 pt-4 pb-1">
-                <p class="text-[10px] font-bold text-emerald-400/80 dark:text-emerald-400/60 tracking-[0.15em] uppercase whitespace-nowrap">Account</p>
+            <div class="nav-text px-3 pt-4 pb-1.5">
+                <p class="text-[10px] font-semibold text-slate-400 dark:text-slate-500 tracking-wider uppercase">Account</p>
             </div>
             <?php echo nav_item('profile.php', 'My Profile', 'circle-user', $current_page, null, null, 'indigo'); ?>
             <?php echo nav_item('payroll.php', 'My Payroll', 'wallet', $current_page, null, null, 'emerald'); ?>
@@ -261,16 +282,19 @@ if ($sidebar_role === 'admin') {
             </div>
 
         <?php endif; ?>
-                
+
     </nav>
-     <button class="sidebar-collapse-btn" onclick="toggleDesktopSidebar()" title="Toggle sidebar">
-        <i class="fa-solid fa-chevron-left"></i>
-    </button>
+
+    <!-- Collapse Toggle -->
+    <div class="px-3 pb-3 pt-2 border-t border-slate-200 dark:border-white/[0.06]">
+        <button class="sidebar-collapse-btn" onclick="toggleDesktopSidebar()" title="Toggle sidebar">
+            <i class="fa-solid fa-chevron-left"></i>
+        </button>
+    </div>
 </aside>
 
-<!-- Sidebar collapse JS (tablet only — desktop always expanded, mobile uses slide menu) -->
+<!-- Sidebar JS -->
 <script>
-// Always define toggleDesktopSidebar so the collapse button works
 (function() {
     var sidebar = document.querySelector('aside');
     if (!sidebar) return;
@@ -293,32 +317,15 @@ if ($sidebar_role === 'admin') {
         return window.innerWidth >= 768 && window.innerWidth < 1024;
     }
 
-    // Desktop sidebar toggle — always available
     window.toggleDesktopSidebar = function() {
         var next = !sidebar.classList.contains('collapsed');
         localStorage.setItem('sidebar-collapsed', next);
         applyCollapse(next);
     };
 
-    // On desktop, respect saved state (default expanded)
-    if (!isTablet()) {
-        var savedDesktop = localStorage.getItem('sidebar-collapsed') === 'true';
-        applyCollapse(savedDesktop);
-    } else {
-        // On tablet, respect saved state (default expanded)
-        var saved = localStorage.getItem('sidebar-collapsed') === 'true';
-        applyCollapse(saved);
-
-        var toggleBtn = document.getElementById('sidebarToggleBtn');
-        if (toggleBtn) {
-            toggleBtn.addEventListener('click', function(e) {
-                e.preventDefault();
-                var next = !sidebar.classList.contains('collapsed');
-                localStorage.setItem('sidebar-collapsed', next);
-                applyCollapse(next);
-            });
-        }
-    }
+    // Apply saved state
+    var saved = localStorage.getItem('sidebar-collapsed') === 'true';
+    applyCollapse(saved);
 
     // Tooltip on collapsed hover
     var tip = null, hideT = null;
@@ -339,19 +346,13 @@ if ($sidebar_role === 'admin') {
     sidebar.addEventListener('mouseout', function(e) {
         if (e.target.closest('.nav-item')) hideT = setTimeout(function() { if (tip) tip.classList.remove('visible'); }, 80);
     });
-
-    // Re-evaluate on resize
-    window.addEventListener('resize', function() {
-        if (!isTablet()) {
-            applyCollapse(false);
-        }
-    });
 })();
 </script>
 <script>
 (function() {
-    const sidebar = document.querySelector('.sidebar-container');
-    const overlay = document.createElement('div');
+    var sidebar = document.querySelector('.sidebar-container');
+    if (!sidebar) return;
+    var overlay = document.createElement('div');
     overlay.className = 'sidebar-overlay';
     overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.3);z-index:35;display:none;';
     document.body.appendChild(overlay);

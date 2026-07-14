@@ -58,7 +58,7 @@ function getChartColors() {
 /* -- Glass backgrounds -- */
 :root:not(.dark) .glass-strong,
 :root:not(.dark) .glass {
-  background: rgba(255,255,255,0.90);
+  background: rgba(255,255,255,0.95);
   border-color: rgba(30,58,138,0.08);
   backdrop-filter: blur(20px);
 }
@@ -67,7 +67,7 @@ function getChartColors() {
 :root:not(.dark) .bg-white\/\[0\.06\],
 :root:not(.dark) .bg-white\/10,
 :root:not(.dark) .bg-white\/\[0\.04\],
-:root:not(.dark) .bg-white\/\[0\.02\] { background-color: #F1F5F9 !important; }
+:root:not(.dark) .bg-white\/\[0\.02\] { background-color: #F8FAFC !important; }
 
 /* Force dark body background across all pages */
 :root.dark .bg-\[\#0B1120\],
@@ -76,7 +76,7 @@ function getChartColors() {
 
 /* -- Body background: subtle slate gradient -- */
 :root:not(.dark) body {
-  background: linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 50%, #EFF6FF 100%) !important;
+  background: #F8FAFC !important;
 }
 
 /* -- Text colors -- */
@@ -86,7 +86,7 @@ function getChartColors() {
 :root:not(.dark) .text-zinc-500 { color: #94A3B8 !important; }
 :root:not(.dark) .text-zinc-600 { color: #64748B !important; }
 
-/* -- Status colors: rich and readable -- */
+/* -- Status colors -- */
 :root:not(.dark) .text-emerald-400 { color: #16A34A !important; }
 :root:not(.dark) .text-emerald-500 { color: #15803D !important; }
 :root:not(.dark) .text-amber-400 { color: #D97706 !important; }
@@ -110,18 +110,18 @@ function getChartColors() {
 /* -- Border colors -- */
 :root:not(.dark) .border-white\/10,
 :root:not(.dark) .border-white\/\[0\.06\],
-:root:not(.dark) .border-white\/\[0\.08\] { border-color: rgba(30,58,138,0.10) !important; }
+:root:not(.dark) .border-white\/\[0\.08\] { border-color: #E2E8F0 !important; }
 
 :root:not(.dark) .border-black\/\[0\.06\],
-:root:not(.dark) .border-black\/\[0\.04\] { border-color: rgba(30,58,138,0.08) !important; }
+:root:not(.dark) .border-black\/\[0\.04\] { border-color: #E2E8F0 !important; }
 
 /* -- Divide colors -- */
-:root:not(.dark) .divide-white\/\[0\.06\] > :not([hidden]) ~ :not([hidden]) { border-color: rgba(30,58,138,0.08) !important; }
+:root:not(.dark) .divide-white\/\[0\.06\] > :not([hidden]) ~ :not([hidden]) { border-color: #E2E8F0 !important; }
 
 /* -- Hover states -- */
 :root:not(.dark) .hover\:bg-white\/5:hover,
 :root:not(.dark) .hover\:bg-white\/\[0\.02\]:hover,
-:root:not(.dark) .hover\:bg-white\/\[0\.04\]:hover { background-color: #E2E8F0 !important; }
+:root:not(.dark) .hover\:bg-white\/\[0\.04\]:hover { background-color: #F1F5F9 !important; }
 
 :root:not(.dark) .hover\:text-white:hover { color: #1E293B !important; }
 
@@ -155,7 +155,7 @@ function getChartColors() {
 :root:not(.dark) .bg-gradient-to-r.from-violet-500\/20.to-fuchsia-500\/10 { background: linear-gradient(to right, rgba(30,58,138,0.12), rgba(79,70,229,0.08)) !important; }
 :root:not(.dark) .bg-gradient-to-r.from-violet-500\/5.to-fuchsia-500\/5 { background: linear-gradient(to right, rgba(30,58,138,0.06), rgba(79,70,229,0.06)) !important; }
 
-/* -- Form inputs: navy-tinted -- */
+/* -- Form inputs -- */
 :root:not(.dark) input[type="text"],
 :root:not(.dark) input[type="number"],
 :root:not(.dark) input[type="email"],
@@ -165,7 +165,7 @@ function getChartColors() {
 :root:not(.dark) select,
 :root:not(.dark) textarea {
   background-color: #F1F5F9 !important;
-  border-color: #CBD5E1 !important;
+  border-color: #E2E8F0 !important;
   color: #1E293B !important;
 }
 :root:not(.dark) input:focus,
@@ -179,53 +179,16 @@ function getChartColors() {
 :root:not(.dark) textarea::placeholder { color: #94A3B8 !important; }
 :root:not(.dark) select option { background: #FFFFFF; color: #1E293B; }
 
-/* -- Notification badge pulse -- */
-:root:not(.dark) .animate-pulse-soft { animation: pulse 2s ease-in-out infinite; }
-
-/* -- Table header gradient -- */
+/* -- Table header -- */
 :root:not(.dark) table thead { background: linear-gradient(135deg, #1E3A8A, #4F46E5) !important; }
 :root:not(.dark) table thead th { color: #FFFFFF !important; }
 :root:not(.dark) table tbody tr:hover { background-color: #F1F5F9 !important; }
 
-/* -- Sidebar icon shadows -- */
-:root:not(.dark) .sidebar-icon-navy, :root:not(.dark) .sidebar-icon-indigo,
-:root:not(.dark) .sidebar-icon-blue, :root:not(.dark) .sidebar-icon-sky,
-:root:not(.dark) .sidebar-icon-emerald, :root:not(.dark) .sidebar-icon-amber,
-:root:not(.dark) .sidebar-icon-orange, :root:not(.dark) .sidebar-icon-cyan,
-:root:not(.dark) .sidebar-icon-purple, :root:not(.dark) .sidebar-icon-rose,
-:root:not(.dark) .sidebar-icon-slate, :root:not(.dark) .sidebar-icon-violet {
-  box-shadow: 0 4px 12px rgba(0,0,0,0.18);
-}
-
-/* -- Buttons inside glass: keep gradient colors -- */
-:root:not(.dark) .glass-strong button.bg-gradient-to-r,
-:root:not(.dark) .glass-strong button.bg-blue-600,
-:root:not(.dark) .glass-strong button.bg-orange-500,
-:root:not(.dark) .glass-strong button.bg-emerald-600,
-:root:not(.dark) .glass-strong button.bg-rose-500 { color: #FFFFFF !important; }
-
-/* -- Glow effects -- */
-:root:not(.dark) .glow-navy { box-shadow: 0 0 24px rgba(30,58,138,0.18); }
-:root:not(.dark) .glow-indigo { box-shadow: 0 0 24px rgba(79,70,229,0.18); }
-:root:not(.dark) .glow-emerald { box-shadow: 0 0 24px rgba(16,185,129,0.18); }
-:root:not(.dark) .glow-amber { box-shadow: 0 0 24px rgba(245,158,11,0.18); }
-:root:not(.dark) .glow-rose { box-shadow: 0 0 24px rgba(239,68,68,0.18); }
-:root:not(.dark) .glow-violet { box-shadow: 0 0 24px rgba(30,58,138,0.18); }
-
-/* -- Modal overlay -- */
-:root:not(.dark) .fixed.inset-0.bg-black\/60 { background: rgba(15,23,42,0.25) !important; }
-
-/* -- Empty state SVG -- */
-:root:not(.dark) .empty-state svg { opacity: 0.45; }
-
-/* -- Progress bar -- */
-:root:not(.dark) .progress-bar { background: #E2E8F0; }
-
 /* -- Card hover -- */
-:root:not(.dark) .card-hover:hover { box-shadow: 0 20px 50px rgba(30,58,138,0.08), 0 8px 20px rgba(0,0,0,0.03); }
+:root:not(.dark) .card-hover:hover { box-shadow: 0 8px 30px rgba(30,58,138,0.08); }
 
 /* -- Theme toggle button -- */
-:root:not(.dark) .theme-toggle-btn { background: #F1F5F9; border-color: #CBD5E1; color: #4F46E5; }
+:root:not(.dark) .theme-toggle-btn { background: #F1F5F9; border-color: #E2E8F0; color: #4F46E5; }
 :root:not(.dark) .theme-toggle-btn:hover { background: #E2E8F0; color: #1E3A8A; }
 
 /* -- Scrollbar -- */
@@ -253,22 +216,12 @@ function getChartColors() {
 /* -- Employee Bottom Nav Light Mode -- */
 :root:not(.dark) .emp-bottom-nav {
   background: rgba(255,255,255,0.95);
-  border-top-color: rgba(30,58,138,0.06);
+  border-top-color: #E2E8F0;
   box-shadow: 0 -4px 24px rgba(30,58,138,0.06);
 }
-:root:not(.dark) .emp-bottom-nav-icon {
-  color: #94A3B8;
-}
-:root:not(.dark) .emp-bottom-nav-item.active .emp-bottom-nav-icon {
-  color: #FFFFFF;
-}
-:root:not(.dark) .emp-bottom-nav-label {
-  color: #94A3B8;
-}
-:root:not(.dark) .emp-bottom-nav-item.active .emp-bottom-nav-label {
-  color: #4F46E5;
-}
-:root:not(.dark) .emp-bottom-nav-item:hover .emp-bottom-nav-icon-wrap {
-  background: rgba(79,70,229,0.06);
-}
+:root:not(.dark) .emp-bottom-nav-icon { color: #94A3B8; }
+:root:not(.dark) .emp-bottom-nav-item.active .emp-bottom-nav-icon { color: #FFFFFF; }
+:root:not(.dark) .emp-bottom-nav-label { color: #94A3B8; }
+:root:not(.dark) .emp-bottom-nav-item.active .emp-bottom-nav-label { color: #4F46E5; }
+:root:not(.dark) .emp-bottom-nav-item:hover .emp-bottom-nav-icon-wrap { background: rgba(79,70,229,0.06); }
 </style>

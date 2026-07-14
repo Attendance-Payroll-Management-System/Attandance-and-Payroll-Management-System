@@ -6,7 +6,7 @@
 
 -- Create Database
 CREATE DATABASE IF NOT EXISTS attendance_payroll_system
-  CHARACTER SET utf8mb4
+  CHARACTER SET 
   COLLATE utf8mb4_unicode_ci;
 
 USE attendance_payroll_system;

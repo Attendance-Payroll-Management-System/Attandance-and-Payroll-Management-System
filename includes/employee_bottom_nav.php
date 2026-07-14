@@ -6,14 +6,12 @@
  */
 $current_page = basename($_SERVER['SCRIPT_NAME'] ?? 'dashboard.php');
 
-// Bottom nav items
+// Bottom nav items — 5 core items per requirements
 $nav_items = [
     ['page' => 'dashboard.php',        'icon' => 'house',              'label' => 'Dashboard',     'href' => 'dashboard.php'],
     ['page' => 'attendance.php',       'icon' => 'calendar-check',     'label' => 'Attendance',    'href' => 'attendance.php'],
-    ['page' => 'attendanceall.php',    'icon' => 'folder-open',        'label' => 'My Records',    'href' => 'attendanceall.php'],
     ['page' => 'leaverequest.php',     'icon' => 'paper-plane',        'label' => 'Leave',          'href' => 'leaverequest.php'],
-    ['page' => 'overtimerequest.php',  'icon' => 'stopwatch',          'label' => 'Overtime',       'href' => 'overtimerequest.php'],
-    ['page' => 'company_policy.php',   'icon' => 'file-contract',      'label' => 'Policy',         'href' => 'company_policy.php'],
+    ['page' => 'notifications',        'icon' => 'bell',               'label' => 'Notify',         'href' => '#notifications'],
     ['page' => 'profile.php',          'icon' => 'circle-user',        'label' => 'Profile',        'href' => 'profile.php'],
 ];
 
@@ -22,13 +20,14 @@ $page_map = [
     'dashboard.php'          => 'dashboard.php',
     'attendance.php'         => 'attendance.php',
     'attendance_summary.php' => 'attendance.php',
-    'attendanceall.php'      => 'attendanceall.php',
+    'attendanceall.php'      => 'attendance.php',
     'leaverequest.php'       => 'leaverequest.php',
-    'overtimerequest.php'    => 'overtimerequest.php',
-    'company_policy.php'     => 'company_policy.php',
+    'overtimerequest.php'    => 'leaverequest.php',
+    'company_policy.php'     => 'dashboard.php',
     'profile.php'            => 'profile.php',
     'payroll.php'            => 'profile.php',
     'change_password.php'    => 'profile.php',
+    'notifications'          => 'notifications',
 ];
 
 $active_page = $page_map[$current_page] ?? $current_page;
@@ -38,6 +37,10 @@ $active_page = $page_map[$current_page] ?? $current_page;
     <div class="emp-bottom-nav-inner">
         <?php foreach ($nav_items as $item):
             $is_active = ($item['page'] === $active_page);
+            // Special handling for notifications (4th item) — highlight when on dashboard
+            if ($item['icon'] === 'bell') {
+                $is_active = ($current_page === 'dashboard.php');
+            }
         ?>
         <a href="<?php echo $item['href']; ?>" class="emp-bottom-nav-item <?php echo $is_active ? 'active' : ''; ?>">
             <div class="emp-bottom-nav-icon-wrap">

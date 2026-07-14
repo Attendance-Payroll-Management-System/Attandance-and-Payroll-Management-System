@@ -1,36 +1,43 @@
 <?php
 $admin_name  = $admin_name  ?? ($_SESSION['admin_name'] ?? 'Admin');
-$admin_email = $_SESSION['admin_email'] ?? 'admin@aura.hr';
+$admin_email = $_SESSION['admin_email'] ?? 'admin@company.com';
 $admin_photo = '';
 $page_actions  = $page_actions  ?? '';
 
 $current_page = basename($_SERVER['SCRIPT_NAME'] ?? 'dashboard.php');
 
 $page_info_map = [
-    'dashboard.php'          => ['Dashboard',              'View system overview, employee statistics, attendance summaries, payroll summaries, and recent activities.'],
-    'employee.php'           => ['Employee Directory',      'Manage employee records, personal information, departments, positions, and employee status.'],
-    'insert1.php'            => ['Add Employee',            'Create new employee records with personal, company, and financial details.'],
-    'edit_employee.php'      => ['Edit Employee',           'Update employee information, personal details, and employment records.'],
-    'view_employee.php'      => ['Employee Profile',        'View detailed employee information, attendance, leave, and payroll history.'],
-    'attendance.php'         => ['Attendance',              'Track employee check-in, check-out, late arrivals, attendance history, and daily attendance records.'],
-    'dailyattendance.php'    => ['Daily Attendance',        'View and manage daily attendance records for all employees.'],
-    'process_daily_attendance.php' => ['Process Attendance','Automatically process daily attendance, weekends, holidays, and absences.'],
-    'leaveApproval.php'      => ['Leave Management',        'Manage employee leave requests, approvals, leave balances, and leave history.'],
-    'leavereport.php'        => ['Leave Report',            'View and analyze employee leave records, balances, and reporting.'],
-    'overtimeApproval.php'   => ['Overtime Management',     'Monitor overtime requests, approval status, overtime hours, and work schedules.'],
-    'assign_overtime.php'    => ['Assign Overtime',         'Assign overtime work to employees and manage overtime schedules.'],
-    'overtimereport.php'     => ['Overtime Report',         'View and analyze overtime records, hours, and approval reports.'],
-    'payroll.php'            => ['Payroll',                 'Calculate salaries, allowances, deductions, bonuses, and generate salary slips.'],
-    'salaryreport.php'       => ['Salary Report',           'View and analyze payroll summaries, salary reports, and financial data.'],
-    'salary_slip.php'        => ['Salary Slips',            'Generate, view, and email employee salary slips.'],
-    'bonous.php'             => ['Bonuses',                 'Manage employee bonuses, incentives, and additional compensation.'],
-    'deduction.php'          => ['Deductions',              'Manage employee deductions, adjustments, and payroll deductions.'],
-    'department.php'         => ['Departments',             'Manage company departments, structure, and employee distribution.'],
-    'position.php'           => ['Positions',               'Manage job positions, roles, and organizational hierarchy.'],
-    'holiday.php'            => ['Holidays',                'Manage company holidays, non-working days, and special dates.'],
-    'reports.php'            => ['Reports',                 'View attendance reports, payroll reports, leave reports, overtime reports, and employee analytics.'],
-    'profile.php'            => ['My Profile',              'View and manage your profile information, password, and account settings.'],
-    'settings.php'           => ['Settings',                'Configure system settings, company information, payroll rules, and preferences.'],
+    'dashboard.php'          => ['Dashboard',              'View system overview and recent activities.'],
+    'employee.php'           => ['Employee Directory',      'Manage employee records and information.'],
+    'insert1.php'            => ['Add Employee',            'Create new employee records.'],
+    'edit_employee.php'      => ['Edit Employee',           'Update employee information.'],
+    'view_employee.php'      => ['Employee Profile',        'View detailed employee information.'],
+    'attendance.php'         => ['Attendance',              'Track check-in, check-out, and daily attendance.'],
+    'dailyattendance.php'    => ['Daily Attendance',        'View daily attendance records.'],
+    'attendance_summary.php' => ['Attendance Summary',      'View attendance summaries and analytics.'],
+    'attendanceall.php'      => ['Attendance Records',      'Your complete attendance history.'],
+    'process_daily_attendance.php' => ['Process Attendance','Process daily attendance records.'],
+    'leaveApproval.php'      => ['Leave Management',        'Manage employee leave requests and approvals.'],
+    'leaverequest.php'       => ['Leave Request',           'Submit and track your leave requests.'],
+    'leavereport.php'        => ['Leave Report',            'View and analyze leave records.'],
+    'overtimeApproval.php'   => ['Overtime Management',     'Monitor overtime requests and approvals.'],
+    'overtimerequest.php'    => ['Overtime Request',        'Submit and track overtime requests.'],
+    'assign_overtime.php'    => ['Assign Overtime',         'Assign overtime to employees.'],
+    'overtimereport.php'     => ['Overtime Report',         'View overtime records and reports.'],
+    'payroll.php'            => ['Payroll',                 'Calculate salaries and generate payslips.'],
+    'salaryreport.php'       => ['Salary Report',           'View salary reports and financial data.'],
+    'salary_slip.php'        => ['Salary Slips',            'Generate and view salary slips.'],
+    'bonous.php'             => ['Bonuses',                 'Manage employee bonuses and incentives.'],
+    'deduction.php'          => ['Deductions',              'Manage payroll deductions.'],
+    'department.php'         => ['Departments',             'Manage company departments.'],
+    'position.php'           => ['Positions',               'Manage job positions and roles.'],
+    'holiday.php'            => ['Holidays',                'Manage company holidays.'],
+    'policy.php'             => ['Company Policy',          'View and manage company policies.'],
+    'reports.php'            => ['Reports',                 'View attendance and payroll reports.'],
+    'profile.php'            => ['My Profile',              'Manage your personal information.'],
+    'settings.php'           => ['Settings',                'Configure system settings.'],
+    'company_policy.php'     => ['Company Policy',          'Review company rules and guidelines.'],
+    'change_password.php'    => ['Change Password',         'Update your account password.'],
 ];
 
 $detected = $page_info_map[$current_page] ?? null;
@@ -42,174 +49,178 @@ $topbar_notifications = [];
 $is_admin = (strpos($_SERVER['SCRIPT_NAME'] ?? '', '/admin/') !== false);
 $topbar_emp_id = $is_admin ? null : ($_SESSION['employee_id'] ?? null);
 
+// Fetch profile info for both admin and employee
 if (isset($conn) && $conn) {
     require_once __DIR__ . '/../config/notifications.php';
     if ($topbar_emp_id) {
         $unread_count = get_unread_count($conn, $topbar_emp_id);
         $topbar_notifications = get_notifications($conn, $topbar_emp_id, 5);
+        // Fetch employee profile for topbar
+        $emp_stmt = $conn->prepare("SELECT name, email, profile_photo FROM employee WHERE id = ?");
+        $emp_stmt->bind_param("i", $topbar_emp_id);
+        $emp_stmt->execute();
+        $emp_profile = $emp_stmt->get_result()->fetch_assoc();
+        $emp_stmt->close();
+        if ($emp_profile) {
+            $admin_name = $emp_profile['name'] ?? $admin_name;
+            if (!empty($emp_profile['email'])) $admin_email = $emp_profile['email'];
+            $admin_photo = $emp_profile['profile_photo'] ?? '';
+        }
     } else {
         $unread_count = get_unread_count($conn);
         $topbar_notifications = get_notifications($conn, null, 5);
-    }
-    $admin_id = $_SESSION['admin_id'] ?? null;
-    if ($admin_id) {
-        $res = $conn->query("SHOW COLUMNS FROM employee LIKE 'profile_photo'");
-        if ($res && $res->num_rows > 0) {
-            $res = $conn->query("SELECT profile_photo, email FROM employee WHERE id = " . (int)$admin_id);
-            if ($res && $row = $res->fetch_assoc()) {
-                $admin_photo = $row['profile_photo'] ?? '';
-                if (!empty($row['email'])) $admin_email = $row['email'];
-            }
-        } else {
-            $res = $conn->query("SELECT email FROM employee WHERE id = " . (int)$admin_id);
-            if ($res && $row = $res->fetch_assoc()) {
-                if (!empty($row['email'])) $admin_email = $row['email'];
+        $admin_id = $_SESSION['admin_id'] ?? null;
+        if ($admin_id) {
+            $res = $conn->query("SHOW COLUMNS FROM employee LIKE 'profile_photo'");
+            if ($res && $res->num_rows > 0) {
+                $res = $conn->query("SELECT profile_photo, email FROM employee WHERE id = " . (int)$admin_id);
+                if ($res && $row = $res->fetch_assoc()) {
+                    $admin_photo = $row['profile_photo'] ?? '';
+                    if (!empty($row['email'])) $admin_email = $row['email'];
+                }
+            } else {
+                $res = $conn->query("SELECT email FROM employee WHERE id = " . (int)$admin_id);
+                if ($res && $row = $res->fetch_assoc()) {
+                    if (!empty($row['email'])) $admin_email = $row['email'];
+                }
             }
         }
     }
 }
 
 $short_name = explode(' ', $admin_name)[0];
-
-// Employee desktop navigation items
-$emp_desktop_nav = [
-    ['label' => 'Dashboard',      'icon' => 'gauge-high',        'href' => 'dashboard.php',         'pages' => ['dashboard.php']],
-    ['label' => 'Attendance',     'icon' => 'calendar-check',    'href' => 'attendance.php',        'pages' => ['attendance.php', 'attendance_summary.php', 'attendanceall.php']],
-    ['label' => 'Leave',          'icon' => 'paper-plane',       'href' => 'leaverequest.php',      'pages' => ['leaverequest.php']],
-    ['label' => 'Overtime',       'icon' => 'stopwatch',         'href' => 'overtimerequest.php',   'pages' => ['overtimerequest.php']],
-    ['label' => 'Notifications',  'icon' => 'bell',              'href' => 'dashboard.php',         'pages' => [], 'action' => 'notifications'],
-    ['label' => 'Profile',        'icon' => 'circle-user',       'href' => 'profile.php',           'pages' => ['profile.php', 'payroll.php', 'change_password.php']],
-    ['label' => 'Settings',       'icon' => 'gear',              'href' => 'settings.php',          'pages' => ['settings.php']],
-];
 ?>
 <?php if ($is_admin): ?>
-<!-- Spacer for fixed admin topbar -->
-<div aria-hidden="true" class="h-16 w-full flex-shrink-0"></div>
+    <!-- Spacer for fixed topbar -->
+    <div aria-hidden="true" class="h-16 w-full flex-shrink-0"></div>
 <?php else: ?>
-<!-- Spacer for fixed employee topbar -->
-<div aria-hidden="true" class="emp-header-spacer" style="<?php echo !empty($use_sidebar) ? 'height:4rem' : ''; ?>"></div>
+    <!-- Spacer for fixed topbar -->
+    <div aria-hidden="true" class="h-16 w-full flex-shrink-0"></div>
 <?php endif; ?>
-<header class="<?php echo $is_admin ? 'fixed top-0 right-0 z-30 admin-topbar' : 'emp-header'; ?> bg-white/80 dark:bg-[#0F172A]/80 backdrop-blur-xl border-b border-slate-200 dark:border-blue-500/10">
-    <div class="flex items-center justify-between <?php echo $is_admin ? 'pl-16' : 'pl-4'; ?> pr-4 md:pl-4 lg:px-8 h-16">
-        <div class="min-w-0 flex-1">
-            <h1 class="text-xl font-bold tracking-tight text-slate-900 dark:text-white truncate"><?php echo htmlspecialchars($page_title); ?></h1>
+
+<header class="fixed top-0 right-0 z-30 <?php echo $is_admin ? 'admin-topbar' : 'emp-header'; ?> bg-white dark:bg-[#0F172A] border-b border-slate-200 dark:border-white/[0.06]">
+    <div class="flex items-center justify-between h-16 px-4 lg:px-6">
+        <!-- Left: Page Title & Subtitle -->
+        <div class="flex-1 min-w-0 ">
+            <h1 class="text-lg font-bold text-slate-900 dark:text-white truncate"><?php echo htmlspecialchars($page_title); ?></h1>
             <?php if (!empty($page_subtitle)): ?>
-            <p class="text-xs text-slate-500 dark:text-zinc-400 mt-0.5 truncate"><?php echo htmlspecialchars($page_subtitle); ?></p>
+            <p class="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5"><?php echo htmlspecialchars($page_subtitle); ?></p>
             <?php endif; ?>
         </div>
-        <div class="flex items-center space-x-2 lg:space-x-3">
+
+        <!-- Right: Actions -->
+        <div class="flex items-center gap-1.5 lg:gap-2 ml-4">
 
             <!-- Notifications -->
             <div class="relative" x-data="{ open: false }">
-                <button @click="open = !open" class="relative p-2.5 text-slate-500 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-white bg-slate-100 dark:bg-white/[0.06] hover:bg-slate-200 dark:hover:bg-white/[0.1] rounded-xl transition-all duration-200">
-                    <i class="fa-solid fa-bell text-lg"></i>
+                <button @click="open = !open" class="relative p-2 text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/[0.06] rounded-lg transition-all duration-200">
+                    <i class="fa-solid fa-bell text-base"></i>
                     <?php if ($unread_count > 0): ?>
-                    <span class="absolute -top-0.5 -right-0.5 w-5 h-5 bg-rose-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-lg shadow-rose-500/30 animate-scale-in"><?php echo $unread_count; ?></span>
+                        <span class="absolute top-1 right-1 w-4 h-4 bg-rose-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center"><?php echo $unread_count; ?></span>
                     <?php endif; ?>
                 </button>
                 <div x-show="open" @click.outside="open = false"
-                     x-transition:enter="transition-all duration-300 ease-out"
-                     x-transition:enter-start="opacity-0 scale-95 -translate-y-2"
-                     x-transition:enter-end="opacity-100 scale-100 translate-y-0"
-                     x-transition:leave="transition-all duration-200 ease-in"
-                     x-transition:leave-start="opacity-100 scale-100 translate-y-0"
-                     x-transition:leave-end="opacity-0 scale-95 -translate-y-2"
-                     class="absolute right-0 mt-2 w-[calc(100vw-2rem)] max-w-80 lg:w-96 glass-strong rounded-xl shadow-xl border border-black/10 dark:border-white/10 z-50" style="display: none;">
-                    <div class="p-3 border-b border-black/[0.06] dark:border-white/[0.06] flex items-center justify-between">
-                        <h4 class="text-sm font-bold text-slate-900 dark:text-white"><i class="fa-regular fa-bell mr-1.5 text-blue-400"></i>Notifications</h4>
+                    x-transition:enter="transition-all duration-200 ease-out"
+                    x-transition:enter-start="opacity-0 scale-95 -translate-y-2"
+                    x-transition:enter-end="opacity-100 scale-100 translate-y-0"
+                    x-transition:leave="transition-all duration-150 ease-in"
+                    x-transition:leave-start="opacity-100 scale-100 translate-y-0"
+                    x-transition:leave-end="opacity-0 scale-95 -translate-y-2"
+                    class="absolute right-0 mt-2 w-[calc(100vw-2rem)] max-w-80 lg:w-96 bg-white dark:bg-[#1E293B] rounded-xl shadow-xl border border-slate-200 dark:border-white/[0.06] z-50" style="display: none;">
+                    <div class="px-4 py-3 border-b border-slate-100 dark:border-white/[0.06] flex items-center justify-between">
+                        <h4 class="text-sm font-semibold text-slate-900 dark:text-white">Notifications</h4>
                         <?php if ($unread_count > 0): ?>
-                        <a href="mark_notifications_read.php" class="text-[10px] font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors">Mark all read</a>
+                            <a href="mark_notifications_read.php" class="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors">Mark all read</a>
                         <?php endif; ?>
                     </div>
-                    <div class="max-h-96 overflow-y-auto">
+                    <div class="max-h-80 overflow-y-auto">
                         <?php if (empty($topbar_notifications)): ?>
-                        <div class="p-4 text-xs text-slate-500 dark:text-zinc-500 text-center">
-                            <i class="fa-regular fa-bell-slash text-2xl text-slate-300 dark:text-zinc-600 block mb-2"></i>
-                            <p>No notifications</p>
-                        </div>
+                            <div class="p-6 text-center">
+                                <i class="fa-regular fa-bell-slash text-2xl text-slate-300 dark:text-slate-600 block mb-2"></i>
+                                <p class="text-xs text-slate-500 dark:text-slate-400">No notifications</p>
+                            </div>
                         <?php else: ?>
                             <?php foreach ($topbar_notifications as $noti): ?>
-                            <a href="<?php echo $noti['link'] ?: '#'; ?>" class="block px-4 py-3 border-b border-black/[0.04] dark:border-white/[0.04] hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition <?php echo !$noti['is_read'] ? 'bg-blue-500/5 dark:bg-blue-500/10' : ''; ?>">
-                                <p class="text-xs text-slate-700 dark:text-zinc-300"><?php echo htmlspecialchars($noti['message']); ?></p>
-                                <p class="text-[10px] text-slate-400 dark:text-zinc-500 mt-1"><?php echo date('M d, h:i A', strtotime($noti['created_at'])); ?></p>
-                            </a>
+                                <a href="<?php echo $noti['link'] ?: '#'; ?>" class="block px-4 py-3 border-b border-slate-50 dark:border-white/[0.04] hover:bg-slate-50 dark:hover:bg-white/[0.02] transition-colors <?php echo !$noti['is_read'] ? 'bg-indigo-50/50 dark:bg-indigo-500/5' : ''; ?>">
+                                    <p class="text-xs text-slate-700 dark:text-slate-300 leading-relaxed"><?php echo htmlspecialchars($noti['message']); ?></p>
+                                    <p class="text-[10px] text-slate-400 dark:text-slate-500 mt-1"><?php echo date('M d, h:i A', strtotime($noti['created_at'])); ?></p>
+                                </a>
                             <?php endforeach; ?>
                         <?php endif; ?>
                     </div>
-                    <div class="p-2 border-t border-black/[0.06] dark:border-white/[0.06] text-center">
-                        <a href="dashboard.php" class="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"><i class="fa-regular fa-eye mr-1"></i>View Dashboard</a>
+                    <div class="px-4 py-2.5 border-t border-slate-100 dark:border-white/[0.06] text-center">
+                        <a href="dashboard.php" class="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors">View Dashboard</a>
                     </div>
                 </div>
             </div>
 
-            <!-- Theme Toggle -->
-            <button onclick="toggleTheme()" class="theme-toggle-btn">
-                <i class="fa-solid fa-sun icon-sun text-base"></i>
-                <i class="fa-solid fa-moon icon-moon text-base"></i>
+            <!-- Dark Mode Toggle -->
+            <button onclick="toggleTheme()" class="p-2 text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/[0.06] rounded-lg transition-all duration-200">
+                <i class="fa-solid fa-sun text-base theme-icon-sun"></i>
+                <i class="fa-solid fa-moon text-base theme-icon-moon" style="display:none;"></i>
             </button>
 
-            <!-- Settings (hidden on mobile for employee, shown on desktop) -->
+            <!-- Settings (admin only) -->
             <?php if ($is_admin): ?>
-            <a href="settings.php" class="p-2.5 text-slate-500 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-white bg-slate-100 dark:bg-white/[0.06] hover:bg-slate-200 dark:hover:bg-white/[0.1] rounded-xl transition-all duration-200">
-                <i class="fa-solid fa-gear text-lg"></i>
-            </a>
-            <?php else: ?>
-            <a href="settings.php" class="hidden lg:flex p-2.5 text-slate-500 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-white bg-slate-100 dark:bg-white/[0.06] hover:bg-slate-200 dark:hover:bg-white/[0.1] rounded-xl transition-all duration-200">
-                <i class="fa-solid fa-gear text-lg"></i>
-            </a>
+                <a href="settings.php" class="p-2 text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/[0.06] rounded-lg transition-all duration-200">
+                    <i class="fa-solid fa-gear text-base"></i>
+                </a>
             <?php endif; ?>
 
             <!-- Profile Dropdown -->
             <div class="relative" x-data="{ open: false }">
-                <button @click="open = !open" class="flex items-center gap-2 pl-1.5 pr-3 py-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-white/[0.06] transition-all duration-200">
+                <button @click="open = !open" class="flex items-center gap-2 pl-1.5 pr-2 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-white/[0.06] transition-all duration-200">
                     <?php if (!empty($admin_photo)): ?>
-                    <img src="../<?php echo htmlspecialchars($admin_photo); ?>" alt="" class="w-8 h-8 rounded-full object-cover ring-2 ring-blue-500/30">
+                        <img src="../<?php echo htmlspecialchars($admin_photo); ?>" alt="" class="w-8 h-8 rounded-lg object-cover border border-slate-200 dark:border-white/[0.06]">
                     <?php else: ?>
-                    <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-500 text-white flex items-center justify-center text-xs font-bold shadow-lg shadow-blue-500/20">
-                        <?php echo strtoupper(substr($admin_name, 0, 2)); ?>
-                    </div>
+                        <div class="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-xs font-bold">
+                            <?php echo strtoupper(substr($admin_name, 0, 2)); ?>
+                        </div>
                     <?php endif; ?>
-                    <span class="text-sm font-semibold text-slate-700 dark:text-zinc-300 hidden sm:block"><?php echo htmlspecialchars($short_name); ?></span>
-                    <i class="fa-solid fa-chevron-down text-[10px] text-slate-400 dark:text-zinc-500 hidden sm:block transition-transform duration-200" :class="{ 'rotate-180': open }"></i>
+                    <span class="text-sm font-medium text-slate-700 dark:text-slate-300 hidden sm:block"><?php echo htmlspecialchars($short_name); ?></span>
+                    <i class="fa-solid fa-chevron-down text-[10px] text-slate-400 dark:text-slate-500 hidden sm:block transition-transform duration-200" :class="{ 'rotate-180': open }"></i>
                 </button>
 
                 <div x-show="open" @click.outside="open = false"
-                     x-transition:enter="transition-all duration-200 ease-out"
-                     x-transition:enter-start="opacity-0 scale-95 -translate-y-2"
-                     x-transition:enter-end="opacity-100 scale-100 translate-y-0"
-                     x-transition:leave="transition-all duration-150 ease-in"
-                     x-transition:leave-start="opacity-100 scale-100 translate-y-0"
-                     x-transition:leave-end="opacity-0 scale-95 -translate-y-2"
-                     class="absolute right-0 mt-2 w-[calc(100vw-2rem)] max-w-64 glass-strong rounded-2xl shadow-2xl border border-black/10 dark:border-white/10 z-50 overflow-hidden" style="display: none;">
+                    x-transition:enter="transition-all duration-200 ease-out"
+                    x-transition:enter-start="opacity-0 scale-95 -translate-y-2"
+                    x-transition:enter-end="opacity-100 scale-100 translate-y-0"
+                    x-transition:leave="transition-all duration-150 ease-in"
+                    x-transition:leave-start="opacity-100 scale-100 translate-y-0"
+                    x-transition:leave-end="opacity-0 scale-95 -translate-y-2"
+                    class="absolute right-0 mt-2 w-56 bg-white dark:bg-[#1E293B] rounded-xl shadow-xl border border-slate-200 dark:border-white/[0.06] z-50 overflow-hidden" style="display: none;">
 
-                    <div class="p-4 bg-gradient-to-r from-blue-500/10 to-indigo-500/10 border-b border-black/[0.06] dark:border-white/[0.06]">
+                    <!-- Profile Header -->
+                    <div class="px-4 py-3 border-b border-slate-100 dark:border-white/[0.06] bg-slate-50 dark:bg-white/[0.02]">
                         <div class="flex items-center gap-3">
                             <?php if (!empty($admin_photo)): ?>
-                            <img src="../<?php echo htmlspecialchars($admin_photo); ?>" alt="" class="w-10 h-10 rounded-full object-cover ring-2 ring-white dark:ring-[#1E293B] shadow-lg">
+                                <img src="../<?php echo htmlspecialchars($admin_photo); ?>" alt="" class="w-10 h-10 rounded-lg object-cover border border-slate-200 dark:border-white/[0.06]">
                             <?php else: ?>
-                            <div class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-500 text-white flex items-center justify-center text-sm font-bold shadow-lg shadow-blue-500/20">
-                                <?php echo strtoupper(substr($admin_name, 0, 2)); ?>
-                            </div>
+                                <div class="w-10 h-10 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-sm font-bold">
+                                    <?php echo strtoupper(substr($admin_name, 0, 2)); ?>
+                                </div>
                             <?php endif; ?>
                             <div class="min-w-0">
-                                <p class="text-sm font-bold text-slate-900 dark:text-white truncate"><?php echo htmlspecialchars($admin_name); ?></p>
-                                <p class="text-[11px] text-slate-500 dark:text-zinc-400 truncate"><?php echo htmlspecialchars($admin_email); ?></p>
+                                <p class="text-sm font-semibold text-slate-900 dark:text-white truncate"><?php echo htmlspecialchars($admin_name); ?></p>
+                                <p class="text-[11px] text-slate-500 dark:text-slate-400 truncate"><?php echo htmlspecialchars($admin_email); ?></p>
                             </div>
                         </div>
                     </div>
 
-                    <div class="p-2">
-                        <a href="profile.php" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-slate-700 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-white/[0.06] transition-colors">
-                            <i class="fa-solid fa-user text-xs text-slate-400 dark:text-zinc-500 w-5 text-center"></i> View Profile
+                    <!-- Menu Items -->
+                    <div class="py-1">
+                        <a href="profile.php" class="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/[0.03] transition-colors">
+                            <i class="fa-solid fa-user text-xs text-slate-400 dark:text-slate-500 w-4 text-center"></i> View Profile
                         </a>
-                        <a href="profile.php#password" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-slate-700 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-white/[0.06] transition-colors">
-                            <i class="fa-solid fa-lock text-xs text-slate-400 dark:text-zinc-500 w-5 text-center"></i> Change Password
+                        <a href="profile.php#password" class="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/[0.03] transition-colors">
+                            <i class="fa-solid fa-lock text-xs text-slate-400 dark:text-slate-500 w-4 text-center"></i> Change Password
                         </a>
                     </div>
 
-                    <div class="p-2 border-t border-black/[0.06] dark:border-white/[0.06]">
-                        <a href="<?php echo (strpos($_SERVER['SCRIPT_NAME'], '/admin/') !== false) ? 'logout.php' : '../admin/logout.php'; ?>" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors">
-                            <i class="fa-solid fa-right-from-bracket text-xs w-5 text-center"></i> Logout
+                    <!-- Logout -->
+                    <div class="py-1 border-t border-slate-100 dark:border-white/[0.06]">
+                        <a href="<?php echo $is_admin ? 'logout.php' : '../admin/logout.php'; ?>" class="flex items-center gap-3 px-4 py-2.5 text-sm text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors">
+                            <i class="fa-solid fa-right-from-bracket text-xs w-4 text-center"></i> Logout
                         </a>
                     </div>
                 </div>
@@ -217,40 +228,10 @@ $emp_desktop_nav = [
 
         </div>
     </div>
-
-    <?php if (!$is_admin && empty($use_sidebar)): ?>
-    <!-- Employee Desktop Navbar — visible on lg+ screens only (hidden when sidebar is used) -->
-    <nav class="emp-desktop-nav border-t border-slate-200/60 dark:border-white/[0.06]">
-        <div class="max-w-7xl mx-auto px-8">
-            <div class="flex items-center gap-1">
-                <?php foreach ($emp_desktop_nav as $nav):
-                    $is_nav_active = in_array($current_page, $nav['pages']);
-                ?>
-                <?php if (($nav['action'] ?? '') === 'notifications'): ?>
-                <!-- Notifications nav item — triggers the dropdown above -->
-                <button onclick="event.preventDefault(); document.querySelector('[x-data] button[aria-label]')?.click();"
-                    class="emp-desktop-nav-item relative <?php echo $is_nav_active ? 'active' : ''; ?>">
-                    <i class="fa-solid fa-<?php echo $nav['icon']; ?> text-sm"></i>
-                    <span><?php echo $nav['label']; ?></span>
-                    <?php if ($unread_count > 0): ?>
-                    <span class="absolute -top-1 right-1 w-4 h-4 bg-rose-500 text-white text-[8px] font-bold rounded-full flex items-center justify-center shadow-lg shadow-rose-500/30"><?php echo $unread_count; ?></span>
-                    <?php endif; ?>
-                </button>
-                <?php else: ?>
-                <a href="<?php echo $nav['href']; ?>" class="emp-desktop-nav-item <?php echo $is_nav_active ? 'active' : ''; ?>">
-                    <i class="fa-solid fa-<?php echo $nav['icon']; ?> text-sm"></i>
-                    <span><?php echo $nav['label']; ?></span>
-                </a>
-                <?php endif; ?>
-                <?php endforeach; ?>
-            </div>
-        </div>
-    </nav>
-    <?php endif; ?>
 </header>
 
 <?php if (!empty($page_actions)): ?>
-<div class="bg-white/60 dark:bg-[#0F172A]/60 border-b border-slate-200 dark:border-blue-500/10 px-4 lg:px-8 py-2.5 flex flex-wrap items-center justify-end gap-2">
-    <div class="flex items-center gap-2"><?php echo $page_actions; ?></div>
-</div>
+    <div class="bg-white dark:bg-[#0F172A] border-b border-slate-200 dark:border-white/[0.06] px-4 lg:px-8 py-2.5 flex flex-wrap items-center justify-end gap-2">
+        <div class="flex items-center gap-2"><?php echo $page_actions; ?></div>
+    </div>
 <?php endif; ?>

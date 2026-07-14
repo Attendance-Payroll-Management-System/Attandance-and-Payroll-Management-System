@@ -377,71 +377,127 @@ body.dark {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   LAYOUT — Sidebar responsive
-   Tablet (768-1023px): collapsible sidebar
-   Desktop (>=1024px): full expanded sidebar, always
+   LAYOUT — Sidebar + Topbar + Content Alignment
    ═══════════════════════════════════════════════════════════════ */
-@media (min-width: 768px) and (max-width: 1023px) {
-  .main-wrapper { margin-left: 16rem; transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
-  .main-wrapper .page-content { max-width: 1400px; margin: 0 auto; }
-  body.sidebar-collapsed .main-wrapper { margin-left: 5rem; }
+:root {
+  --sidebar-width: 16rem;
+  --sidebar-collapsed-width: 4.5rem;
+  --topbar-height: 4rem;
+  --layout-transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
+
+/* Tablet (768-1023px): collapsible sidebar */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .main-wrapper {
+    margin-left: var(--sidebar-width);
+    transition: margin-left var(--layout-transition);
+  }
+  body.sidebar-collapsed .main-wrapper {
+    margin-left: var(--sidebar-collapsed-width);
+  }
+}
+/* Desktop (>=1024px): expanded sidebar */
 @media (min-width: 1024px) {
-  .main-wrapper { margin-left: 16rem; transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
-  .main-wrapper .page-content { max-width: 1400px; margin: 0 auto; }
-  body.sidebar-collapsed .main-wrapper { margin-left: 5rem; }
+  .main-wrapper {
+    margin-left: var(--sidebar-width);
+    transition: margin-left var(--layout-transition);
+  }
+  body.sidebar-collapsed .main-wrapper {
+    margin-left: var(--sidebar-collapsed-width);
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   ADMIN FIXED TOPBAR — Independent of sidebar
+   ADMIN FIXED TOPBAR — Aligned with sidebar + main content
    ═══════════════════════════════════════════════════════════════ */
 .admin-topbar {
   position: fixed !important;
   top: 0;
   right: 0;
+  left: var(--sidebar-width);
   z-index: 30 !important;
+  height: var(--topbar-height);
+  transition: left var(--layout-transition);
+}
+body.sidebar-collapsed .admin-topbar {
+  left: var(--sidebar-collapsed-width);
 }
 
 @media (min-width: 768px) and (max-width: 1023px) {
   .admin-topbar {
-    left: 16rem;
-    transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    left: var(--sidebar-width);
   }
   body.sidebar-collapsed .admin-topbar {
-    left: 5rem;
+    left: var(--sidebar-collapsed-width);
   }
 }
 
 @media (min-width: 1024px) {
   .admin-topbar {
-    left: 16rem;
-    transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    left: var(--sidebar-width);
   }
   body.sidebar-collapsed .admin-topbar {
-    left: 5rem;
+    left: var(--sidebar-collapsed-width);
   }
 }
 
 @media (max-width: 767px) {
   .admin-topbar {
-    left: 0;
+    left: 0 !important;
   }
 }
 
 .sidebar-nav::-webkit-scrollbar { display: none; }
 
-/* Sidebar collapse */
-aside.collapsed { width: 5rem !important; }
-aside.collapsed .nav-text { opacity: 0; width: 0; max-width: 0; overflow: hidden; pointer-events: none; }
-aside.collapsed .nav-badge { display: none; }
-aside.collapsed .nav-item { justify-content: center; padding-left: 0; padding-right: 0; }
-aside.collapsed .nav-item > div:first-child { margin: 0; }
-aside.collapsed .sidebar-logo { margin: 0 auto; }
-aside.collapsed .nav-section .nav-item { justify-content: center; }
-aside.collapsed .nav-item:hover { background: rgba(16, 185, 129, 0.08) !important; }
-.dark aside.collapsed .nav-item:hover { background: rgba(16, 185, 129, 0.12) !important; }
-aside.collapsed .mx-3 { margin-left: 0.5rem; margin-right: 0.5rem; padding: 0.5rem; }
-aside.collapsed .mx-3 .relative { display: flex; justify-content: center; }
+/* ═══════════════════════════════════════════════════════════════
+   SIDEBAR COLLAPSE — Icon-only mode
+   ═══════════════════════════════════════════════════════════════ */
+aside.collapsed {
+  width: var(--sidebar-collapsed-width) !important;
+}
+aside.collapsed .nav-text {
+  opacity: 0;
+  width: 0;
+  max-width: 0;
+  overflow: hidden;
+  pointer-events: none;
+  transition: opacity 0.2s ease, width 0.2s ease;
+}
+aside.collapsed .nav-badge {
+  display: none;
+}
+aside.collapsed .nav-item {
+  justify-content: center;
+  padding-left: 0;
+  padding-right: 0;
+}
+aside.collapsed .nav-item > div:first-child {
+  margin: 0;
+}
+aside.collapsed .nav-section .nav-item {
+  justify-content: center;
+}
+aside.collapsed .nav-item:hover {
+  background: rgba(79, 70, 229, 0.08) !important;
+}
+.dark aside.collapsed .nav-item:hover {
+  background: rgba(99, 102, 241, 0.12) !important;
+}
+aside.collapsed .sidebar-profile {
+  margin: 0 0.5rem;
+  padding: 0.5rem;
+}
+aside.collapsed .sidebar-profile > div {
+  justify-content: center;
+}
+aside.collapsed .sidebar-brand-text,
+aside.collapsed .sidebar-profile-text {
+  opacity: 0;
+  width: 0;
+  max-width: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
 
 /* ═══════════════════════════════════════════════════════════════
    EMPLOYEE SIDEBAR — Pure CSS (no Tailwind dependency)
@@ -473,36 +529,31 @@ aside.collapsed .mx-3 .relative { display: flex; justify-content: center; }
   }
 }
 
-/* Sidebar collapse button */
+/* ═══════════════════════════════════════════════════════════════
+   SIDEBAR COLLAPSE BUTTON
+   ═══════════════════════════════════════════════════════════════ */
 .sidebar-collapse-btn {
   display: flex;
   align-items: center;
   justify-content: center;
   width: calc(100% - 1.5rem);
   margin: 0.5rem 0.75rem 0.75rem;
-  padding: 0.625rem;
-  border-radius: 0.75rem;
-  border: 1px solid rgba(30,58,138,0.08);
-  background: rgba(255,255,255,0.6);
-  color: #64748B;
-  font-size: 14px;
+  padding: 0.5rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--border-color);
+  background: var(--bg-card-hover);
+  color: var(--text-muted);
+  font-size: 12px;
   cursor: pointer;
   transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .sidebar-collapse-btn:hover {
-  background: rgba(79,70,229,0.06);
-  color: #4F46E5;
-  border-color: rgba(79,70,229,0.15);
-}
-.dark .sidebar-collapse-btn {
-  background: rgba(255,255,255,0.04);
-  border-color: rgba(148,163,184,0.08);
-  color: #94A3B8;
+  background: var(--glass-strong-bg);
+  color: var(--text-primary);
+  border-color: rgba(79,70,229,0.2);
 }
 .dark .sidebar-collapse-btn:hover {
-  background: rgba(99,102,241,0.1);
   color: #818CF8;
-  border-color: rgba(99,102,241,0.2);
 }
 .sidebar-collapse-btn i {
   transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
@@ -510,7 +561,6 @@ aside.collapsed .mx-3 .relative { display: flex; justify-content: center; }
 aside.collapsed .sidebar-collapse-btn {
   width: calc(100% - 1rem);
   margin: 0.5rem;
-  padding: 0.5rem;
 }
 aside.collapsed .sidebar-collapse-btn i {
   transform: rotate(180deg);
@@ -554,6 +604,12 @@ aside.collapsed .sidebar-collapse-btn i {
 .dark .theme-toggle-btn .icon-moon { display: inline; }
 :not(.dark) .theme-toggle-btn .icon-sun { display: inline; }
 :not(.dark) .theme-toggle-btn .icon-moon { display: none; }
+
+/* Theme icon visibility for new topbar */
+.dark .theme-icon-sun { display: none !important; }
+.dark .theme-icon-moon { display: inline !important; }
+:not(.dark) .theme-icon-sun { display: inline !important; }
+:not(.dark) .theme-icon-moon { display: none !important; }
 
 /* ═══════════════════════════════════════════════════════════════
    SMOOTH THEME TRANSITIONS
@@ -1048,70 +1104,45 @@ html { scroll-behavior: smooth; }
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   EMPLOYEE TOPBAR — Pure CSS (no Tailwind dependency)
+   EMPLOYEE TOPBAR — Identical to Admin Topbar
    ═══════════════════════════════════════════════════════════════ */
 .emp-header {
   position: fixed !important;
-  top: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
+  top: 0;
+  right: 0;
+  left: var(--sidebar-width);
   z-index: 30 !important;
-  background: rgba(255,255,255,0.88);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border-bottom: 1px solid rgba(30,58,138,0.08);
+  height: var(--topbar-height);
+  transition: left var(--layout-transition);
 }
-.dark .emp-header {
-  background: rgba(15,23,42,0.88);
-  border-bottom-color: rgba(148,163,184,0.06);
+body.sidebar-collapsed .emp-header {
+  left: var(--sidebar-collapsed-width);
 }
-.emp-header .h-16 {
-  height: 4rem;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding-right: 1rem;
-}
-@media (min-width: 768px) {
-  .emp-header .h-16 {
-    padding-left: 1rem;
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .emp-header {
+    left: var(--sidebar-width);
   }
-}
-@media (min-width: 1024px) {
-  .emp-header .h-16 {
-    padding-left: 2rem;
-    padding-right: 2rem;
+  body.sidebar-collapsed .emp-header {
+    left: var(--sidebar-collapsed-width);
   }
 }
 
-/* Header inner layout */
-.emp-header .min-w-0 {
-  min-width: 0;
-  flex: 1;
+@media (min-width: 1024px) {
+  .emp-header {
+    left: var(--sidebar-width);
+  }
+  body.sidebar-collapsed .emp-header {
+    left: var(--sidebar-collapsed-width);
+  }
 }
-.emp-header h1 {
-  font-size: 1.25rem;
-  font-weight: 700;
-  letter-spacing: -0.025em;
-  color: #1E293B;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+
+@media (max-width: 767px) {
+  .emp-header {
+    left: 0 !important;
+  }
 }
-.dark .emp-header h1 {
-  color: #FFFFFF;
-}
-.emp-header p.text-xs {
-  font-size: 0.75rem;
-  color: #64748B;
-  margin-top: 0.125rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.dark .emp-header p.text-xs {
-  color: #94A3B8;
-}
+/* Both topbars use identical styling via bg-white/border-b Tailwind classes */
 
 /* Header action buttons area */
 .emp-header .flex.items-center.space-x-2 {
@@ -1135,16 +1166,30 @@ html { scroll-behavior: smooth; }
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   EMPLOYEE TOPBAR SPACER — Pure CSS (no Tailwind dependency)
+   EMPLOYEE TOPBAR SPACER — Aligned with header
    ═══════════════════════════════════════════════════════════════ */
 .emp-header-spacer {
   width: 100%;
   flex-shrink: 0;
   height: 4rem;
 }
+@media (min-width: 768px) and (max-width: 1023px) {
+  .emp-header-spacer {
+    margin-left: var(--sidebar-width);
+    width: calc(100% - var(--sidebar-width));
+  }
+}
 @media (min-width: 1024px) {
   .emp-header-spacer {
-    height: 104px;
+    margin-left: var(--sidebar-width);
+    width: calc(100% - var(--sidebar-width));
+    height: 4rem;
+  }
+}
+@media (max-width: 767px) {
+  .emp-header-spacer {
+    margin-left: 0;
+    width: 100%;
   }
 }
 
