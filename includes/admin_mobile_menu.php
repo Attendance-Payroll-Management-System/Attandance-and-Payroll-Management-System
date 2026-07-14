@@ -1,8 +1,7 @@
 <?php
 /**
- * Admin Mobile Navigation Menu (Telegram-style)
+ * Admin Mobile Navigation Menu
  * Slide-in menu from the left for mobile screens.
- * Desktop sidebar remains unchanged.
  */
 $current_page = basename($_SERVER['SCRIPT_NAME'] ?? 'dashboard.php');
 
@@ -73,8 +72,8 @@ $page_map = [
 
 $active_page = $page_map[$current_page] ?? $current_page;
 ?>
-<!-- Admin Mobile Hamburger Button (mobile only) -->
-<button id="adminMobileMenuBtn" onclick="openAdminMobileMenu()" class="fixed top-4 left-4 z-[60] md:hidden w-11 h-11 rounded-2xl bg-gradient-to-br from-indigo-600 to-indigo-500 text-white flex items-center justify-center shadow-lg shadow-indigo-600/30 hover:shadow-xl hover:shadow-indigo-600/40 hover:scale-105 active:scale-95 transition-all duration-200">
+<!-- Admin Mobile Hamburger Button -->
+<button id="adminMobileMenuBtn" onclick="openAdminMobileMenu()" class="fixed top-4 left-4 z-[60] md:hidden w-11 h-11 rounded-2xl bg-gradient-to-br from-sky-500 to-blue-500 text-white flex items-center justify-center shadow-lg shadow-sky-500/30 hover:shadow-xl hover:shadow-sky-500/40 hover:scale-105 active:scale-95 transition-all duration-200">
     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
     </svg>
@@ -83,29 +82,29 @@ $active_page = $page_map[$current_page] ?? $current_page;
 <!-- Admin Mobile Backdrop -->
 <div id="adminMobileBackdrop" onclick="closeAdminMobileMenu()" class="fixed inset-0 z-[70] bg-black/60 backdrop-blur-sm md:hidden opacity-0 pointer-events-none transition-opacity duration-300"></div>
 
-<!-- Admin Mobile Menu (Telegram-style slide panel) -->
-<div id="adminMobileMenu" class="fixed inset-y-0 left-0 z-[80] w-[300px] max-w-[85vw] bg-white dark:bg-[#0F172A] transform -translate-x-full transition-transform duration-300 ease-in-out md:hidden shadow-2xl flex flex-col">
+<!-- Admin Mobile Menu -->
+<div id="adminMobileMenu" class="fixed inset-y-0 left-0 z-[80] w-[300px] max-w-[85vw] bg-white dark:bg-[#0F172A] transform -translate-x-full transition-transform duration-300 ease-in-out md:hidden shadow-2xl flex flex-col border-r border-slate-200 dark:border-white/[0.06]">
 
     <!-- Menu Header - Profile -->
     <div class="relative overflow-hidden px-5 pt-6 pb-5 border-b border-slate-200/60 dark:border-white/[0.06] shrink-0">
-        <div class="absolute -inset-20 bg-gradient-to-br from-indigo-500/20 via-blue-500/10 to-cyan-500/5 blur-3xl opacity-80"></div>
+        <div class="absolute -inset-20 bg-gradient-to-br from-sky-500/20 via-blue-500/10 to-cyan-500/5 blur-3xl opacity-80"></div>
         <div class="relative flex items-center gap-3">
             <?php if (!empty($admin_photo)): ?>
-            <img src="../<?php echo htmlspecialchars($admin_photo); ?>" alt="" class="w-12 h-12 rounded-full object-cover ring-2 ring-indigo-500/30 shadow-lg shrink-0">
+            <img src="../<?php echo htmlspecialchars($admin_photo); ?>" alt="" class="w-12 h-12 rounded-xl object-cover ring-2 ring-sky-500/30 shadow-lg shrink-0">
             <?php else: ?>
-            <div class="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-500 to-blue-600 text-white flex items-center justify-center text-sm font-bold shadow-lg shadow-indigo-500/30 shrink-0">
+            <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-sky-500 to-blue-500 text-white flex items-center justify-center text-sm font-bold shadow-lg shadow-sky-500/30 shrink-0">
                 <?php echo strtoupper(substr($admin_name, 0, 2)); ?>
             </div>
             <?php endif; ?>
             <div class="min-w-0 flex-1">
                 <p class="text-sm font-bold text-slate-900 dark:text-white leading-tight"><?php echo htmlspecialchars($admin_name); ?></p>
                 <p class="text-xs text-slate-500 dark:text-zinc-400 mt-0.5 leading-tight"><?php echo htmlspecialchars($admin_email); ?></p>
-                <span class="inline-block mt-1 text-[10px] font-semibold text-indigo-500 dark:text-indigo-400 bg-indigo-500/10 dark:bg-indigo-500/15 px-2 py-0.5 rounded-full">Administrator</span>
+                <span class="inline-block mt-1 text-[10px] font-semibold text-sky-500 dark:text-sky-400 bg-sky-500/10 dark:bg-sky-500/15 px-2 py-0.5 rounded-full">Administrator</span>
             </div>
         </div>
     </div>
 
-    <!-- Menu Items (scrollable) -->
+    <!-- Menu Items -->
     <nav class="flex-1 overflow-y-auto py-2 px-2.5 admin-mobile-scrollbar">
         <?php foreach ($menu_items as $item): ?>
             <?php if (isset($item['section'])): ?>
@@ -119,12 +118,12 @@ $active_page = $page_map[$current_page] ?? $current_page;
             ?>
             <a href="<?php echo $item['href']; ?>" onclick="closeAdminMobileMenu()" class="flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200 group
                 <?php echo $is_active
-                    ? 'bg-indigo-500/10 dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 font-semibold'
+                    ? 'bg-sky-500/10 dark:bg-sky-500/15 text-sky-600 dark:text-sky-400 font-semibold'
                     : 'text-slate-700 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-white/[0.05] hover:text-slate-900 dark:hover:text-white'; ?>">
                 <div class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-all duration-200
                     <?php echo $is_active
-                        ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/30'
-                        : 'bg-slate-100 dark:bg-white/[0.06] text-slate-400 dark:text-zinc-500 group-hover:bg-indigo-100 dark:group-hover:bg-indigo-500/15 group-hover:text-indigo-500 dark:group-hover:text-indigo-400'; ?>">
+                        ? 'bg-sky-500 text-white shadow-lg shadow-sky-500/30'
+                        : 'bg-slate-100 dark:bg-white/[0.06] text-slate-400 dark:text-zinc-500 group-hover:bg-sky-100 dark:group-hover:bg-sky-500/15 group-hover:text-sky-500 dark:group-hover:text-sky-400'; ?>">
                     <i class="fa-solid fa-<?php echo $item['icon']; ?> text-sm"></i>
                 </div>
                 <span class="text-[13px] font-medium leading-snug"><?php echo $item['label']; ?></span>

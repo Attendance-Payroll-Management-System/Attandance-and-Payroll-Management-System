@@ -3,15 +3,17 @@
  * Daily Attendance Processing Script
  * 
  * Auto-marks attendance for all active employees:
- * - Saturdays/Sundays → weekend
- * - Public holidays → public_holiday
- * - Working days without check-in and no approved leave → AWOL
+ * - Saturdays/Sundays -> weekend
+ * - Public holidays -> public_holiday
+ * - Working days without check-in and no approved leave -> AWOL
+ * 
+ * Also reconciles missing Pension Fund deductions for AWOL records.
  * 
  * Can be triggered:
  * 1. Manually by admin via browser
  * 2. As a cron job (CLI)
  * 
- * Usage (CLI): php admin/process_daily_attendance.php [date]
+ * Usage (CLI): php admin/process_daily_attendance.php [date] [--reconcile]
  * Usage (Web): Navigate to this page in admin panel
  */
 
@@ -31,7 +33,7 @@ require_once '../config/notifications.php';
 
 set_mmt_timezone();
 
-// Get date to process (default: yesterday for cron, today for web)
+// Get date to process (default: today)
 $process_date = '';
 
 if ($is_cli) {
@@ -47,29 +49,111 @@ if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $process_date)) {
     else { $_SESSION['message'] = $error_msg; $_SESSION['message_type'] = 'error'; header('Location: dashboard.php'); exit; }
 }
 
-// Check if already processed
-$log_check = $conn->prepare("SELECT id FROM attendance_processing_log WHERE process_date = ?");
-$log_check->bind_param('s', $process_date);
-$log_check->execute();
-$log_check->store_result();
-$already_processed = $log_check->num_rows > 0;
-$log_check->close();
+$reconcile_only = false;
+if ($is_cli && in_array('--reconcile', $argv ?? [])) {
+    $reconcile_only = true;
+}
+if (!$is_cli && isset($_POST['reconcile'])) {
+    $reconcile_only = true;
+}
 
-if (!$is_cli && !$already_processed) {
-    // Run processing
+$message = '';
+$message_type = '';
+
+// Handle Reconcile Deductions
+if ($reconcile_only) {
+    $recon_result = reconcile_awol_deductions($conn, $process_date);
+    $message = "Deduction Reconcile for $process_date: Checked {$recon_result['checked']} AWOL records, Created {$recon_result['created']} new deductions, Skipped {$recon_result['skipped']} existing.";
+    $message_type = !empty($recon_result['errors']) ? 'error' : 'success';
+
+    if (!empty($recon_result['errors'])) {
+        $message .= " Errors: " . implode('; ', $recon_result['errors']);
+    }
+
+    if ($is_cli) {
+        echo $message . "\n";
+        exit(0);
+    }
+    $_SESSION['message'] = $message;
+    $_SESSION['message_type'] = $message_type;
+}
+
+// Handle Process Attendance
+if (!$reconcile_only && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['process_attendance'])) {
     $result = auto_mark_daily_attendance($conn, $process_date);
 
-    // Log the processing run
-    $log = $conn->prepare("INSERT INTO attendance_processing_log (process_date, processed_by, employees_processed, awol_marked, weekend_marked, holiday_marked) VALUES (?, ?, ?, ?, ?, ?)");
-    $who = $is_cli ? 'cron' : ('admin_' . ($_SESSION['admin_id'] ?? 0));
-    $log->bind_param('ssiiii', $process_date, $who, $result['processed'], $result['awol'], $result['weekend'], $result['holiday']);
-    $log->execute();
-    $log->close();
+    // Try to log the processing run (table may not exist)
+    $log_check = $conn->query("SHOW TABLES LIKE 'attendance_processing_log'");
+    if ($log_check && $log_check->num_rows > 0) {
+        $log = $conn->prepare("INSERT INTO attendance_processing_log (process_date, processed_by, employees_processed, awol_marked, weekend_marked, holiday_marked) VALUES (?, ?, ?, ?, ?, ?)");
+        $who = 'admin_' . ($_SESSION['admin_id'] ?? 0);
+        $log->bind_param('ssiiii', $process_date, $who, $result['processed'], $result['awol'], $result['weekend'], $result['holiday']);
+        $log->execute();
+        $log->close();
+    }
 
-    $summary = "Processed {$result['processed']} employees: {$result['awol']} AWOL, {$result['weekend']} Weekend, {$result['holiday']} Public Holiday.";
-    $_SESSION['message'] = $summary;
-    $_SESSION['message_type'] = 'success';
+    // Also reconcile deductions for any AWOL records
+    $recon = reconcile_awol_deductions($conn, $process_date);
+
+    $message = "Processed {$result['processed']} employees: {$result['awol']} AWOL, {$result['weekend']} Weekend, {$result['holiday']} Holiday. Deductions: {$recon['created']} created, {$recon['skipped']} existing.";
+    $message_type = 'success';
+
+    if ($is_cli) {
+        echo $message . "\n";
+        exit(0);
+    }
+    $_SESSION['message'] = $message;
+    $_SESSION['message_type'] = $message_type;
 }
+
+// CLI mode: run both processing + reconcile
+if ($is_cli && !$reconcile_only) {
+    $result = auto_mark_daily_attendance($conn, $process_date);
+
+    $log_check = $conn->query("SHOW TABLES LIKE 'attendance_processing_log'");
+    if ($log_check && $log_check->num_rows > 0) {
+        $log = $conn->prepare("INSERT INTO attendance_processing_log (process_date, processed_by, employees_processed, awol_marked, weekend_marked, holiday_marked) VALUES (?, 'cron', ?, ?, ?, ?)");
+        $log->bind_param('siiii', $process_date, $result['processed'], $result['awol'], $result['weekend'], $result['holiday']);
+        $log->execute();
+        $log->close();
+    }
+
+    $recon = reconcile_awol_deductions($conn, $process_date);
+
+    echo "Processed {$result['processed']} employees on $process_date.\n";
+    echo "  AWOL: {$result['awol']}\n";
+    echo "  Weekend: {$result['weekend']}\n";
+    echo "  Public Holiday: {$result['holiday']}\n";
+    echo "  Deductions created: {$recon['created']}\n";
+    echo "  Deductions existing (skipped): {$recon['skipped']}\n";
+    exit(0);
+}
+
+// Get processing history for display
+$processing_log = [];
+$log_table_check = $conn->query("SHOW TABLES LIKE 'attendance_processing_log'");
+if ($log_table_check && $log_table_check->num_rows > 0) {
+    $logs_result = $conn->query("SELECT * FROM attendance_processing_log ORDER BY process_date DESC LIMIT 20");
+    if ($logs_result) {
+        $processing_log = $logs_result->fetch_all(MYSQLI_ASSOC);
+    }
+}
+
+// Get AWOL deduction summary for the selected date
+$awol_summary = [];
+$awol_stmt = $conn->prepare(
+    "SELECT a.id, a.employee_id, e.name, e.employee_code, a.status,
+            (SELECT d.id FROM deductions d WHERE d.employee_id = a.employee_id AND d.deduction_date = a.attendance_date AND d.remarks = ? LIMIT 1) as deduction_id
+     FROM attendance a
+     JOIN employee e ON a.employee_id = e.id
+     WHERE a.attendance_date = ? AND a.status IN ('awol', 'absent', 'full_absent')
+     ORDER BY e.name"
+);
+$awol_remarks = AWOL_DEDUCTION_REMARKS;
+$awol_stmt->bind_param('ss', $awol_remarks, $process_date);
+$awol_stmt->execute();
+$awol_summary = $awol_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+$awol_stmt->close();
 
 // Web mode - show results page
 if (!$is_cli):
@@ -86,58 +170,110 @@ if (!$is_cli):
 <body x-data="{}" class="bg-slate-50 dark:bg-[#0B1120] text-slate-900 dark:text-white font-sans antialiased min-h-screen flex">
     <?php include "../includes/sidebar.php"; ?>
     <div class="flex-1 flex flex-col min-w-0 main-wrapper">
-        <?php $page_title = "Process Daily Attendance"; $page_subtitle = "Automatically mark weekend, holiday, and AWOL attendance for all active employees."; include "../includes/topbar.php"; ?>
+        <?php $page_title = "Process Daily Attendance"; $page_subtitle = "Auto-mark weekend, holiday, AWOL attendance and ensure Pension Fund deductions are created."; include "../includes/topbar.php"; ?>
         <main class="flex-1 p-8 overflow-y-auto">
-            <div class="max-w-2xl mx-auto">
+            <div class="max-w-3xl mx-auto">
 
-                <?php
-                $msg = get_message();
-                if ($msg['message']):
-                ?>
-                <div class="mb-6 rounded-2xl px-6 py-4 shadow-sm border <?php echo $msg['message_type'] == 'success' ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400' : 'bg-red-500/20 border-red-500/30 text-red-400'; ?>">
+                <?php if ($message): ?>
+                <div class="mb-6 rounded-2xl px-6 py-4 shadow-sm border <?php echo $message_type == 'success' ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400' : 'bg-red-500/20 border-red-500/30 text-red-400'; ?>">
                     <div class="flex items-center gap-3">
-                        <i class="fa-solid <?php echo $msg['message_type'] == 'success' ? 'fa-circle-check' : 'fa-circle-exclamation'; ?> text-lg"></i>
-                        <p class="font-medium"><?php echo htmlspecialchars($msg['message']); ?></p>
+                        <i class="fa-solid <?php echo $message_type == 'success' ? 'fa-circle-check' : 'fa-circle-exclamation'; ?> text-lg"></i>
+                        <p class="font-medium"><?php echo htmlspecialchars($message); ?></p>
                     </div>
                 </div>
                 <?php endif; ?>
 
-                <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-6">
-                    <h2 class="text-lg font-bold text-white mb-6"><i class="fa-solid fa-robot text-blue-400 mr-2"></i>Attendance Processor</h2>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Process Attendance -->
+                    <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-6">
+                        <h2 class="text-lg font-bold text-white mb-4"><i class="fa-solid fa-robot text-blue-400 mr-2"></i>Process Attendance</h2>
 
-                    <form method="POST" class="space-y-4">
-                    <?php echo csrf_field(); ?>
-                        <div>
-                            <label class="text-xs font-semibold text-zinc-400 block mb-1.5">Process Date</label>
-                            <input type="date" name="date" value="<?php echo $process_date; ?>" required class="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white placeholder-zinc-500 shadow-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30">
-                            <p class="text-xs text-zinc-500 mt-1">Select the date to process attendance for.</p>
-                        </div>
+                        <form method="POST" class="space-y-4">
+                        <?php echo csrf_field(); ?>
+                            <div>
+                                <label class="text-xs font-semibold text-zinc-400 block mb-1.5">Process Date</label>
+                                <input type="date" name="date" value="<?php echo htmlspecialchars($process_date); ?>" required class="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white placeholder-zinc-500 shadow-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30">
+                            </div>
 
-                        <div class="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 text-sm text-amber-400">
-                            <i class="fa-solid fa-triangle-exclamation mr-2"></i>
-                            <strong>What this does:</strong>
-                            <ul class="mt-2 space-y-1 text-zinc-400 ml-5 list-disc">
-                                <li>Marks all active employees as <strong>Weekend</strong> on Saturdays/Sundays</li>
-                                <li>Marks all active employees as <strong>Public Holiday</strong> on holidays</li>
-                                <li>Marks employees without check-in as <strong>AWOL</strong> on working days</li>
-                                <li>Skips employees who already have attendance records or approved leave</li>
-                            </ul>
-                        </div>
+                            <div class="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 text-sm text-amber-400">
+                                <i class="fa-solid fa-triangle-exclamation mr-2"></i>
+                                <strong>What this does:</strong>
+                                <ul class="mt-2 space-y-1 text-zinc-400 ml-5 list-disc">
+                                    <li>Marks <strong>Weekend</strong> on Saturdays/Sundays</li>
+                                    <li>Marks <strong>Public Holiday</strong> on holidays</li>
+                                    <li>Marks <strong>AWOL</strong> on working days without check-in</li>
+                                    <li>Creates <strong>Pension Fund deductions (2%)</strong> for AWOL records</li>
+                                </ul>
+                            </div>
 
-                        <?php if ($already_processed): ?>
-                        <div class="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4 text-sm text-blue-400">
-                            <i class="fa-solid fa-circle-info mr-2"></i>
-                            Attendance has already been processed for <?php echo $process_date; ?>. Processing again will only add records for employees not yet processed.
-                        </div>
-                        <?php endif; ?>
+                            <button type="submit" name="process_attendance" value="1" class="w-full rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold text-sm px-5 py-3 shadow-sm transition flex items-center justify-center gap-2">
+                                <i class="fa-solid fa-play"></i> Process Attendance
+                            </button>
+                        </form>
+                    </div>
 
-                        <button type="submit" class="w-full rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold text-sm px-5 py-3 shadow-sm transition flex items-center justify-center gap-2">
-                            <i class="fa-solid fa-play"></i> Process Attendance for <?php echo $process_date; ?>
-                        </button>
-                    </form>
+                    <!-- Reconcile Deductions -->
+                    <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-6">
+                        <h2 class="text-lg font-bold text-white mb-4"><i class="fa-solid fa-wrench text-amber-400 mr-2"></i>Reconcile Deductions</h2>
+
+                        <form method="POST" class="space-y-4">
+                        <?php echo csrf_field(); ?>
+                            <input type="hidden" name="date" value="<?php echo htmlspecialchars($process_date); ?>">
+
+                            <div class="bg-rose-500/10 border border-rose-500/20 rounded-xl p-4 text-sm text-rose-400">
+                                <i class="fa-solid fa-circle-info mr-2"></i>
+                                <strong>What this does:</strong>
+                                <ul class="mt-2 space-y-1 text-zinc-400 ml-5 list-disc">
+                                    <li>Scans all <strong>AWOL</strong> attendance records for the date</li>
+                                    <li>Creates missing <strong>Pension Fund deductions (2%)</strong></li>
+                                    <li>Safe to run multiple times (skips existing)</li>
+                                </ul>
+                            </div>
+
+                            <button type="submit" name="reconcile" value="1" class="w-full rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-semibold text-sm px-5 py-3 shadow-sm transition flex items-center justify-center gap-2">
+                                <i class="fa-solid fa-wrench"></i> Reconcile Deductions
+                            </button>
+                        </form>
+                    </div>
                 </div>
 
+                <!-- AWOL Summary for Selected Date -->
+                <?php if (!empty($awol_summary)): ?>
+                <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-6 mt-6">
+                    <h2 class="text-lg font-bold text-white mb-4"><i class="fa-solid fa-users-slash text-red-400 mr-2"></i>AWOL Records — <?php echo htmlspecialchars($process_date); ?></h2>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm">
+                            <thead class="text-zinc-500 text-xs uppercase tracking-wider border-b border-white/[0.06]">
+                                <tr>
+                                    <th class="py-3 font-semibold">Employee</th>
+                                    <th class="py-3 font-semibold">Code</th>
+                                    <th class="py-3 font-semibold">Status</th>
+                                    <th class="py-3 font-semibold text-center">Deduction</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-white/[0.06] text-zinc-300">
+                                <?php foreach ($awol_summary as $aw): ?>
+                                <tr>
+                                    <td class="py-3 font-medium text-white"><?php echo htmlspecialchars($aw['name']); ?></td>
+                                    <td class="py-3 text-zinc-400 font-mono text-xs"><?php echo htmlspecialchars($aw['employee_code']); ?></td>
+                                    <td class="py-3"><span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold bg-red-700/20 text-red-500"><?php echo strtoupper($aw['status']); ?></span></td>
+                                    <td class="py-3 text-center">
+                                        <?php if ($aw['deduction_id']): ?>
+                                            <span class="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/20"><i class="fa-solid fa-check text-[10px]"></i> Applied</span>
+                                        <?php else: ?>
+                                            <span class="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-amber-500/15 text-amber-400 border border-amber-500/20"><i class="fa-solid fa-exclamation text-[10px]"></i> Missing</span>
+                                        <?php endif; ?>
+                                    </td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <?php endif; ?>
+
                 <!-- Processing Log -->
+                <?php if (!empty($processing_log)): ?>
                 <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-6 mt-6">
                     <h2 class="text-lg font-bold text-white mb-4"><i class="fa-solid fa-clock-rotate-left text-blue-400 mr-2"></i>Processing History</h2>
                     <div class="overflow-x-auto">
@@ -153,38 +289,28 @@ if (!$is_cli):
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-white/[0.06] text-zinc-300">
-                                <?php
-                                $logs = $conn->query("SELECT * FROM attendance_processing_log ORDER BY process_date DESC LIMIT 20");
-                                if ($logs && $logs->num_rows > 0):
-                                    while ($log = $logs->fetch_assoc()):
-                                ?>
+                                <?php foreach ($processing_log as $log): ?>
                                 <tr>
-                                    <td class="py-3 font-medium text-white"><?php echo $log['process_date']; ?></td>
+                                    <td class="py-3 font-medium text-white"><?php echo htmlspecialchars($log['process_date']); ?></td>
                                     <td class="py-3"><?php echo $log['employees_processed']; ?></td>
                                     <td class="py-3 text-red-400"><?php echo $log['awol_marked']; ?></td>
                                     <td class="py-3 text-purple-400"><?php echo $log['weekend_marked']; ?></td>
                                     <td class="py-3 text-pink-400"><?php echo $log['holiday_marked']; ?></td>
                                     <td class="py-3 text-zinc-500 text-xs"><?php echo htmlspecialchars($log['processed_by']); ?></td>
                                 </tr>
-                                <?php
-                                    endwhile;
-                                else:
-                                ?>
-                                <tr>
-                                    <td colspan="6" class="py-6 text-center text-zinc-500">No processing history yet.</td>
-                                </tr>
-                                <?php endif; ?>
+                                <?php endforeach; ?>
                             </tbody>
                         </table>
                     </div>
                 </div>
+                <?php endif; ?>
 
                 <!-- Cron Setup Instructions -->
                 <div class="glass-strong rounded-2xl p-6 mt-6">
                     <h3 class="font-bold text-white text-sm mb-2"><i class="fa-solid fa-terminal text-emerald-400 mr-2"></i>Automated Cron Setup (Linux)</h3>
                     <p class="text-xs text-zinc-400 mb-2">Add this to your crontab to run daily at 11:45 PM:</p>
                     <pre class="bg-black/40 text-emerald-300 text-xs p-3 rounded-lg overflow-x-auto">45 23 * * * /usr/bin/php /path/to/admin/process_daily_attendance.php</pre>
-                    <p class="text-xs text-zinc-500 mt-2">This will auto-mark attendance for the current day.</p>
+                    <p class="text-xs text-zinc-500 mt-2">This will auto-mark attendance and create Pension Fund deductions for AWOL.</p>
                 </div>
             </div>
         </main>
@@ -199,21 +325,4 @@ if (!$is_cli):
     </div>
 </body>
 </html>
-<?php
-endif;
-// CLI mode output
-if ($is_cli) {
-    if ($already_processed) {
-        echo "Attendance already processed for $process_date.\n";
-    } else {
-        $result = auto_mark_daily_attendance($conn, $process_date);
-        $log = $conn->prepare("INSERT INTO attendance_processing_log (process_date, processed_by, employees_processed, awol_marked, weekend_marked, holiday_marked) VALUES (?, 'cron', ?, ?, ?, ?)");
-        $log->bind_param('siiii', $process_date, $result['processed'], $result['awol'], $result['weekend'], $result['holiday']);
-        $log->execute();
-        $log->close();
-        echo "Processed {$result['processed']} employees on $process_date.\n";
-        echo "  AWOL: {$result['awol']}\n";
-        echo "  Weekend: {$result['weekend']}\n";
-        echo "  Public Holiday: {$result['holiday']}\n";
-    }
-}
+<?php endif; ?>

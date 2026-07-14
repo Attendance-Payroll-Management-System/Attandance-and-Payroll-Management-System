@@ -227,16 +227,23 @@ $total_amount = array_sum(array_column($records, 'amount'));
                                                 <?php if (!empty($r['description'])): ?>
                                                 <div class="text-xs text-zinc-500 max-w-[200px] truncate" title="<?php echo htmlspecialchars($r['description']); ?>"><?php echo htmlspecialchars($r['description']); ?></div>
                                                 <?php endif; ?>
+                                                <?php if (!empty($r['remarks']) && $r['remarks'] === 'Auto Pension Fund Deduction for Unauthorized Absence'): ?>
+                                                <span class="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full bg-amber-500/15 text-[10px] font-semibold text-amber-400 border border-amber-500/20"><i class="fa-solid fa-robot text-[8px]"></i> Auto</span>
+                                                <?php endif; ?>
                                             </td>
                                             <td class="px-6 py-4 text-right font-mono font-semibold text-rose-400">-$<?php echo number_format($r['amount'], 2); ?></td>
                                             <td class="px-6 py-4"><?php echo date('M d, Y', strtotime($r['deduction_date'])); ?></td>
                                             <td class="px-6 py-4 text-right space-x-3">
+                                                <?php if (empty($r['remarks']) || $r['remarks'] !== 'Auto Pension Fund Deduction for Unauthorized Absence'): ?>
                                                 <button type="button" @click="$dispatch('open-edit', { id: <?php echo $r['id']; ?>, title: '<?php echo htmlspecialchars(addslashes($r['title'] ?? ''), ENT_QUOTES); ?>', amount: <?php echo $r['amount']; ?>, description: '<?php echo htmlspecialchars(addslashes($r['description'] ?? ''), ENT_QUOTES); ?>', date: '<?php echo $r['deduction_date']; ?>' })" class="text-blue-400 hover:text-blue-300 text-xs font-medium"><i class="fa-solid fa-pen"></i></button>
                                                 <form method="POST" onsubmit="return confirm('Delete this deduction?');" class="inline">
                                                 <?php echo csrf_field(); ?>
                                                     <input type="hidden" name="id" value="<?php echo $r['id']; ?>">
                                                     <button type="submit" name="delete_deduction" class="text-red-400 hover:text-red-300 text-xs font-medium"><i class="fa-solid fa-trash"></i></button>
                                                 </form>
+                                                <?php else: ?>
+                                                <span class="text-xs text-zinc-500 italic">System managed</span>
+                                                <?php endif; ?>
                                             </td>
                                         </tr>
                                         <?php endforeach; ?>
@@ -277,7 +284,12 @@ $total_amount = array_sum(array_column($records, 'amount'));
                             </div>
                             <div>
                                 <label class="text-xs font-semibold text-zinc-400 block mb-1.5">Title</label>
-                                <input type="text" name="title" required placeholder="e.g. Health Insurance" class="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white placeholder-zinc-500 shadow-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30">
+                                <select name="title" required class="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white placeholder-zinc-500 shadow-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30">
+                                    <option value="">-- Select Title --</option>
+                                    <?php foreach ($deduction_types as $dt): ?>
+                                    <option value="<?php echo htmlspecialchars($dt['deduction_name']); ?>"><?php echo htmlspecialchars($dt['deduction_name']); ?></option>
+                                    <?php endforeach; ?>
+                                </select>
                             </div>
                             <div>
                                 <label class="text-xs font-semibold text-zinc-400 block mb-1.5">Amount ($)</label>
@@ -349,7 +361,12 @@ $total_amount = array_sum(array_column($records, 'amount'));
                         <input type="hidden" name="id" :value="editId">
                         <div>
                             <label class="text-xs font-semibold text-zinc-400 block mb-1.5">Title</label>
-                            <input type="text" name="title" x-model="editTitle" required class="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white placeholder-zinc-500 shadow-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30">
+                            <select name="title" x-model="editTitle" required class="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white placeholder-zinc-500 shadow-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30">
+                                <option value="">-- Select Title --</option>
+                                <?php foreach ($deduction_types as $dt): ?>
+                                <option value="<?php echo htmlspecialchars($dt['deduction_name']); ?>"><?php echo htmlspecialchars($dt['deduction_name']); ?></option>
+                                <?php endforeach; ?>
+                            </select>
                         </div>
                         <div>
                             <label class="text-xs font-semibold text-zinc-400 block mb-1.5">Amount ($)</label>

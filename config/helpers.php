@@ -585,6 +585,14 @@ function get_attendance_block_message(string $block_type): string {
 // ─── Attendance Record Update after Check-out ──────────────────
 
 function recalculate_attendance_after_checkout(mysqli $conn, int $attendance_id, int $employee_id, string $date, string $check_in, string $check_out, float $total_hours): string {
+    // Get current status before recalculation
+    $old_stmt = $conn->prepare("SELECT status FROM attendance WHERE id = ?");
+    $old_stmt->bind_param('i', $attendance_id);
+    $old_stmt->execute();
+    $old_row = $old_stmt->get_result()->fetch_assoc();
+    $old_stmt->close();
+    $old_status = $old_row['status'] ?? '';
+
     $new_status = calculate_attendance_status($conn, $employee_id, $date, $check_in, $check_out, $total_hours);
 
     $is_late_flag = is_late_checkin($check_in) ? 1 : 0;
@@ -595,6 +603,11 @@ function recalculate_attendance_after_checkout(mysqli $conn, int $attendance_id,
     $stmt->bind_param('sidi', $new_status, $is_late_flag, $total_hours, $attendance_id);
     $stmt->execute();
     $stmt->close();
+
+    // Handle AWOL deduction on status change
+    if ($old_status !== $new_status) {
+        handle_awol_deduction_on_status_change($conn, $employee_id, $new_status, $attendance_id, $date);
+    }
 
     return $new_status;
 }
@@ -672,9 +685,146 @@ function auto_mark_daily_attendance(mysqli $conn, string $date): array {
                 $stmt = $conn->prepare("INSERT INTO attendance (employee_id, attendance_date, status, auto_calculated) VALUES (?, ?, 'awol', 1)");
                 $stmt->bind_param('is', $eid, $date);
                 $stmt->execute();
+                $awol_att_id = $conn->insert_id;
                 $stmt->close();
                 $result['awol']++;
+
+                // Auto-create Pension Fund deduction for AWOL
+                create_awol_deduction($conn, $eid, $awol_att_id, $date);
             }
+        }
+    }
+
+    return $result;
+}
+
+// ─── Automatic Pension Fund Deduction for AWOL Attendance ─────
+
+define('AWOL_DEDUCTION_RATE', 0.02);
+define('AWOL_DEDUCTION_REMARKS', 'Auto Pension Fund Deduction for Unauthorized Absence');
+
+function get_awol_deduction_type_id(mysqli $conn): ?int {
+    $result = $conn->query("SELECT id FROM deduction_types WHERE deduction_name = 'Pension Fund' LIMIT 1");
+    if ($result && $row = $result->fetch_assoc()) {
+        return (int)$row['id'];
+    }
+    return null;
+}
+
+function has_awol_deduction(mysqli $conn, int $employee_id, string $date): bool {
+    $stmt = $conn->prepare("SELECT id FROM deductions WHERE employee_id = ? AND deduction_date = ? AND remarks = ? LIMIT 1");
+    $stmt->bind_param('iss', $employee_id, $date, AWOL_DEDUCTION_REMARKS);
+    $stmt->execute();
+    $stmt->store_result();
+    $exists = $stmt->num_rows > 0;
+    $stmt->close();
+    return $exists;
+}
+
+function create_awol_deduction(mysqli $conn, int $employee_id, int $attendance_id, string $date): bool {
+    if (has_awol_deduction($conn, $employee_id, $date)) {
+        return false;
+    }
+
+    $emp_stmt = $conn->prepare("SELECT basic_salary, name, employee_code FROM employee WHERE id = ?");
+    $emp_stmt->bind_param('i', $employee_id);
+    $emp_stmt->execute();
+    $emp = $emp_stmt->get_result()->fetch_assoc();
+    $emp_stmt->close();
+
+    $basic_salary = (float)($emp['basic_salary'] ?? 0);
+    if ($basic_salary <= 0) return false;
+
+    $deduction_amount = round($basic_salary * AWOL_DEDUCTION_RATE, 2);
+    $type_id = get_awol_deduction_type_id($conn);
+
+    $stmt = $conn->prepare("INSERT INTO deductions (employee_id, title, deduction_type_id, attendance_id, amount, deduction_rate, description, deduction_date, remarks) VALUES (?, 'Pension Fund', ?, ?, ?, ?, 'Auto Pension Fund Deduction for Unauthorized Absence (2% of salary)', ?, ?)");
+    $stmt->bind_param('iiiddss', $employee_id, $type_id, $attendance_id, $deduction_amount, AWOL_DEDUCTION_RATE, $date, AWOL_DEDUCTION_REMARKS);
+    $result = $stmt->execute();
+    $stmt->close();
+
+    if ($result) {
+        log_awol_deduction($conn, $employee_id, $emp['name'] ?? '', $emp['employee_code'] ?? '', $date, $basic_salary, $deduction_amount);
+    }
+
+    return $result;
+}
+
+function remove_awol_deduction(mysqli $conn, int $employee_id, string $date): bool {
+    $stmt = $conn->prepare("DELETE FROM deductions WHERE employee_id = ? AND deduction_date = ? AND remarks = ?");
+    $stmt->bind_param('iss', $employee_id, $date, AWOL_DEDUCTION_REMARKS);
+    $result = $stmt->execute();
+    $affected = $stmt->affected_rows;
+    $stmt->close();
+    return $affected > 0;
+}
+
+function handle_awol_deduction_on_status_change(mysqli $conn, int $employee_id, string $new_status, int $attendance_id, string $date): void {
+    $awol_statuses = ['awol', 'absent', 'full_absent'];
+
+    if (in_array($new_status, $awol_statuses)) {
+        create_awol_deduction($conn, $employee_id, $attendance_id, $date);
+    } else {
+        remove_awol_deduction($conn, $employee_id, $date);
+    }
+}
+
+function log_awol_deduction(mysqli $conn, int $employee_id, string $employee_name, string $employee_code, string $date, float $basic_salary, float $deduction_amount): void {
+    $res = $conn->query("SHOW TABLES LIKE 'activity_logs'");
+    if (!$res || $res->num_rows === 0) return;
+
+    $description = sprintf(
+        'Pension Fund Deduction created for %s (%s) | Attendance Date: %s | Basic Salary: %s | Deduction Rate: %.2f%% | Deduction Amount: %s | Timestamp: %s',
+        $employee_name,
+        $employee_code,
+        $date,
+        number_format($basic_salary, 2),
+        AWOL_DEDUCTION_RATE * 100,
+        number_format($deduction_amount, 2),
+        mmt_datetime()
+    );
+
+    $stmt = $conn->prepare("INSERT INTO activity_logs (employee_id, action, description, ip_address, user_agent) VALUES (?, 'awol_deduction_created', ?, 'system', 'auto_deduction')");
+    $stmt->bind_param('is', $employee_id, $description);
+    $stmt->execute();
+    $stmt->close();
+}
+
+function reconcile_awol_deductions(mysqli $conn, string $date): array {
+    set_mmt_timezone();
+
+    $result = [
+        'checked' => 0,
+        'created' => 0,
+        'skipped' => 0,
+        'errors' => [],
+    ];
+
+    $awol_stmt = $conn->prepare(
+        "SELECT a.id as attendance_id, a.employee_id, a.status
+         FROM attendance a
+         WHERE a.attendance_date = ? AND a.status IN ('awol', 'absent', 'full_absent')"
+    );
+    $awol_stmt->bind_param('s', $date);
+    $awol_stmt->execute();
+    $awol_records = $awol_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $awol_stmt->close();
+
+    foreach ($awol_records as $record) {
+        $result['checked']++;
+        $eid = (int)$record['employee_id'];
+        $att_id = (int)$record['attendance_id'];
+
+        if (has_awol_deduction($conn, $eid, $date)) {
+            $result['skipped']++;
+            continue;
+        }
+
+        $created = create_awol_deduction($conn, $eid, $att_id, $date);
+        if ($created) {
+            $result['created']++;
+        } else {
+            $result['errors'][] = "Failed to create deduction for employee ID $eid on $date";
         }
     }
 

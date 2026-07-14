@@ -72,9 +72,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['check_in']) && !$is_in
     } elseif (has_approved_leave_on_date($conn, $employee_id, $today)) {
         $message = "You have an approved leave for today. Attendance check-in is blocked.";
         $message_type = "error";
-    } elseif (has_checked_in_today($conn, $employee_id, $today)) {
-        $message = "You have already checked in today.";
-        $message_type = "error";
     } elseif (strtotime($current_time) < strtotime($CHECK_IN_START)) {
         $message = "Check-in is not allowed before " . date('h:i A', strtotime($CHECK_IN_START)) . " MMT. You can check in starting from " . date('h:i A', strtotime($CHECK_IN_START)) . ".";
         $message_type = "error";
@@ -87,17 +84,42 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['check_in']) && !$is_in
         $status = $is_late ? 'late' : 'present';
         $status_label = $is_late ? 'Late' : 'Present (On Time)';
 
-        $stmt = $conn->prepare("INSERT INTO attendance (employee_id, attendance_date, check_in, status, is_late, check_in_ip, check_in_source) VALUES (?, ?, ?, ?, ?, ?, 'web')");
-        $stmt->bind_param('isssis', $employee_id, $today, $current_time, $status, $is_late, $ip);
-        if ($stmt->execute()) {
-            $time_display = date('h:i:s A');
-            $message = "Check-in recorded at $time_display. Status: $status_label.";
-            $message_type = "success";
-        } else {
-            $message = "Error recording check-in.";
+        // Check if an existing record is already present (e.g. AWOL auto-marked by daily process)
+        $existing_att = has_checked_in_today($conn, $employee_id, $today);
+
+        if ($existing_att && $existing_att['check_in']) {
+            // Already has a check_in - block duplicate
+            $message = "You have already checked in today.";
             $message_type = "error";
+        } elseif ($existing_att && !$existing_att['check_in']) {
+            // AWOL record exists (no check_in) - UPDATE it
+            $stmt = $conn->prepare("UPDATE attendance SET check_in = ?, status = ?, is_late = ?, check_in_ip = ?, check_in_source = 'web', auto_calculated = 1 WHERE id = ?");
+            $stmt->bind_param('ssiisi', $current_time, $status, $is_late, $ip, $existing_att['id']);
+            if ($stmt->execute()) {
+                $time_display = date('h:i:s A');
+                $message = "Check-in recorded at $time_display. Status: $status_label. (AWOL status corrected)";
+                $message_type = "success";
+                // Remove any AWOL deduction for today since employee checked in
+                remove_awol_deduction($conn, $employee_id, $today);
+            } else {
+                $message = "Error recording check-in.";
+                $message_type = "error";
+            }
+            $stmt->close();
+        } else {
+            // No existing record - normal INSERT
+            $stmt = $conn->prepare("INSERT INTO attendance (employee_id, attendance_date, check_in, status, is_late, check_in_ip, check_in_source) VALUES (?, ?, ?, ?, ?, ?, 'web')");
+            $stmt->bind_param('isssis', $employee_id, $today, $current_time, $status, $is_late, $ip);
+            if ($stmt->execute()) {
+                $time_display = date('h:i:s A');
+                $message = "Check-in recorded at $time_display. Status: $status_label.";
+                $message_type = "success";
+            } else {
+                $message = "Error recording check-in.";
+                $message_type = "error";
+            }
+            $stmt->close();
         }
-        $stmt->close();
     }
 }
 

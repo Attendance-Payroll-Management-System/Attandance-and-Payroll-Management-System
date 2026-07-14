@@ -23,6 +23,16 @@ if (isset($_GET['download_pdf']) && isset($_GET['pid'])) {
     $stmt->close();
 
     if ($slip) {
+        // Fetch AWOL deduction amount for this employee and month
+        $awol_stmt = $conn->prepare("SELECT COALESCE(SUM(amount), 0) as awol_total FROM deductions WHERE employee_id = ? AND deduction_date BETWEEN ? AND ? AND remarks = 'Auto Pension Fund Deduction for Unauthorized Absence'");
+        $month_start_pdf = sprintf('%04d-%02d-01', $selected_year, $selected_month);
+        $month_end_pdf = date('Y-m-t', strtotime($month_start_pdf));
+        $awol_stmt->bind_param('iss', $slip['employee_id'], $month_start_pdf, $month_end_pdf);
+        $awol_stmt->execute();
+        $awol_data = $awol_stmt->get_result()->fetch_assoc();
+        $slip['awol_deduction'] = $awol_data['awol_total'] ?? 0;
+        $awol_stmt->close();
+
         $pdfContent = generate_salary_slip_pdf($slip, $month_name, $selected_year);
         $filename = "Salary_Slip_{$slip['employee_code']}_{$month_name}_{$selected_year}.pdf";
 

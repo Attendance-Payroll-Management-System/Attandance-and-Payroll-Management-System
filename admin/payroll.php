@@ -460,6 +460,18 @@ foreach ($payroll_data as $p) {
                                 </td>
                             </tr>
                             <?php else: ?>
+                                <?php
+                                // Fetch deduction details for each employee
+                                $ded_details = [];
+                                foreach ($payroll_data as $p) {
+                                    $emp_id = $p['employee_id'];
+                                    $ded_stmt = $conn->prepare("SELECT d.title, d.amount, d.deduction_date, dt.deduction_name FROM deductions d LEFT JOIN deduction_types dt ON d.deduction_type_id = dt.id WHERE d.employee_id = ? AND d.deduction_date BETWEEN ? AND ?");
+                                    $ded_stmt->bind_param('iss', $emp_id, $month_start, $month_end);
+                                    $ded_stmt->execute();
+                                    $ded_details[$emp_id] = $ded_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+                                    $ded_stmt->close();
+                                }
+                                ?>
                                 <?php foreach ($payroll_data as $idx => $p): ?>
                                 <tr class="table-row animate-fade-in-up" style="animation-delay: <?php echo 0.05 + ($idx * 0.03); ?>s;">
                                     <td class="px-6 py-4">
@@ -503,9 +515,23 @@ foreach ($payroll_data as $p) {
                                             <span class="font-mono text-zinc-600">—</span>
                                         <?php endif; ?>
                                     </td>
-                                    <td class="px-6 py-4 text-right">
+                                    <td class="px-6 py-4 text-right relative group">
                                         <?php if ($p['deduction_amount'] > 0): ?>
-                                            <span class="amount-deduction font-mono font-medium">$<?php echo number_format($p['deduction_amount'], 2); ?></span>
+                                            <span class="amount-deduction font-mono font-medium cursor-help">$<?php echo number_format($p['deduction_amount'], 2); ?></span>
+                                            <?php if (!empty($ded_details[$p['employee_id']])): ?>
+                                            <div class="absolute right-0 top-full mt-2 w-64 bg-slate-800 border border-white/10 rounded-xl shadow-2xl p-3 z-50 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
+                                                <div class="text-xs font-bold text-zinc-400 mb-2 uppercase tracking-wider">Deduction Breakdown</div>
+                                                <?php foreach ($ded_details[$p['employee_id']] as $dd): ?>
+                                                <div class="flex items-center justify-between py-1.5 border-b border-white/5 last:border-0">
+                                                    <div>
+                                                        <div class="text-xs text-white font-medium"><?php echo htmlspecialchars($dd['title'] ?? $dd['deduction_name'] ?? '-'); ?></div>
+                                                        <div class="text-[10px] text-zinc-500"><?php echo date('M d', strtotime($dd['deduction_date'])); ?></div>
+                                                    </div>
+                                                    <span class="text-xs font-mono text-rose-400 font-semibold">-$<?php echo number_format($dd['amount'], 2); ?></span>
+                                                </div>
+                                                <?php endforeach; ?>
+                                            </div>
+                                            <?php endif; ?>
                                         <?php else: ?>
                                             <span class="font-mono text-zinc-600">—</span>
                                         <?php endif; ?>

@@ -122,6 +122,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                         $upd_att->bind_param('is', $leave_req['employee_id'], $d);
                                         $upd_att->execute();
                                         $upd_att->close();
+
+                                        // Remove automatic AWOL deduction for this date
+                                        remove_awol_deduction($conn, $leave_req['employee_id'], $d);
                                     }
                                 } else {
                                     $ins_att = $conn->prepare("INSERT INTO attendance (employee_id, attendance_date, status, auto_calculated) VALUES (?, ?, 'leave', 1)");

@@ -160,9 +160,7 @@ $total_departments = count($departments_data);
                             <p class="text-xs text-slate-500 dark:text-zinc-400"><?php echo $total_employees; ?> employee<?php echo $total_employees !== 1 ? 's' : ''; ?> in this department</p>
                         </div>
                     </div>
-                    <a href="insert1.php" class="rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold text-sm px-4 py-2.5 shadow-sm transition flex items-center gap-2">
-                        <i class="fa-solid fa-user-plus"></i> Add to Department
-                    </a>
+
                 </div>
 
                 <?php if ($dept_manager): ?>

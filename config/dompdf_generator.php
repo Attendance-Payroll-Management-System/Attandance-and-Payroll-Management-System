@@ -22,6 +22,7 @@ function generate_salary_slip_pdf($data, $month_name, $year)
     $allowance = number_format($data['allowance_amount'] ?? 0, 2);
     $tax = number_format($data['tax_amount'] ?? 0, 2);
     $leave_ded = number_format($data['leave_deduction'] ?? 0, 2);
+    $awol_ded = number_format($data['awol_deduction'] ?? 0, 2);
 
     $html = '
 <!DOCTYPE html>
@@ -286,7 +287,8 @@ body {
             <tbody>
                 <tr><td>Absent Deduction</td><td class="amount">-$' . number_format(($data['late_deduction'] ?? 0) + ($data['unpaid_leave_deduction'] ?? 0), 2) . '</td></tr>
                 <tr><td>Late Deduction</td><td class="amount">-$' . number_format($data['late_deduction'] ?? 0, 2) . '</td></tr>
-                <tr><td>Unpaid Leave Ded.</td><td class="amount">-$' . number_format($data['unpaid_leave_deduction'] ?? 0, 2) . '</td></tr>
+                <tr><td>Unpaid Leave Ded.</td><td class="amount">-$' . number_format($data['unpaid_leave_deduction'] ?? 0, 2) . '</td></tr>' . ($awol_ded !== '0.00' ? '
+                <tr><td>Pension Fund Deduction (2%)</td><td class="amount">-$' . $awol_ded . '</td></tr>' : '') . '
                 <tr><td>Other Deductions</td><td class="amount">-$' . $deduction . '</td></tr>
                 <tr><td>Tax</td><td class="amount">-$' . $tax . '</td></tr>
                 <tr class="total-row"><td>TOTAL DEDUCTIONS</td><td class="amount">-$' . number_format(($data['deduction_amount'] ?? 0) + ($data['late_deduction'] ?? 0) + ($data['unpaid_leave_deduction'] ?? 0) + ($data['tax_amount'] ?? 0), 2) . '</td></tr>

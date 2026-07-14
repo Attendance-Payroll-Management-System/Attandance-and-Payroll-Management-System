@@ -49,13 +49,11 @@ $topbar_notifications = [];
 $is_admin = (strpos($_SERVER['SCRIPT_NAME'] ?? '', '/admin/') !== false);
 $topbar_emp_id = $is_admin ? null : ($_SESSION['employee_id'] ?? null);
 
-// Fetch profile info for both admin and employee
 if (isset($conn) && $conn) {
     require_once __DIR__ . '/../config/notifications.php';
     if ($topbar_emp_id) {
         $unread_count = get_unread_count($conn, $topbar_emp_id);
         $topbar_notifications = get_notifications($conn, $topbar_emp_id, 5);
-        // Fetch employee profile for topbar
         $emp_stmt = $conn->prepare("SELECT name, email, profile_photo FROM employee WHERE id = ?");
         $emp_stmt->bind_param("i", $topbar_emp_id);
         $emp_stmt->execute();
@@ -91,17 +89,15 @@ if (isset($conn) && $conn) {
 $short_name = explode(' ', $admin_name)[0];
 ?>
 <?php if ($is_admin): ?>
-    <!-- Spacer for fixed topbar -->
     <div aria-hidden="true" class="h-16 w-full flex-shrink-0"></div>
 <?php else: ?>
-    <!-- Spacer for fixed topbar -->
     <div aria-hidden="true" class="h-16 w-full flex-shrink-0"></div>
 <?php endif; ?>
 
-<header class="fixed top-0 right-0 z-30 <?php echo $is_admin ? 'admin-topbar' : 'emp-header'; ?> bg-white dark:bg-[#0F172A] border-b border-slate-200 dark:border-white/[0.06]">
+<header class="fixed top-0 right-0 z-30 <?php echo $is_admin ? 'admin-topbar' : 'emp-header'; ?> bg-white/90 dark:bg-[#0F172A]/90 border-b border-slate-200 dark:border-white/[0.06] backdrop-blur-xl">
     <div class="flex items-center justify-between h-16 px-4 lg:px-6">
         <!-- Left: Page Title & Subtitle -->
-        <div class="flex-1 min-w-0 ">
+        <div class="flex-1 min-w-0">
             <h1 class="text-lg font-bold text-slate-900 dark:text-white truncate"><?php echo htmlspecialchars($page_title); ?></h1>
             <?php if (!empty($page_subtitle)): ?>
             <p class="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5"><?php echo htmlspecialchars($page_subtitle); ?></p>
@@ -113,10 +109,10 @@ $short_name = explode(' ', $admin_name)[0];
 
             <!-- Notifications -->
             <div class="relative" x-data="{ open: false }">
-                <button @click="open = !open" class="relative p-2 text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/[0.06] rounded-lg transition-all duration-200">
+                <button @click="open = !open" class="relative p-2.5 text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/[0.06] rounded-xl transition-all duration-200">
                     <i class="fa-solid fa-bell text-base"></i>
                     <?php if ($unread_count > 0): ?>
-                        <span class="absolute top-1 right-1 w-4 h-4 bg-rose-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center"><?php echo $unread_count; ?></span>
+                        <span class="absolute top-1.5 right-1.5 w-4 h-4 bg-rose-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center shadow-lg shadow-rose-500/30 animate-pulse-soft"><?php echo $unread_count; ?></span>
                     <?php endif; ?>
                 </button>
                 <div x-show="open" @click.outside="open = false"
@@ -126,22 +122,24 @@ $short_name = explode(' ', $admin_name)[0];
                     x-transition:leave="transition-all duration-150 ease-in"
                     x-transition:leave-start="opacity-100 scale-100 translate-y-0"
                     x-transition:leave-end="opacity-0 scale-95 -translate-y-2"
-                    class="absolute right-0 mt-2 w-[calc(100vw-2rem)] max-w-80 lg:w-96 bg-white dark:bg-[#1E293B] rounded-xl shadow-xl border border-slate-200 dark:border-white/[0.06] z-50" style="display: none;">
+                    class="absolute right-0 mt-2 w-[calc(100vw-2rem)] max-w-80 lg:w-96 bg-white dark:bg-[#1E293B] rounded-2xl shadow-xl border border-slate-200 dark:border-white/[0.06] z-50 overflow-hidden" style="display: none;">
                     <div class="px-4 py-3 border-b border-slate-100 dark:border-white/[0.06] flex items-center justify-between">
                         <h4 class="text-sm font-semibold text-slate-900 dark:text-white">Notifications</h4>
                         <?php if ($unread_count > 0): ?>
-                            <a href="mark_notifications_read.php" class="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors">Mark all read</a>
+                            <a href="mark_notifications_read.php" class="text-xs font-medium text-sky-600 dark:text-sky-400 hover:text-sky-700 dark:hover:text-sky-300 transition-colors">Mark all read</a>
                         <?php endif; ?>
                     </div>
                     <div class="max-h-80 overflow-y-auto">
                         <?php if (empty($topbar_notifications)): ?>
                             <div class="p-6 text-center">
-                                <i class="fa-regular fa-bell-slash text-2xl text-slate-300 dark:text-slate-600 block mb-2"></i>
-                                <p class="text-xs text-slate-500 dark:text-slate-400">No notifications</p>
+                                <div class="w-12 h-12 mx-auto mb-3 rounded-full bg-slate-100 dark:bg-white/[0.05] flex items-center justify-center">
+                                    <i class="fa-regular fa-bell-slash text-xl text-slate-300 dark:text-slate-600"></i>
+                                </div>
+                                <p class="text-xs text-slate-500 dark:text-slate-400 font-medium">No notifications yet</p>
                             </div>
                         <?php else: ?>
                             <?php foreach ($topbar_notifications as $noti): ?>
-                                <a href="<?php echo $noti['link'] ?: '#'; ?>" class="block px-4 py-3 border-b border-slate-50 dark:border-white/[0.04] hover:bg-slate-50 dark:hover:bg-white/[0.02] transition-colors <?php echo !$noti['is_read'] ? 'bg-indigo-50/50 dark:bg-indigo-500/5' : ''; ?>">
+                                <a href="<?php echo $noti['link'] ?: '#'; ?>" class="block px-4 py-3 border-b border-slate-50 dark:border-white/[0.04] hover:bg-slate-50 dark:hover:bg-white/[0.02] transition-colors <?php echo !$noti['is_read'] ? 'bg-sky-50/50 dark:bg-sky-500/5' : ''; ?>">
                                     <p class="text-xs text-slate-700 dark:text-slate-300 leading-relaxed"><?php echo htmlspecialchars($noti['message']); ?></p>
                                     <p class="text-[10px] text-slate-400 dark:text-slate-500 mt-1"><?php echo date('M d, h:i A', strtotime($noti['created_at'])); ?></p>
                                 </a>
@@ -149,31 +147,31 @@ $short_name = explode(' ', $admin_name)[0];
                         <?php endif; ?>
                     </div>
                     <div class="px-4 py-2.5 border-t border-slate-100 dark:border-white/[0.06] text-center">
-                        <a href="dashboard.php" class="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors">View Dashboard</a>
+                        <a href="dashboard.php" class="text-xs font-medium text-sky-600 dark:text-sky-400 hover:text-sky-700 dark:hover:text-sky-300 transition-colors">View Dashboard</a>
                     </div>
                 </div>
             </div>
 
             <!-- Dark Mode Toggle -->
-            <button onclick="toggleTheme()" class="p-2 text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/[0.06] rounded-lg transition-all duration-200">
+            <button onclick="toggleTheme()" class="p-2.5 text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/[0.06] rounded-xl transition-all duration-200">
                 <i class="fa-solid fa-sun text-base theme-icon-sun"></i>
                 <i class="fa-solid fa-moon text-base theme-icon-moon" style="display:none;"></i>
             </button>
 
             <!-- Settings (admin only) -->
             <?php if ($is_admin): ?>
-                <a href="settings.php" class="p-2 text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/[0.06] rounded-lg transition-all duration-200">
+                <a href="settings.php" class="p-2.5 text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/[0.06] rounded-xl transition-all duration-200 hidden sm:flex">
                     <i class="fa-solid fa-gear text-base"></i>
                 </a>
             <?php endif; ?>
 
             <!-- Profile Dropdown -->
             <div class="relative" x-data="{ open: false }">
-                <button @click="open = !open" class="flex items-center gap-2 pl-1.5 pr-2 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-white/[0.06] transition-all duration-200">
+                <button @click="open = !open" class="flex items-center gap-2.5 pl-1.5 pr-2.5 py-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-white/[0.06] transition-all duration-200">
                     <?php if (!empty($admin_photo)): ?>
-                        <img src="../<?php echo htmlspecialchars($admin_photo); ?>" alt="" class="w-8 h-8 rounded-lg object-cover border border-slate-200 dark:border-white/[0.06]">
+                        <img src="../<?php echo htmlspecialchars($admin_photo); ?>" alt="" class="w-8 h-8 rounded-xl object-cover border border-slate-200 dark:border-white/[0.06] shadow-sm">
                     <?php else: ?>
-                        <div class="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-xs font-bold">
+                        <div class="w-8 h-8 rounded-xl bg-gradient-to-br from-sky-500 to-blue-500 text-white flex items-center justify-center text-xs font-bold shadow-sm shadow-sky-500/20">
                             <?php echo strtoupper(substr($admin_name, 0, 2)); ?>
                         </div>
                     <?php endif; ?>
@@ -188,15 +186,15 @@ $short_name = explode(' ', $admin_name)[0];
                     x-transition:leave="transition-all duration-150 ease-in"
                     x-transition:leave-start="opacity-100 scale-100 translate-y-0"
                     x-transition:leave-end="opacity-0 scale-95 -translate-y-2"
-                    class="absolute right-0 mt-2 w-56 bg-white dark:bg-[#1E293B] rounded-xl shadow-xl border border-slate-200 dark:border-white/[0.06] z-50 overflow-hidden" style="display: none;">
+                    class="absolute right-0 mt-2 w-56 bg-white dark:bg-[#1E293B] rounded-2xl shadow-xl border border-slate-200 dark:border-white/[0.06] z-50 overflow-hidden" style="display: none;">
 
                     <!-- Profile Header -->
                     <div class="px-4 py-3 border-b border-slate-100 dark:border-white/[0.06] bg-slate-50 dark:bg-white/[0.02]">
                         <div class="flex items-center gap-3">
                             <?php if (!empty($admin_photo)): ?>
-                                <img src="../<?php echo htmlspecialchars($admin_photo); ?>" alt="" class="w-10 h-10 rounded-lg object-cover border border-slate-200 dark:border-white/[0.06]">
+                                <img src="../<?php echo htmlspecialchars($admin_photo); ?>" alt="" class="w-10 h-10 rounded-xl object-cover border border-slate-200 dark:border-white/[0.06] shadow-sm">
                             <?php else: ?>
-                                <div class="w-10 h-10 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-sm font-bold">
+                                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500 to-blue-500 text-white flex items-center justify-center text-sm font-bold shadow-sm shadow-sky-500/20">
                                     <?php echo strtoupper(substr($admin_name, 0, 2)); ?>
                                 </div>
                             <?php endif; ?>

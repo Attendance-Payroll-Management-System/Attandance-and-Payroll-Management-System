@@ -6,7 +6,6 @@
  */
 $current_page = basename($_SERVER['SCRIPT_NAME'] ?? 'dashboard.php');
 
-// Bottom nav items — 5 core items per requirements
 $nav_items = [
     ['page' => 'dashboard.php',        'icon' => 'house',              'label' => 'Dashboard',     'href' => 'dashboard.php'],
     ['page' => 'attendance.php',       'icon' => 'calendar-check',     'label' => 'Attendance',    'href' => 'attendance.php'],
@@ -15,7 +14,6 @@ $nav_items = [
     ['page' => 'profile.php',          'icon' => 'circle-user',        'label' => 'Profile',        'href' => 'profile.php'],
 ];
 
-// Pages that map to a parent nav item
 $page_map = [
     'dashboard.php'          => 'dashboard.php',
     'attendance.php'         => 'attendance.php',
@@ -37,7 +35,6 @@ $active_page = $page_map[$current_page] ?? $current_page;
     <div class="emp-bottom-nav-inner">
         <?php foreach ($nav_items as $item):
             $is_active = ($item['page'] === $active_page);
-            // Special handling for notifications (4th item) — highlight when on dashboard
             if ($item['icon'] === 'bell') {
                 $is_active = ($current_page === 'dashboard.php');
             }

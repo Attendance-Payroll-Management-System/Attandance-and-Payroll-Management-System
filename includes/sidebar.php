@@ -19,7 +19,6 @@ $emp_position_name = $emp_position_name ?? 'Employee';
 $emp_photo_path = $emp_photo_path ?? '';
 $emp_department_name = $emp_department_name ?? '';
 
-// Fetch employee details for sidebar profile card
 if ($sidebar_role === 'employee' && isset($conn) && $conn && empty($emp_photo_path)) {
     $emp_id = $_SESSION['employee_id'] ?? null;
     if ($emp_id) {
@@ -78,8 +77,7 @@ function nav_item($href, $label, $icon, $current, $pages = null, $badge = null, 
     ];
 
     $c = $colors[$color] ?? $colors['indigo'];
-
-    $base = 'group nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 relative';
+    $base = 'group nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 relative';
 
     if ($active) {
         $classes = $base . ' ' . $c['active_bg'] . ' ' . $c['active_text'] . ' font-semibold border-l-[3px] ' . $c['active_border'] . ' ml-0';
@@ -90,7 +88,7 @@ function nav_item($href, $label, $icon, $current, $pages = null, $badge = null, 
     $html = '<a href="' . $href . '" class="' . $classes . '" title="' . htmlspecialchars($label) . '">';
     $html .= '<div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-all duration-200 ' . ($active ? $c['icon_bg'] . ' text-white shadow-sm' : 'bg-slate-100 dark:bg-white/[0.06] text-slate-500 dark:text-slate-400 ' . $c['icon_hover'] . ' group-hover:text-white') . '">';
     $html .= '<i class="fas fa-' . $icon . ' text-sm"></i></div>';
-    $html .= '<span class="nav-text text-sm whitespace-nowrap overflow-hidden">' . $label . '</span>';
+    $html .= '<span class="nav-text text-[13px] whitespace-nowrap overflow-hidden">' . $label . '</span>';
     if ($badge !== null && $badge > 0) {
         $html .= '<span class="nav-badge ml-auto bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center shrink-0">' . $badge . '</span>';
     }
@@ -120,11 +118,11 @@ function nav_section($label, $icon, $children, $current_page, $badge = null, $co
     $section_active = nav_active($child_pages, $current_page);
 
     $html = '<div x-data="{ open: ' . ($open ? 'true' : 'false') . ' }" class="nav-section">';
-    $html .= '<button @click="open = !open" class="group w-full flex items-center justify-between px-3 py-2 rounded-lg transition-all duration-200 ' . ($section_active ? $c['active_bg'] . ' ' . $c['active_text'] . ' font-semibold border-l-[3px] ' . $c['active_border'] . ' ml-0' : 'text-slate-600 dark:text-slate-400 ' . $c['hover_bg'] . ' hover:text-slate-900 dark:hover:text-white') . '">';
+    $html .= '<button @click="open = !open" class="group w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition-all duration-200 ' . ($section_active ? $c['active_bg'] . ' ' . $c['active_text'] . ' font-semibold border-l-[3px] ' . $c['active_border'] . ' ml-0' : 'text-slate-600 dark:text-slate-400 ' . $c['hover_bg'] . ' hover:text-slate-900 dark:hover:text-white') . '">';
     $html .= '<span class="flex items-center gap-3">';
     $html .= '<div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-all duration-200 ' . ($section_active ? $c['icon_bg'] . ' text-white shadow-sm' : 'bg-slate-100 dark:bg-white/[0.06] text-slate-500 dark:text-slate-400 ' . $c['icon_hover'] . ' group-hover:text-white') . '">';
     $html .= '<i class="fas fa-' . $icon . ' text-sm"></i></div>';
-    $html .= '<span class="nav-text text-sm whitespace-nowrap overflow-hidden">' . $label . '</span></span>';
+    $html .= '<span class="nav-text text-[13px] whitespace-nowrap overflow-hidden">' . $label . '</span></span>';
     $html .= '<span class="nav-badge flex items-center gap-1.5">';
     if ($badge !== null && $badge > 0) {
         $html .= '<span class="bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0">' . $badge . '</span>';
@@ -136,10 +134,10 @@ function nav_section($label, $icon, $children, $current_page, $badge = null, $co
     foreach ($children as $child) {
         $child_active = $child['page'] === $current_page;
         if ($child_active) {
-            $html .= '<a href="' . $child['href'] . '" class="flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium ' . $c['child_active'] . '">';
+            $html .= '<a href="' . $child['href'] . '" class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[13px] font-medium ' . $c['child_active'] . '">';
             $html .= '<span class="w-1.5 h-1.5 rounded-full ' . $c['child_dot'] . ' shrink-0"></span>' . $child['label'] . '</a>';
         } else {
-            $html .= '<a href="' . $child['href'] . '" class="block px-3 py-1.5 rounded-md text-sm text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/[0.03] transition-colors duration-150">' . $child['label'] . '</a>';
+            $html .= '<a href="' . $child['href'] . '" class="block px-3 py-1.5 rounded-lg text-[13px] text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/[0.03] transition-colors duration-150">' . $child['label'] . '</a>';
         }
     }
     $html .= '</div></div></div>';
@@ -148,7 +146,6 @@ function nav_section($label, $icon, $children, $current_page, $badge = null, $co
 ?>
 
 <?php
-// Include mobile menu for admin
 if ($sidebar_role === 'admin') {
     include __DIR__ . '/admin_mobile_menu.php';
 }
@@ -159,32 +156,14 @@ if ($sidebar_role === 'admin') {
 
     <!-- Logo / Brand -->
     <div class="flex items-center gap-3 px-5 h-16 border-b border-slate-200 dark:border-white/[0.06] shrink-0">
-        <div class="w-9 h-9 rounded-lg bg-indigo-600 flex items-center justify-center shrink-0">
-            <i class="fas fa-bolt text-white text-sm"></i>
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-sky-500 to-blue-500 flex items-center justify-center shrink-0 shadow-lg shadow-sky-500/20 sidebar-logo">
+            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+            </svg>
         </div>
         <div class="sidebar-brand-text min-w-0 flex-1 overflow-hidden">
             <h1 class="text-sm font-bold text-slate-900 dark:text-white truncate leading-tight">HNIN AKARI NWE</h1>
-            <p class="text-[10px] text-slate-400 dark:text-slate-500 font-medium truncate leading-tight">Payroll Management</p>
-        </div>
-    </div>
-
-    <!-- User Profile -->
-    <div class="sidebar-profile mx-3 mt-3 mb-1 px-3 py-2.5 rounded-lg bg-slate-50 dark:bg-white/[0.03] border border-slate-200 dark:border-white/[0.06]">
-        <div class="flex items-center gap-3">
-            <div class="relative shrink-0">
-                <?php if ($sidebar_role === 'employee' && !empty($emp_photo_path)): ?>
-                <img src="../<?php echo htmlspecialchars($emp_photo_path); ?>" alt="" class="w-9 h-9 rounded-lg object-cover border border-slate-200 dark:border-white/[0.06]">
-                <?php else: ?>
-                <div class="w-9 h-9 rounded-lg bg-indigo-600 flex items-center justify-center text-xs font-bold text-white">
-                    <?php echo strtoupper(substr($sidebar_role === 'admin' ? $admin_name : $emp_name, 0, 2)); ?>
-                </div>
-                <?php endif; ?>
-                <div class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-white dark:border-[#0F172A]"></div>
-            </div>
-            <div class="sidebar-profile-text min-w-0 flex-1 overflow-hidden">
-                <p class="text-sm font-semibold text-slate-900 dark:text-white truncate leading-tight"><?php echo htmlspecialchars($sidebar_role === 'admin' ? $admin_name : $emp_name); ?></p>
-                <p class="text-[10px] text-slate-500 dark:text-slate-400 font-medium truncate leading-tight"><?php echo $sidebar_role === 'admin' ? 'Administrator' : htmlspecialchars($emp_position_name); ?></p>
-            </div>
+            <p class="text-[10px] text-slate-400 dark:text-slate-500 font-medium truncate leading-tight">HR Management</p>
         </div>
     </div>
 
@@ -204,14 +183,10 @@ if ($sidebar_role === 'admin') {
             <?php echo nav_section('Employees', 'users-gear', [
                 ['page' => 'employee.php', 'href' => 'employee.php', 'label' => 'Employee List'],
                 ['page' => 'insert1.php', 'href' => 'insert1.php', 'label' => 'Add Employee'],
-                ['page' => 'edit_employee.php', 'href' => 'edit_employee.php', 'label' => 'Edit Employee'],
-                ['page' => 'view_employee.php', 'href' => 'view_employee.php', 'label' => 'View Employee'],
             ], $current_page, null, 'indigo'); ?>
             <?php echo nav_section('Attendance', 'calendar-check', [
                 ['page' => 'attendance.php', 'href' => 'attendance.php', 'label' => 'Monthly Attendance'],
                 ['page' => 'dailyattendance.php', 'href' => 'dailyattendance.php', 'label' => 'Daily Attendance'],
-                ['page' => 'attendance_summary.php', 'href' => 'attendance_summary.php', 'label' => 'Attendance Summary'],
-                ['page' => 'process_daily_attendance.php', 'href' => 'process_daily_attendance.php', 'label' => 'Process Attendance'],
             ], $current_page, null, 'emerald'); ?>
             <?php echo nav_section('Leave', 'paper-plane', [
                 ['page' => 'leaveApproval.php', 'href' => 'leaveApproval.php', 'label' => 'Leave Approvals'],
@@ -247,11 +222,6 @@ if ($sidebar_role === 'admin') {
             ], $current_page, null, 'rose'); ?>
 
             <div class="nav-text px-3 pt-4 pb-1.5">
-                <p class="text-[10px] font-semibold text-slate-400 dark:text-slate-500 tracking-wider uppercase">Account</p>
-            </div>
-            <?php echo nav_item('profile.php', 'My Profile', 'circle-user', $current_page, null, null, 'slate'); ?>
-
-            <div class="nav-text px-3 pt-4 pb-1.5">
                 <p class="text-[10px] font-semibold text-slate-400 dark:text-slate-500 tracking-wider uppercase">System</p>
             </div>
             <?php echo nav_item('settings.php', 'Settings', 'sliders', $current_page, null, null, 'slate'); ?>
@@ -264,22 +234,10 @@ if ($sidebar_role === 'admin') {
             </div>
             <?php echo nav_item('dashboard.php', 'Dashboard', 'house-chimney', $current_page, null, null, 'indigo'); ?>
             <?php echo nav_item('attendance.php', 'Attendance', 'calendar-check', $current_page, null, null, 'emerald'); ?>
-            <?php echo nav_item('attendance_summary.php', 'Attendance Summary', 'chart-simple', $current_page, null, null, 'cyan'); ?>
             <?php echo nav_item('leaverequest.php', 'Leave Request', 'paper-plane', $current_page, null, null, 'amber'); ?>
             <?php echo nav_item('overtimerequest.php', 'Overtime Request', 'stopwatch', $current_page, null, null, 'orange'); ?>
             <?php echo nav_item('attendanceall.php', 'My Records', 'folder-open', $current_page, null, null, 'cyan'); ?>
             <?php echo nav_item('company_policy.php', 'Company Policy', 'file-contract', $current_page, null, null, 'purple'); ?>
-
-            <div class="nav-text px-3 pt-4 pb-1.5">
-                <p class="text-[10px] font-semibold text-slate-400 dark:text-slate-500 tracking-wider uppercase">Account</p>
-            </div>
-            <?php echo nav_item('profile.php', 'My Profile', 'circle-user', $current_page, null, null, 'indigo'); ?>
-            <?php echo nav_item('payroll.php', 'My Payroll', 'wallet', $current_page, null, null, 'emerald'); ?>
-            <?php echo nav_item('change_password.php', 'Change Password', 'key', $current_page, null, null, 'amber'); ?>
-
-            <div class="pt-2">
-                <?php echo nav_item('login.php?logout=1', 'Logout', 'right-from-bracket', $current_page, null, null, 'rose'); ?>
-            </div>
 
         <?php endif; ?>
 
@@ -288,86 +246,74 @@ if ($sidebar_role === 'admin') {
     <!-- Collapse Toggle -->
     <div class="px-3 pb-3 pt-2 border-t border-slate-200 dark:border-white/[0.06]">
         <button class="sidebar-collapse-btn" onclick="toggleDesktopSidebar()" title="Toggle sidebar">
-            <i class="fa-solid fa-chevron-left"></i>
+            <i class="fa-solid fa-chevron-left" id="sidebarToggleIcon"></i>
         </button>
     </div>
 </aside>
 
 <!-- Sidebar JS -->
 <script>
-(function() {
-    var sidebar = document.querySelector('aside');
-    if (!sidebar) return;
+    (function() {
+        var sidebar = document.querySelector('aside');
+        if (!sidebar) return;
 
-    function applyCollapse(collapsed) {
-        if (collapsed) {
-            sidebar.classList.add('collapsed');
-            document.body.classList.add('sidebar-collapsed');
-            var icon = document.getElementById('sidebarToggleIcon');
-            if (icon) { icon.classList.remove('fa-chevron-left'); icon.classList.add('fa-chevron-right'); }
-        } else {
-            sidebar.classList.remove('collapsed');
-            document.body.classList.remove('sidebar-collapsed');
-            var icon = document.getElementById('sidebarToggleIcon');
-            if (icon) { icon.classList.remove('fa-chevron-right'); icon.classList.add('fa-chevron-left'); }
+        function applyCollapse(collapsed) {
+            if (collapsed) {
+                sidebar.classList.add('collapsed');
+                document.body.classList.add('sidebar-collapsed');
+                var icon = document.getElementById('sidebarToggleIcon');
+                if (icon) {
+                    icon.classList.remove('fa-chevron-left');
+                    icon.classList.add('fa-chevron-right');
+                }
+            } else {
+                sidebar.classList.remove('collapsed');
+                document.body.classList.remove('sidebar-collapsed');
+                var icon = document.getElementById('sidebarToggleIcon');
+                if (icon) {
+                    icon.classList.remove('fa-chevron-right');
+                    icon.classList.add('fa-chevron-left');
+                }
+            }
         }
-    }
 
-    function isTablet() {
-        return window.innerWidth >= 768 && window.innerWidth < 1024;
-    }
-
-    window.toggleDesktopSidebar = function() {
-        var next = !sidebar.classList.contains('collapsed');
-        localStorage.setItem('sidebar-collapsed', next);
-        applyCollapse(next);
-    };
-
-    // Apply saved state
-    var saved = localStorage.getItem('sidebar-collapsed') === 'true';
-    applyCollapse(saved);
-
-    // Tooltip on collapsed hover
-    var tip = null, hideT = null;
-    sidebar.addEventListener('mouseover', function(e) {
-        if (!sidebar.classList.contains('collapsed')) return;
-        var item = e.target.closest('.nav-item');
-        if (!item) return;
-        var txt = item.getAttribute('data-tooltip') || item.querySelector('.nav-text')?.textContent?.trim();
-        if (!txt) return;
-        clearTimeout(hideT);
-        if (!tip) { tip = document.createElement('div'); tip.className = 'sidebar-tooltip'; document.body.appendChild(tip); }
-        tip.textContent = txt;
-        var r = item.getBoundingClientRect();
-        tip.style.top = (r.top + r.height / 2 - 14) + 'px';
-        tip.style.left = (r.right + 10) + 'px';
-        requestAnimationFrame(function() { tip.classList.add('visible'); });
-    });
-    sidebar.addEventListener('mouseout', function(e) {
-        if (e.target.closest('.nav-item')) hideT = setTimeout(function() { if (tip) tip.classList.remove('visible'); }, 80);
-    });
-})();
-</script>
-<script>
-(function() {
-    var sidebar = document.querySelector('.sidebar-container');
-    if (!sidebar) return;
-    var overlay = document.createElement('div');
-    overlay.className = 'sidebar-overlay';
-    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.3);z-index:35;display:none;';
-    document.body.appendChild(overlay);
-    overlay.addEventListener('click', function() {
-        sidebar.classList.remove('sidebar-open');
-        overlay.style.display = 'none';
-    });
-    window.toggleSidebar = function() {
-        document.querySelector('.sidebar-container').classList.toggle('sidebar-open');
-    };
-    window.addEventListener('resize', function() {
-        if (window.innerWidth > 1024) {
-            sidebar.classList.remove('sidebar-open');
-            overlay.style.display = 'none';
+        function isTablet() {
+            return window.innerWidth >= 768 && window.innerWidth < 1024;
         }
-    });
-})();
+
+        window.toggleDesktopSidebar = function() {
+            var next = !sidebar.classList.contains('collapsed');
+            localStorage.setItem('sidebar-collapsed', next);
+            applyCollapse(next);
+        };
+
+        var saved = localStorage.getItem('sidebar-collapsed') === 'true';
+        applyCollapse(saved);
+
+        // Tooltip on collapsed hover
+        var tip = null, hideT = null;
+        sidebar.addEventListener('mouseover', function(e) {
+            if (!sidebar.classList.contains('collapsed')) return;
+            var item = e.target.closest('.nav-item');
+            if (!item) return;
+            var txt = item.getAttribute('data-tooltip') || item.querySelector('.nav-text')?.textContent?.trim();
+            if (!txt) return;
+            clearTimeout(hideT);
+            if (!tip) {
+                tip = document.createElement('div');
+                tip.className = 'sidebar-tooltip';
+                document.body.appendChild(tip);
+            }
+            tip.textContent = txt;
+            var r = item.getBoundingClientRect();
+            tip.style.top = (r.top + r.height / 2 - 14) + 'px';
+            tip.style.left = (r.right + 10) + 'px';
+            requestAnimationFrame(function() { tip.classList.add('visible'); });
+        });
+        sidebar.addEventListener('mouseout', function(e) {
+            if (e.target.closest('.nav-item')) hideT = setTimeout(function() {
+                if (tip) tip.classList.remove('visible');
+            }, 80);
+        });
+    })();
 </script>

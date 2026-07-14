@@ -279,7 +279,12 @@ $total_amount = array_sum(array_column($records, 'amount'));
                             </div>
                             <div>
                                 <label class="text-xs font-semibold text-zinc-400 block mb-1.5">Title</label>
-                                <input type="text" name="title" required placeholder="e.g. Performance Bonus" class="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white placeholder-zinc-500 shadow-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30">
+                                <select name="title" required class="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white placeholder-zinc-500 shadow-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30">
+                                    <option value="">-- Select Title --</option>
+                                    <?php foreach ($bonus_types as $bt): ?>
+                                    <option value="<?php echo htmlspecialchars($bt['bonus_name']); ?>"><?php echo htmlspecialchars($bt['bonus_name']); ?></option>
+                                    <?php endforeach; ?>
+                                </select>
                             </div>
                             <div>
                                 <label class="text-xs font-semibold text-zinc-400 block mb-1.5">Amount ($)</label>
@@ -351,7 +356,12 @@ $total_amount = array_sum(array_column($records, 'amount'));
                         <input type="hidden" name="id" :value="editId">
                         <div>
                             <label class="text-xs font-semibold text-zinc-400 block mb-1.5">Title</label>
-                            <input type="text" name="title" x-model="editTitle" required class="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white placeholder-zinc-500 shadow-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30">
+                            <select name="title" x-model="editTitle" required class="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white placeholder-zinc-500 shadow-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30">
+                                <option value="">-- Select Title --</option>
+                                <?php foreach ($bonus_types as $bt): ?>
+                                <option value="<?php echo htmlspecialchars($bt['bonus_name']); ?>"><?php echo htmlspecialchars($bt['bonus_name']); ?></option>
+                                <?php endforeach; ?>
+                            </select>
                         </div>
                         <div>
                             <label class="text-xs font-semibold text-zinc-400 block mb-1.5">Amount ($)</label>
