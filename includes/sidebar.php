@@ -158,7 +158,7 @@ if ($sidebar_role === 'admin') {
     <div class="flex items-center gap-3 px-5 h-16 border-b border-slate-200 dark:border-white/[0.06] shrink-0">
         <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-sky-500 to-blue-500 flex items-center justify-center shrink-0 shadow-lg shadow-sky-500/20 sidebar-logo">
             <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
             </svg>
         </div>
         <div class="sidebar-brand-text min-w-0 flex-1 overflow-hidden">
@@ -184,25 +184,44 @@ if ($sidebar_role === 'admin') {
                 ['page' => 'employee.php', 'href' => 'employee.php', 'label' => 'Employee List'],
                 ['page' => 'insert1.php', 'href' => 'insert1.php', 'label' => 'Add Employee'],
             ], $current_page, null, 'indigo'); ?>
-            <?php echo nav_section('Attendance', 'calendar-check', [
+            <?php
+            $pending_corrections = 0;
+            if ($sidebar_role === 'admin' && isset($conn) && $conn) {
+                $table_check = $conn->query("SHOW TABLES LIKE 'attendance_corrections'");
+                if ($table_check && $table_check->num_rows > 0) {
+                    $cr = $conn->query("SELECT COUNT(*) as cnt FROM attendance_corrections WHERE status = 'Pending'");
+                    $pending_corrections = $cr ? (int)$cr->fetch_assoc()['cnt'] : 0;
+                }
+            }
+            echo nav_section('Attendance', 'calendar-check', [
                 ['page' => 'attendance.php', 'href' => 'attendance.php', 'label' => 'Monthly Attendance'],
                 ['page' => 'dailyattendance.php', 'href' => 'dailyattendance.php', 'label' => 'Daily Attendance'],
-            ], $current_page, null, 'emerald'); ?>
+                ['page' => 'attendance_settings.php', 'href' => 'attendance_settings.php', 'label' => 'Settings'],
+                ['page' => 'attendance_corrections.php', 'href' => 'attendance_corrections.php', 'label' => 'Corrections'],
+                ['page' => 'attendance_reports.php', 'href' => 'attendance_reports.php', 'label' => 'Reports'],
+                ['page' => 'attendance_management.php', 'href' => 'attendance_management.php', 'label' => 'Management'],
+            ], $current_page, $pending_corrections, 'emerald'); ?>
             <?php echo nav_section('Leave', 'paper-plane', [
                 ['page' => 'leaveApproval.php', 'href' => 'leaveApproval.php', 'label' => 'Leave Approvals'],
                 ['page' => 'leavereport.php', 'href' => 'leavereport.php', 'label' => 'Leave Report'],
             ], $current_page, $pending_leaves, 'amber'); ?>
             <?php echo nav_section('Overtime', 'stopwatch', [
+                ['page' => 'overtime_dashboard.php', 'href' => 'overtime_dashboard.php', 'label' => 'Dashboard'],
                 ['page' => 'overtimeApproval.php', 'href' => 'overtimeApproval.php', 'label' => 'OT Approvals'],
                 ['page' => 'assign_overtime.php', 'href' => 'assign_overtime.php', 'label' => 'Assign OT'],
                 ['page' => 'overtimereport.php', 'href' => 'overtimereport.php', 'label' => 'OT Report'],
+                ['page' => 'overtime_reports.php', 'href' => 'overtime_reports.php', 'label' => 'OT Reports (New)'],
             ], $current_page, $pending_ot, 'orange'); ?>
             <?php echo nav_section('Payroll', 'money-bill-wave', [
+                ['page' => 'payroll_dashboard.php', 'href' => 'payroll_dashboard.php', 'label' => 'Dashboard'],
                 ['page' => 'payroll.php', 'href' => 'payroll.php', 'label' => 'Generate Payroll'],
+                ['page' => 'payroll_list.php', 'href' => 'payroll_list.php', 'label' => 'Payroll List'],
+                ['page' => 'salary_structure.php', 'href' => 'salary_structure.php', 'label' => 'Salary Structure'],
                 ['page' => 'salaryreport.php', 'href' => 'salaryreport.php', 'label' => 'Salary Report'],
                 ['page' => 'salary_slip.php', 'href' => 'salary_slip.php', 'label' => 'Salary Slips'],
                 ['page' => 'bonous.php', 'href' => 'bonous.php', 'label' => 'Bonuses'],
                 ['page' => 'deduction.php', 'href' => 'deduction.php', 'label' => 'Deductions'],
+                ['page' => 'payroll_reports.php', 'href' => 'payroll_reports.php', 'label' => 'Reports'],
             ], $current_page, null, 'sky'); ?>
 
             <div class="nav-text px-3 pt-4 pb-1.5">
@@ -219,13 +238,10 @@ if ($sidebar_role === 'admin') {
                 ['page' => 'salary_slip.php', 'href' => 'salary_slip.php', 'label' => 'Salary Slips'],
                 ['page' => 'leavereport.php', 'href' => 'leavereport.php', 'label' => 'Leave Report'],
                 ['page' => 'overtimereport.php', 'href' => 'overtimereport.php', 'label' => 'OT Report'],
+                ['page' => 'overtime_reports.php', 'href' => 'overtime_reports.php', 'label' => 'OT Reports'],
             ], $current_page, null, 'rose'); ?>
 
-            <div class="nav-text px-3 pt-4 pb-1.5">
-                <p class="text-[10px] font-semibold text-slate-400 dark:text-slate-500 tracking-wider uppercase">System</p>
-            </div>
-            <?php echo nav_item('settings.php', 'Settings', 'sliders', $current_page, null, null, 'slate'); ?>
-            <?php echo nav_item('logout.php', 'Logout', 'right-from-bracket', $current_page, null, null, 'rose'); ?>
+
 
         <?php elseif ($sidebar_role === 'employee'): ?>
 
@@ -233,10 +249,16 @@ if ($sidebar_role === 'admin') {
                 <p class="text-[10px] font-semibold text-slate-400 dark:text-slate-500 tracking-wider uppercase">Main Menu</p>
             </div>
             <?php echo nav_item('dashboard.php', 'Dashboard', 'house-chimney', $current_page, null, null, 'indigo'); ?>
-            <?php echo nav_item('attendance.php', 'Attendance', 'calendar-check', $current_page, null, null, 'emerald'); ?>
+            <?php echo nav_section('Attendance', 'calendar-check', [
+                ['page' => 'attendance.php', 'href' => 'attendance.php', 'label' => 'Check In/Out'],
+                ['page' => 'attendance_calendar.php', 'href' => 'attendance_calendar.php', 'label' => 'Calendar'],
+                ['page' => 'attendanceall.php', 'href' => 'attendanceall.php', 'label' => 'My Records'],
+            ], $current_page, null, 'emerald'); ?>
             <?php echo nav_item('leaverequest.php', 'Leave Request', 'paper-plane', $current_page, null, null, 'amber'); ?>
             <?php echo nav_item('overtimerequest.php', 'Overtime Request', 'stopwatch', $current_page, null, null, 'orange'); ?>
-            <?php echo nav_item('attendanceall.php', 'My Records', 'folder-open', $current_page, null, null, 'cyan'); ?>
+            <?php echo nav_section('Payroll', 'money-bill-wave', [
+                ['page' => 'payroll.php', 'href' => 'payroll.php', 'label' => 'My Payroll'],
+            ], $current_page, null, 'sky'); ?>
             <?php echo nav_item('company_policy.php', 'Company Policy', 'file-contract', $current_page, null, null, 'purple'); ?>
 
         <?php endif; ?>
@@ -291,7 +313,8 @@ if ($sidebar_role === 'admin') {
         applyCollapse(saved);
 
         // Tooltip on collapsed hover
-        var tip = null, hideT = null;
+        var tip = null,
+            hideT = null;
         sidebar.addEventListener('mouseover', function(e) {
             if (!sidebar.classList.contains('collapsed')) return;
             var item = e.target.closest('.nav-item');
@@ -308,7 +331,9 @@ if ($sidebar_role === 'admin') {
             var r = item.getBoundingClientRect();
             tip.style.top = (r.top + r.height / 2 - 14) + 'px';
             tip.style.left = (r.right + 10) + 'px';
-            requestAnimationFrame(function() { tip.classList.add('visible'); });
+            requestAnimationFrame(function() {
+                tip.classList.add('visible');
+            });
         });
         sidebar.addEventListener('mouseout', function(e) {
             if (e.target.closest('.nav-item')) hideT = setTimeout(function() {

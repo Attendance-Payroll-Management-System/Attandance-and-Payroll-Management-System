@@ -17,11 +17,11 @@ $message = '';
 $message_type = '';
 $unread_notifications = get_unread_count($conn, $employee_id);
 
-// Check employee status
 $is_inactive = validate_employee_active($conn, $employee_id) !== null;
 
 $has_source = $conn->query("SHOW COLUMNS FROM overtime_requests LIKE 'source'")->num_rows > 0;
 $has_assigned_by = $conn->query("SHOW COLUMNS FROM overtime_requests LIKE 'assigned_by_id'")->num_rows > 0;
+$has_ot_type = $conn->query("SHOW COLUMNS FROM overtime_requests LIKE 'ot_type'")->num_rows > 0;
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['submit_ot'])) {
     if (!validate_csrf_token()) { $message = "Invalid request."; $message_type = "error"; } else {
@@ -34,7 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['submit_ot'])) {
         $message = "Your account is inactive. You cannot submit overtime requests.";
         $message_type = "error";
     } else {
-        $errors = validate_overtime_request($conn, $employee_id, $ot_date, $start_time, $end_time, $reason);
+        $errors = validate_overtime_request_rules($conn, $employee_id, $ot_date, $start_time, $end_time, $reason);
 
         if (!empty($errors)) {
             $message = implode(' ', $errors);
@@ -42,10 +42,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['submit_ot'])) {
         } else {
             $start_ts = strtotime($start_time);
             $end_ts = strtotime($end_time);
-            $total_seconds = $end_ts - $start_ts;
-            $total_hours = round($total_seconds / 3600, 2);
+            $total_hours = round(($end_ts - $start_ts) / 3600, 2);
+            $ot_type = detect_overtime_type($conn, $ot_date);
+            $ot_rate = get_overtime_rate_for_type($ot_type);
+            $ot_pay = calculate_overtime_pay_for_request($conn, $employee_id, $ot_type, $total_hours);
 
-            if ($has_source) {
+            $has_ot_type_col = $conn->query("SHOW COLUMNS FROM overtime_requests LIKE 'ot_type'")->num_rows > 0;
+            if ($has_ot_type_col) {
+                $stmt = $conn->prepare("INSERT INTO overtime_requests (employee_id, ot_date, start_time, end_time, total_hours, reason, source, ot_type, ot_rate, ot_pay) VALUES (?, ?, ?, ?, ?, ?, 'employee_request', ?, ?, ?)");
+                $stmt->bind_param('isssdssdd', $employee_id, $ot_date, $start_time, $end_time, $total_hours, $reason, $ot_type, $ot_rate, $ot_pay);
+            } elseif ($has_source) {
                 $stmt = $conn->prepare("INSERT INTO overtime_requests (employee_id, ot_date, start_time, end_time, total_hours, reason, source) VALUES (?, ?, ?, ?, ?, ?, 'employee_request')");
                 $stmt->bind_param('isssds', $employee_id, $ot_date, $start_time, $end_time, $total_hours, $reason);
             } else {
@@ -53,20 +59,24 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['submit_ot'])) {
                 $stmt->bind_param('isssds', $employee_id, $ot_date, $start_time, $end_time, $total_hours, $reason);
             }
             if ($stmt->execute()) {
-                create_notification($conn, null, 'ot_request', "$employee_name requested OT on $ot_date (" . number_format($total_hours, 1) . "h)", 'overtimeApproval.php');
+                $new_id = $stmt->insert_id;
+                $stmt->close();
+
+                log_overtime_action($conn, $new_id, 'created', $employee_id, 'employee');
+
+                create_notification($conn, null, 'ot_request', "$employee_name requested OT on $ot_date (" . number_format($total_hours, 1) . "h - " . str_replace('_', ' ', $ot_type) . ")", 'overtimeApproval.php');
                 header('Location: overtimerequest.php');
                 exit;
             } else {
                 $message = "Error submitting overtime request.";
                 $message_type = "error";
             }
-            $stmt->close();
+            if (isset($stmt)) $stmt->close();
         }
     }
     }
 }
 
-// Handle accept/reject for admin-assigned overtime
 if ($has_source && $_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['respond_ot'])) {
     if (!validate_csrf_token()) { $message = "Invalid request."; $message_type = "error"; } else {
     $request_id = $_POST['request_id'] ?? 0;
@@ -78,6 +88,23 @@ if ($has_source && $_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['respond
         $stmt->bind_param('sii', $new_status, $request_id, $employee_id);
         if ($stmt->execute() && $stmt->affected_rows > 0) {
             create_notification($conn, null, 'ot_response', "$employee_name $response OT assignment.", 'overtimeApproval.php');
+            if ($new_status === 'Approved' && $has_ot_type) {
+                $r_stmt = $conn->prepare("SELECT ot_date, total_hours, start_time, end_time FROM overtime_requests WHERE id = ?");
+                $r_stmt->bind_param('i', $request_id);
+                $r_stmt->execute();
+                $ot_row = $r_stmt->get_result()->fetch_assoc();
+                $r_stmt->close();
+                if ($ot_row) {
+                    $ot_type = detect_overtime_type($conn, $ot_row['ot_date']);
+                    $ot_rate = get_overtime_rate_for_type($ot_type);
+                    $ot_pay = calculate_overtime_pay_for_request($conn, $employee_id, $ot_type, (float)$ot_row['total_hours']);
+                    $u_stmt = $conn->prepare("UPDATE overtime_requests SET ot_type = ?, ot_rate = ?, ot_pay = ? WHERE id = ?");
+                    $u_stmt->bind_param('sddi', $ot_type, $ot_rate, $ot_pay, $request_id);
+                    $u_stmt->execute();
+                    $u_stmt->close();
+                }
+            }
+            log_overtime_action($conn, $request_id, $response === 'accepted' ? 'approved' : 'rejected', $employee_id, 'employee');
             header('Location: overtimerequest.php');
             exit;
         } else {
@@ -91,7 +118,6 @@ if ($has_source && $_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['respond
 
 $notifications = get_notifications($conn, $employee_id, 5);
 
-// Get admin-assigned pending overtime
 $admin_ot_result = null;
 if ($has_source) {
     $admin_assignments = $conn->prepare("SELECT * FROM overtime_requests WHERE employee_id = ? AND source = 'admin_assigned' AND status = 'Pending' ORDER BY created_at DESC");
@@ -101,12 +127,13 @@ if ($has_source) {
     $admin_assignments->close();
 }
 
-// Get all existing OT requests
 $ot_requests = $conn->prepare("SELECT otr.*, e.name as employee_name FROM overtime_requests otr JOIN employee e ON otr.employee_id = e.id WHERE otr.employee_id = ? ORDER BY otr.created_at DESC");
 $ot_requests->bind_param('i', $employee_id);
 $ot_requests->execute();
 $ot_result = $ot_requests->get_result();
 $ot_requests->close();
+
+$monthly_remaining = check_monthly_overtime_remaining($conn, $employee_id, mmt_date());
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -119,11 +146,11 @@ $ot_requests->close();
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 </head>
-<body class="bg-slate-50 dark:bg-[#0B1120] text-slate-900 dark:text-white font-sans antialiased emp-page-wrapper">
+<body x-data="otForm()" class="bg-slate-50 dark:bg-[#0B1120] text-slate-900 dark:text-white font-sans antialiased emp-page-wrapper">
     <?php $use_sidebar = true; ?>
     <?php include "../includes/sidebar.php"; ?>
     <div class="main-wrapper flex flex-col min-h-screen">
-        <?php $page_title = "Overtime Request"; $page_subtitle = format_mmt(mmt_date(), 'l, F j, Y') . ' (MMT)'; include "../includes/topbar.php"; ?>
+        <?php $page_title = "Overtime Request"; $page_subtitle = format_mmt(mmt_date(), 'l, F j, Y') . ' (MMT) · <span class="text-purple-400 font-semibold">' . number_format($monthly_remaining['remaining_hours'], 1) . 'h remaining this month</span>'; include "../includes/topbar.php"; ?>
 
         <main class="p-4 sm:p-6 lg:p-8 space-y-6 flex-1 page-content w-full">
             <?php if ($is_inactive): ?>
@@ -137,6 +164,26 @@ $ot_requests->close();
                     <?php echo htmlspecialchars($message); ?>
                 </div>
             <?php endif; ?>
+
+            <!-- Monthly Cap Status -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div class="glass-strong rounded-xl p-4 border border-white/[0.06]">
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Monthly Cap</span>
+                    <p class="text-lg font-bold text-white"><?php echo number_format($monthly_remaining['monthly_max'], 0); ?>h</p>
+                </div>
+                <div class="glass-strong rounded-xl p-4 border border-white/[0.06]">
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Used</span>
+                    <p class="text-lg font-bold text-amber-400"><?php echo number_format($monthly_remaining['used_hours'], 1); ?>h</p>
+                </div>
+                <div class="glass-strong rounded-xl p-4 border border-white/[0.06]">
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Approved</span>
+                    <p class="text-lg font-bold text-emerald-400"><?php echo number_format($monthly_remaining['approved_hours'], 1); ?>h</p>
+                </div>
+                <div class="glass-strong rounded-xl p-4 border border-white/[0.06]">
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Remaining</span>
+                    <p class="text-lg font-bold text-purple-400"><?php echo number_format($monthly_remaining['remaining_hours'], 1); ?>h</p>
+                </div>
+            </div>
 
             <?php if ($admin_ot_result && $admin_ot_result->num_rows > 0): ?>
                 <div class="glass-strong rounded-2xl border border-amber-500/20 shadow-sm p-5">
@@ -156,6 +203,9 @@ $ot_requests->close();
                                             <span class="font-semibold text-white"><?php echo format_mmt($row['ot_date'], 'M d, Y'); ?></span>
                                             <span class="text-zinc-400 font-mono"><?php echo date('h:i A', strtotime($row['start_time'])); ?> - <?php echo date('h:i A', strtotime($row['end_time'])); ?></span>
                                             <span class="text-indigo-400 font-bold"><?php echo $row['total_hours']; ?>h</span>
+                                            <?php if ($has_ot_type && isset($row['ot_type'])): ?>
+                                                <?php echo get_overtime_type_badge($row['ot_type']); ?>
+                                            <?php endif; ?>
                                         </div>
                                         <?php if ($row['reason']): ?>
                                             <p class="text-xs text-zinc-400 mt-1"><?php echo htmlspecialchars($row['reason']); ?></p>
@@ -189,25 +239,56 @@ $ot_requests->close();
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-5">
                     <h3 class="font-bold text-white mb-4">New Overtime Request</h3>
-                    <form method="POST" class="space-y-4 text-zinc-300">
+                    <form method="POST" class="space-y-4 text-zinc-300" @submit.prevent="submitForm">
                     <?php echo csrf_field(); ?>
                         <div>
-                            <label class="text-xs font-semibold text-zinc-400 block mb-1">OT Date (Calendar Date Picker)</label>
+                            <label class="text-xs font-semibold text-zinc-400 block mb-1">OT Date</label>
                             <input type="text" name="ot_date" id="ot_date_picker" required readonly
+                                   x-model="otDate"
+                                   @change="onDateChange"
                                    class="w-full text-sm px-3 py-3 border border-white/10 rounded-lg bg-white/[0.06] text-white focus:outline-blue-500 cursor-pointer"
                                    placeholder="Click to select date...">
-                            <p class="text-[10px] text-zinc-500 mt-1">Select a date with completed attendance (checked in & out)</p>
+                            <template x-if="otType">
+                                <p class="text-xs mt-1" :class="otType === 'working_day' ? 'text-blue-400' : otType === 'weekend' ? 'text-amber-400' : 'text-rose-400'">
+                                    <i class="fa-solid fa-tag mr-1"></i>
+                                    <span x-text="otType === 'working_day' ? 'Working Day OT (17:00-21:00, max 4h)' : otType === 'weekend' ? 'Weekend OT (09:00-17:00, max 8h)' : 'Holiday OT (09:00-17:00, max 8h)'"></span>
+                                </p>
+                            </template>
                         </div>
                         <div class="grid grid-cols-2 gap-3">
                             <div>
                                 <label class="text-xs font-semibold text-zinc-400 block mb-1">Start Time (MMT)</label>
-                                <input type="time" name="start_time" required class="w-full text-sm px-3 py-3 border border-white/10 rounded-lg bg-white/[0.06] text-white focus:outline-blue-500">
+                                <input type="time" name="start_time" required x-model="startTime" @change="calculatePreview"
+                                       class="w-full text-sm px-3 py-3 border border-white/10 rounded-lg bg-white/[0.06] text-white focus:outline-blue-500">
                             </div>
                             <div>
                                 <label class="text-xs font-semibold text-zinc-400 block mb-1">End Time (MMT)</label>
-                                <input type="time" name="end_time" required class="w-full text-sm px-3 py-3 border border-white/10 rounded-lg bg-white/[0.06] text-white focus:outline-blue-500">
+                                <input type="time" name="end_time" required x-model="endTime" @change="calculatePreview"
+                                       class="w-full text-sm px-3 py-3 border border-white/10 rounded-lg bg-white/[0.06] text-white focus:outline-blue-500">
                             </div>
                         </div>
+
+                        <!-- Live Preview -->
+                        <template x-if="preview.show">
+                            <div class="rounded-xl p-4 border" :class="preview.valid ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-red-500/10 border-red-500/20'">
+                                <div class="grid grid-cols-3 gap-3 text-center">
+                                    <div>
+                                        <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Hours</span>
+                                        <p class="text-lg font-bold text-white" x-text="preview.hours + 'h'"></p>
+                                    </div>
+                                    <div>
+                                        <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Rate</span>
+                                        <p class="text-lg font-bold text-purple-400" x-text="'×' + preview.rate"></p>
+                                    </div>
+                                    <div>
+                                        <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Est. Pay</span>
+                                        <p class="text-lg font-bold text-emerald-400" x-text="'$' + preview.pay"></p>
+                                    </div>
+                                </div>
+                                <p class="text-xs mt-2 text-center" x-text="preview.message" :class="preview.valid ? 'text-emerald-400' : 'text-red-400'"></p>
+                            </div>
+                        </template>
+
                         <div>
                             <label class="text-xs font-semibold text-zinc-400 block mb-1">Reason for Overtime</label>
                             <textarea name="reason" rows="4" required class="w-full text-sm px-3 py-3 border border-white/10 rounded-lg bg-white/[0.06] text-white focus:outline-blue-500 resize-none" placeholder="Explain why overtime is needed..."></textarea>
@@ -233,6 +314,8 @@ $ot_requests->close();
                                     <th class="py-3 font-semibold">Date</th>
                                     <th class="py-3 font-semibold">Time</th>
                                     <th class="py-3 font-semibold">Hours</th>
+                                    <th class="py-3 font-semibold">Type</th>
+                                    <th class="py-3 font-semibold">Pay</th>
                                     <th class="py-3 font-semibold">Reason</th>
                                     <th class="py-3 font-semibold">Assigned By</th>
                                     <th class="py-3 font-semibold">Status</th>
@@ -244,15 +327,28 @@ $ot_requests->close();
                                         <td class="py-3 font-medium text-white"><?php echo format_mmt($row['ot_date'], 'M d, Y'); ?></td>
                                         <td class="py-3 font-mono text-xs"><?php echo date('h:i A', strtotime($row['start_time'])); ?> - <?php echo date('h:i A', strtotime($row['end_time'])); ?></td>
                                         <td class="py-3 font-semibold"><?php echo $row['total_hours']; ?>h</td>
-                                        <td class="py-3 text-zinc-400 max-w-[120px] truncate text-xs" title="<?php echo htmlspecialchars($row['reason']); ?>"><?php echo htmlspecialchars($row['reason']); ?></td>
+                                        <td class="py-3">
+                                            <?php if ($has_ot_type && $row['ot_type']): ?>
+                                                <?php echo get_overtime_type_badge($row['ot_type']); ?>
+                                            <?php else: ?>
+                                                <span class="text-xs text-zinc-500">-</span>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td class="py-3 font-mono text-sm">
+                                            <?php if ($row['ot_pay'] !== null && $row['ot_pay'] > 0): ?>
+                                                <span class="text-emerald-400 font-semibold">$<?php echo number_format($row['ot_pay'], 2); ?></span>
+                                            <?php else: ?>
+                                                <span class="text-zinc-500">-</span>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td class="py-3 text-zinc-400 max-w-[100px] truncate text-xs" title="<?php echo htmlspecialchars($row['reason']); ?>"><?php echo htmlspecialchars($row['reason']); ?></td>
                                         <td class="py-3">
                                             <?php if ($has_assigned_by && $row['assigned_by_name']): ?>
                                                 <div class="text-xs">
                                                     <span class="text-blue-300 font-medium"><?php echo htmlspecialchars($row['assigned_by_name']); ?></span>
-                                                    <span class="text-zinc-500 block"><?php echo htmlspecialchars($row['assigned_by_position'] ?? ''); ?>, <?php echo htmlspecialchars($row['assigned_by_department'] ?? ''); ?></span>
                                                 </div>
-                                            <?php elseif ($row['source'] === 'employee_request'): ?>
-                                                <span class="text-xs text-zinc-500">Self-Requested</span>
+                                            <?php elseif (isset($row['source']) && $row['source'] === 'employee_request'): ?>
+                                                <span class="text-xs text-zinc-500">Self</span>
                                             <?php else: ?>
                                                 <span class="text-xs text-zinc-500">-</span>
                                             <?php endif; ?>
@@ -268,7 +364,7 @@ $ot_requests->close();
                                 <?php endwhile; ?>
                                 <?php if ($ot_result->num_rows == 0): ?>
                                     <tr>
-                                        <td colspan="6" class="py-6 text-center text-zinc-400">No overtime requests yet.</td>
+                                        <td colspan="8" class="py-6 text-center text-zinc-400">No overtime requests yet.</td>
                                     </tr>
                                 <?php endif; ?>
                             </tbody>
@@ -279,9 +375,68 @@ $ot_requests->close();
         </main>
     </div>
 <script>
-// Initialize flatpickr for OT date with only valid dates (attendance exists)
+function otForm() {
+    return {
+        otDate: '',
+        startTime: '',
+        endTime: '',
+        otType: '',
+        preview: { show: false, valid: false, hours: '0.0', rate: '0.02', pay: '0.00', message: '' },
+        rateMultipliers: { working_day: 0.02, weekend: 0.03, holiday: 0.04 },
+        basicSalary: <?php
+            $bs = $conn->query("SELECT basic_salary FROM employee WHERE id = $employee_id")->fetch_assoc();
+            echo $bs['basic_salary'] ?? 0;
+        ?>,
+        onDateChange() {
+            if (!this.otDate) { this.otType = ''; return; }
+            fetch('../ajax/detect_ot_type.php?date=' + this.otDate)
+                .then(r => r.json())
+                .then(d => { this.otType = d.type; this.calculatePreview(); })
+                .catch(() => { this.otType = ''; });
+        },
+        calculatePreview() {
+            if (!this.otDate || !this.startTime || !this.endTime || !this.otType) {
+                this.preview.show = false;
+                return;
+            }
+            const s = new Date('2000-01-01T' + this.startTime + ':00');
+            const e = new Date('2000-01-01T' + this.endTime + ':00');
+            if (e <= s) { this.preview = { show: true, valid: false, hours: '0.0', rate: '0', pay: '0.00', message: 'End must be after start' }; return; }
+            const hours = (e - s) / 3600000;
+            const rate = this.rateMultipliers[this.otType] || 0.02;
+            const hourlyRate = this.basicSalary > 0 ? (this.basicSalary / (22 * 8)) : 0;
+            const pay = hourlyRate * rate * hours;
+
+            const maxH = this.otType === 'working_day' ? 4 : 8;
+            const windows = { working_day: { s: '17:00', e: '21:00' }, weekend: { s: '09:00', e: '17:00' }, holiday: { s: '09:00', e: '17:00' } };
+            const w = windows[this.otType];
+            const valid = hours > 0 && hours <= maxH && this.startTime >= w.s && this.endTime <= w.e;
+
+            this.preview = {
+                show: true,
+                valid: valid,
+                hours: hours.toFixed(1),
+                rate: rate.toFixed(2),
+                pay: pay.toFixed(2),
+                message: valid ? 'Valid OT request ✓' : hours > maxH ? 'Exceeds max ' + maxH + 'h for this type' : this.startTime < w.s || this.endTime > w.e ? 'Outside ' + w.s + '-' + w.e + ' window' : 'Check times'
+            };
+        },
+        submitForm(e) {
+            if (!this.preview.valid) {
+                if (this.preview.show) {
+                    alert(this.preview.message);
+                } else {
+                    alert('Please select a date and valid time range first.');
+                }
+                e.preventDefault();
+                return;
+            }
+            e.target.submit();
+        }
+    }
+}
+
 document.addEventListener('DOMContentLoaded', function() {
-    // Fetch valid OT dates from server-side (dates with completed attendance)
     const validDates = <?php
         $dates = $conn->prepare("SELECT attendance_date FROM attendance WHERE employee_id = ? AND check_in IS NOT NULL AND check_out IS NOT NULL ORDER BY attendance_date DESC");
         $dates->bind_param('i', $employee_id);
@@ -297,7 +452,14 @@ document.addEventListener('DOMContentLoaded', function() {
         maxDate: '<?php echo mmt_date(); ?>',
         enable: validDates,
         locale: { firstDayOfWeek: 1 },
-        disableMobile: true
+        disableMobile: true,
+        onChange: function(selectedDates, dateStr) {
+            const alpineEl = document.querySelector('[x-data]');
+            if (alpineEl && alpineEl.__x) {
+                alpineEl.__x.$data.otDate = dateStr;
+                alpineEl.__x.$data.onDateChange();
+            }
+        }
     });
 });
 </script>

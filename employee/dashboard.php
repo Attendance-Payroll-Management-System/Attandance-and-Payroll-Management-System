@@ -50,6 +50,13 @@ $ot_data = $ot->get_result()->fetch_assoc();
 $ot->close();
 $ot_hours = $ot_data['approved_hours'] ?? 0;
 
+// ── Pending Attendance Corrections ──
+$corr_stmt = $conn->prepare("SELECT COUNT(*) as cnt FROM attendance_corrections WHERE employee_id = ? AND status = 'Pending'");
+$corr_stmt->bind_param("i", $employee_id);
+$corr_stmt->execute();
+$pending_corrections = (int)$corr_stmt->get_result()->fetch_assoc()['cnt'];
+$corr_stmt->close();
+
 // ── Pending Counts ──
 $pending_leaves = $leave_data['pending'] ?? 0;
 $pending_ot_stmt = $conn->prepare("SELECT COUNT(*) as cnt FROM overtime_requests WHERE employee_id = ? AND status = 'Pending' AND ot_date BETWEEN ? AND ?");
@@ -299,7 +306,13 @@ $month_name = date('F Y', strtotime($month_start));
                     <div class="xl:col-span-3 bg-white dark:bg-[#1E293B] rounded-2xl p-6 border border-slate-100 dark:border-white/[0.06] shadow-sm">
                         <div class="flex items-center justify-between mb-5">
                             <h3 class="font-bold text-slate-900 dark:text-white flex items-center gap-2"><i class="fa-solid fa-chart-simple text-blue-500 dark:text-blue-400"></i>Attendance Summary</h3>
-                            <a href="attendance_summary.php" class="text-xs font-semibold text-blue-500 dark:text-blue-400 hover:text-blue-600 dark:hover:text-blue-300 transition-colors">View All <i class="fa-solid fa-arrow-right ml-1"></i></a>
+                            <div class="flex items-center gap-2">
+                                <?php if ($pending_corrections > 0): ?>
+                                <a href="attendance.php?tab=corrections" class="text-xs font-semibold text-rose-500 dark:text-rose-400 hover:text-rose-600 dark:hover:text-rose-300 transition-colors flex items-center gap-1"><span class="w-1.5 h-1.5 bg-rose-500 rounded-full animate-pulse"></span><?php echo $pending_corrections; ?> correction<?php echo $pending_corrections > 1 ? 's' : ''; ?></a>
+                                <?php endif; ?>
+                                <a href="attendance_calendar.php" class="text-xs font-semibold text-indigo-500 dark:text-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-300 transition-colors"><i class="fa-regular fa-calendar mr-1"></i>Calendar</a>
+                                <a href="attendance_summary.php" class="text-xs font-semibold text-blue-500 dark:text-blue-400 hover:text-blue-600 dark:hover:text-blue-300 transition-colors">View All <i class="fa-solid fa-arrow-right ml-1"></i></a>
+                            </div>
                         </div>
 
                         <!-- Progress Bar -->
@@ -356,6 +369,7 @@ $month_name = date('F Y', strtotime($month_start));
                     <div class="xl:col-span-2 bg-white dark:bg-[#1E293B] rounded-2xl p-6 border border-slate-100 dark:border-white/[0.06] shadow-sm">
                         <div class="flex items-center justify-between mb-4">
                             <h3 class="font-bold text-slate-900 dark:text-white flex items-center gap-2"><i class="fa-solid fa-calendar text-indigo-500 dark:text-indigo-400"></i><?php echo $month_name; ?></h3>
+                            <a href="attendance_calendar.php" class="text-xs font-semibold text-indigo-500 dark:text-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-300 transition-colors">Full View <i class="fa-solid fa-arrow-right ml-1"></i></a>
                         </div>
 
                         <!-- Day Headers -->

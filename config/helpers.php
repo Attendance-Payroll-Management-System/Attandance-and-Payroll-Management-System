@@ -357,6 +357,35 @@ function get_attendance_summary_for_payroll(mysqli $conn, int $employee_id, stri
 }
 
 function calculate_overtime_amount_for_payroll(mysqli $conn, int $employee_id, string $month_start, string $month_end, float $hourly_rate): float {
+    $has_ot_type = $conn->query("SHOW COLUMNS FROM overtime_requests LIKE 'ot_type'")->num_rows > 0;
+
+    if ($has_ot_type) {
+        $stmt = $conn->prepare(
+            "SELECT ot_date, total_hours, ot_type, ot_rate, ot_pay FROM overtime_requests 
+             WHERE employee_id = ? AND ot_date BETWEEN ? AND ? AND status = 'Approved'"
+        );
+        $stmt->bind_param('iss', $employee_id, $month_start, $month_end);
+        $stmt->execute();
+        $result = $stmt->get_result();
+
+        $total_ot_amount = 0;
+        while ($row = $result->fetch_assoc()) {
+            if ($row['ot_pay'] !== null) {
+                $total_ot_amount += (float)$row['ot_pay'];
+            } else {
+                $rate_multiplier = match ($row['ot_type'] ?? 'working_day') {
+                    'holiday' => 0.04,
+                    'weekend' => 0.03,
+                    default => 0.02,
+                };
+                $total_ot_amount += $hourly_rate * $rate_multiplier * $row['total_hours'];
+            }
+        }
+        $stmt->close();
+        return round($total_ot_amount, 2);
+    }
+
+    // Fallback: old logic without ot_type column
     $stmt = $conn->prepare(
         "SELECT ot_date, start_time, end_time, total_hours FROM overtime_requests 
          WHERE employee_id = ? AND ot_date BETWEEN ? AND ? AND status = 'Approved'"
@@ -368,19 +397,21 @@ function calculate_overtime_amount_for_payroll(mysqli $conn, int $employee_id, s
     $total_ot_amount = 0;
     while ($row = $result->fetch_assoc()) {
         $day_of_week = date('N', strtotime($row['ot_date']));
-        $rate_multiplier = 1.5; // default weekday
-        if ($day_of_week >= 6) {
-            $rate_multiplier = 2.0; // weekend
-        }
-        // Check if holiday
+        $is_weekend = $day_of_week >= 6;
+        $is_holiday = false;
         $h_check = $conn->prepare("SELECT COUNT(*) as cnt FROM holidays WHERE holiday_date = ?");
         $h_check->bind_param('s', $row['ot_date']);
         $h_check->execute();
         if ($h_check->get_result()->fetch_assoc()['cnt'] > 0) {
-            $rate_multiplier = 3.0; // holiday
+            $is_holiday = true;
         }
         $h_check->close();
 
+        $rate_multiplier = match (true) {
+            $is_holiday => 0.04,
+            $is_weekend => 0.03,
+            default => 0.02,
+        };
         $total_ot_amount += $hourly_rate * $rate_multiplier * $row['total_hours'];
     }
     $stmt->close();
@@ -712,8 +743,9 @@ function get_awol_deduction_type_id(mysqli $conn): ?int {
 }
 
 function has_awol_deduction(mysqli $conn, int $employee_id, string $date): bool {
+    $remarks = AWOL_DEDUCTION_REMARKS;
     $stmt = $conn->prepare("SELECT id FROM deductions WHERE employee_id = ? AND deduction_date = ? AND remarks = ? LIMIT 1");
-    $stmt->bind_param('iss', $employee_id, $date, AWOL_DEDUCTION_REMARKS);
+    $stmt->bind_param('iss', $employee_id, $date, $remarks);
     $stmt->execute();
     $stmt->store_result();
     $exists = $stmt->num_rows > 0;
@@ -738,8 +770,10 @@ function create_awol_deduction(mysqli $conn, int $employee_id, int $attendance_i
     $deduction_amount = round($basic_salary * AWOL_DEDUCTION_RATE, 2);
     $type_id = get_awol_deduction_type_id($conn);
 
+    $remarks = AWOL_DEDUCTION_REMARKS;
+    $rate = AWOL_DEDUCTION_RATE;
     $stmt = $conn->prepare("INSERT INTO deductions (employee_id, title, deduction_type_id, attendance_id, amount, deduction_rate, description, deduction_date, remarks) VALUES (?, 'Pension Fund', ?, ?, ?, ?, 'Auto Pension Fund Deduction for Unauthorized Absence (2% of salary)', ?, ?)");
-    $stmt->bind_param('iiiddss', $employee_id, $type_id, $attendance_id, $deduction_amount, AWOL_DEDUCTION_RATE, $date, AWOL_DEDUCTION_REMARKS);
+    $stmt->bind_param('iiiddss', $employee_id, $type_id, $attendance_id, $deduction_amount, $rate, $date, $remarks);
     $result = $stmt->execute();
     $stmt->close();
 
@@ -751,8 +785,9 @@ function create_awol_deduction(mysqli $conn, int $employee_id, int $attendance_i
 }
 
 function remove_awol_deduction(mysqli $conn, int $employee_id, string $date): bool {
+    $remarks = AWOL_DEDUCTION_REMARKS;
     $stmt = $conn->prepare("DELETE FROM deductions WHERE employee_id = ? AND deduction_date = ? AND remarks = ?");
-    $stmt->bind_param('iss', $employee_id, $date, AWOL_DEDUCTION_REMARKS);
+    $stmt->bind_param('iss', $employee_id, $date, $remarks);
     $result = $stmt->execute();
     $affected = $stmt->affected_rows;
     $stmt->close();
@@ -1158,6 +1193,9 @@ function calculate_payroll_for_employee(mysqli $conn, int $employee_id, int $mon
     // Overtime
     $ot_amount = calculate_overtime_amount_for_payroll($conn, $employee_id, $month_start, $month_end, $hourly_rate);
 
+    // Overtime breakdown by type
+    $ot_breakdown = get_overtime_payroll_breakdown($conn, $employee_id, $month_start, $month_end, $hourly_rate);
+
     // Bonuses
     $bonus_stmt = $conn->prepare("SELECT COALESCE(SUM(amount), 0) as total FROM bonuses WHERE employee_id = ? AND bonus_date BETWEEN ? AND ?");
     $bonus_stmt->bind_param('iss', $employee_id, $month_start, $month_end);
@@ -1199,6 +1237,7 @@ function calculate_payroll_for_employee(mysqli $conn, int $employee_id, int $mon
         'overtime_hours' => (float)($att['total_hours_worked'] ?? 0),
         'daily_rate' => $daily_rate,
         'hourly_rate' => $hourly_rate,
+        'ot_breakdown' => $ot_breakdown,
     ];
 }
 
@@ -1246,4 +1285,800 @@ function get_activity_logs($conn, $limit = 50, $emp_id = null, $action = null) {
     }
 
     return $logs;
+}
+
+// ─── Payroll Enterprise Helpers ──────────────────────────────
+
+function get_payroll_setting(mysqli $conn, string $key, string $default = ''): string {
+    $stmt = $conn->prepare("SELECT setting_value FROM payroll_settings WHERE setting_key = ? LIMIT 1");
+    $stmt->bind_param('s', $key);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $row = $result->fetch_assoc();
+    $stmt->close();
+    return $row['setting_value'] ?? $default;
+}
+
+function get_salary_structure(mysqli $conn, int $employee_id): ?array {
+    $stmt = $conn->prepare("SELECT * FROM salary_structures WHERE employee_id = ? AND status = 'Active' ORDER BY effective_date DESC LIMIT 1");
+    $stmt->bind_param('i', $employee_id);
+    $stmt->execute();
+    $result = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    return $result ?: null;
+}
+
+function get_salary_structure_history(mysqli $conn, int $employee_id): array {
+    $stmt = $conn->prepare("SELECT ss.*, a.name as created_by_name FROM salary_structures ss LEFT JOIN admin a ON ss.created_by = a.id WHERE ss.employee_id = ? ORDER BY ss.effective_date DESC");
+    $stmt->bind_param('i', $employee_id);
+    $stmt->execute();
+    $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+    return $rows;
+}
+
+function calculate_salary_structure(mysqli $conn, int $employee_id, float $basic_salary, int $working_days): array {
+    $daily = $working_days > 0 ? round($basic_salary / $working_days, 2) : 0;
+    $hourly = $working_days > 0 ? round($basic_salary / ($working_days * 8), 2) : 0;
+    $ot_rate = round($hourly * 1.5, 2);
+    return [
+        'basic_salary' => $basic_salary,
+        'daily_salary_rate' => $daily,
+        'hourly_salary_rate' => $hourly,
+        'overtime_rate_per_hour' => $ot_rate,
+    ];
+}
+
+function create_salary_structure(mysqli $conn, int $employee_id, float $basic_salary, string $effective_date, int $created_by): bool {
+    $working_days = (int)get_payroll_setting($conn, 'payroll_working_days_per_month', '22');
+    $rates = calculate_salary_structure($conn, $employee_id, $basic_salary, $working_days);
+    $stmt = $conn->prepare("INSERT INTO salary_structures (employee_id, basic_salary, daily_salary_rate, hourly_salary_rate, overtime_rate_per_hour, effective_date, status, created_by) VALUES (?, ?, ?, ?, ?, ?, 'Active', ?)");
+    $stmt->bind_param('idddsi', $employee_id, $rates['basic_salary'], $rates['daily_salary_rate'], $rates['hourly_salary_rate'], $rates['overtime_rate_per_hour'], $effective_date, $created_by);
+    $result = $stmt->execute();
+    $stmt->close();
+    return $result;
+}
+
+function generate_payroll_for_employee(mysqli $conn, int $employee_id, int $month, int $year, string $status = 'Generated', ?int $admin_id = null): ?int {
+    $payroll = calculate_payroll_for_employee($conn, $employee_id, $month, $year);
+    $total_deductions = $payroll['total_attendance_deduction'] + $payroll['other_deductions'];
+    $month_start = sprintf('%04d-%02d-01', $year, $month);
+
+    $upsert = $conn->prepare("INSERT INTO payrolls (employee_id, payroll_month, payroll_year, basic_salary, ot_amount, allowance_amount, bonus_amount, deduction_amount, tax_amount, leave_deduction, late_deduction, unpaid_leave_deduction, gross_salary, net_salary, working_days, present_days, half_days, late_days, absent_days, paid_leave_days, unpaid_leave_days, overtime_hours, generated_date, status, generated_by)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURDATE(), ?, ?)
+        ON DUPLICATE KEY UPDATE basic_salary=VALUES(basic_salary), ot_amount=VALUES(ot_amount), allowance_amount=VALUES(allowance_amount),
+        bonus_amount=VALUES(bonus_amount), deduction_amount=VALUES(deduction_amount), leave_deduction=VALUES(leave_deduction),
+        late_deduction=VALUES(late_deduction), unpaid_leave_deduction=VALUES(unpaid_leave_deduction),
+        gross_salary=VALUES(gross_salary), net_salary=VALUES(net_salary), working_days=VALUES(working_days),
+        present_days=VALUES(present_days), half_days=VALUES(half_days), late_days=VALUES(late_days),
+        absent_days=VALUES(absent_days), paid_leave_days=VALUES(paid_leave_days), unpaid_leave_days=VALUES(unpaid_leave_days),
+        overtime_hours=VALUES(overtime_hours), generated_date=CURDATE(), status=VALUES(status), generated_by=VALUES(generated_by)");
+    $upsert->bind_param('iiidddddddddddiiiiiiidsi',
+        $employee_id, $month, $year, $payroll['basic_salary'], $payroll['ot_amount'],
+        $payroll['allowance_amount'], $payroll['bonus_amount'], $total_deductions,
+        $payroll['unpaid_leave_deduction'], $payroll['late_deduction'], $payroll['unpaid_leave_deduction'],
+        $payroll['gross_salary'], $payroll['net_salary'], $payroll['working_days'],
+        $payroll['present_days'], $payroll['half_days'], $payroll['late_days'],
+        $payroll['absent_days'], $payroll['paid_leave_days'], $payroll['unpaid_leave_days'],
+        $payroll['overtime_hours'], $status, $admin_id
+    );
+    $upsert->execute();
+    $payroll_id = $conn->insert_id;
+    if ($payroll_id <= 0) {
+        $stmt = $conn->prepare("SELECT id FROM payrolls WHERE employee_id = ? AND payroll_month = ? AND payroll_year = ?");
+        $stmt->bind_param('iii', $employee_id, $month, $year);
+        $stmt->execute();
+        $payroll_id = (int)$stmt->get_result()->fetch_assoc()['id'];
+        $stmt->close();
+    }
+    $upsert->close();
+
+    if ($payroll_id > 0) {
+        $conn->query("DELETE FROM payroll_details WHERE payroll_id = $payroll_id");
+        $detail_stmt = $conn->prepare("INSERT INTO payroll_details (payroll_id, component_type, component_name, amount) VALUES (?, ?, ?, ?)");
+        $components = [
+            ['earning', 'Basic Salary', $payroll['basic_salary']],
+            ['earning', 'Allowance', $payroll['allowance_amount']],
+            ['earning', 'Overtime Pay', $payroll['ot_amount']],
+            ['earning', 'Bonuses', $payroll['bonus_amount']],
+            ['deduction', 'Absent Deduction (' . $payroll['absent_days'] . ' days)', $payroll['absent_deduction']],
+            ['deduction', 'Half-Day Deduction (' . $payroll['half_days'] . ' days)', $payroll['half_day_deduction']],
+            ['deduction', 'Unpaid Leave Deduction (' . $payroll['unpaid_leave_days'] . ' days)', $payroll['unpaid_leave_deduction']],
+            ['deduction', 'Late Deduction (' . $payroll['late_days'] . ' occurrences)', $payroll['late_deduction']],
+            ['deduction', 'Other Deductions', $payroll['other_deductions']],
+        ];
+        foreach ($components as $comp) {
+            if ($comp[2] > 0) {
+                $detail_stmt->bind_param('issd', $payroll_id, $comp[0], $comp[1], $comp[2]);
+                $detail_stmt->execute();
+            }
+        }
+        $detail_stmt->close();
+    }
+    return $payroll_id;
+}
+
+function update_payroll_status(mysqli $conn, int $payroll_id, string $new_status, ?int $admin_id = null, string $remarks = ''): bool {
+    $stmt = $conn->prepare("SELECT status FROM payrolls WHERE id = ?");
+    $stmt->bind_param('i', $payroll_id);
+    $stmt->execute();
+    $current = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    if (!$current) return false;
+
+    $from_status = $current['status'];
+
+    $date_col = match($new_status) {
+        'Reviewed' => 'reviewed_date',
+        'Approved' => 'approved_date',
+        'Paid' => 'paid_date',
+        'Cancelled' => 'cancelled_date',
+        default => null
+    };
+
+    $sql = "UPDATE payrolls SET status = ?" . ($date_col ? ", $date_col = CURDATE()" : "") . ($admin_id ? ", reviewed_by = COALESCE(reviewed_by, ?), approved_by = COALESCE(approved_by, ?), paid_by = COALESCE(paid_by, ?)" : "") . " WHERE id = ?";
+    $stmt = $conn->prepare($sql);
+    if ($admin_id) {
+        $stmt->bind_param('siiii', $new_status, $admin_id, $admin_id, $admin_id, $payroll_id);
+    } else {
+        $stmt->bind_param('si', $new_status, $payroll_id);
+    }
+    $stmt->execute();
+    $stmt->close();
+
+    $log = $conn->prepare("INSERT INTO payroll_approvals (payroll_id, from_status, to_status, action_by, remarks) VALUES (?, ?, ?, ?, ?)");
+    $log->bind_param('issis', $payroll_id, $from_status, $new_status, $admin_id, $remarks);
+    $log->execute();
+    $log->close();
+
+    return true;
+}
+
+function add_payroll_notification(mysqli $conn, ?int $employee_id, string $type, string $title, string $message, ?int $payroll_id = null): bool {
+    $stmt = $conn->prepare("INSERT INTO payroll_notifications (employee_id, notification_type, title, message, payroll_id) VALUES (?, ?, ?, ?, ?)");
+    $stmt->bind_param('isssi', $employee_id, $type, $title, $message, $payroll_id);
+    $result = $stmt->execute();
+    $stmt->close();
+    return $result;
+}
+
+function get_unread_notification_count(mysqli $conn, ?int $employee_id = null): int {
+    if ($employee_id) {
+        $stmt = $conn->prepare("SELECT COUNT(*) as cnt FROM payroll_notifications WHERE (employee_id = ? OR employee_id IS NULL) AND is_read = 0");
+        $stmt->bind_param('i', $employee_id);
+    } else {
+        $stmt = $conn->prepare("SELECT COUNT(*) as cnt FROM payroll_notifications WHERE is_read = 0");
+    }
+    $stmt->execute();
+    $cnt = (int)$stmt->get_result()->fetch_assoc()['cnt'];
+    $stmt->close();
+    return $cnt;
+}
+
+function get_payroll_status_badge(string $status): string {
+    $map = [
+        'Draft' => 'bg-zinc-500/15 text-zinc-400 border-zinc-500/20',
+        'Generated' => 'bg-blue-500/15 text-blue-400 border-blue-500/20',
+        'Reviewed' => 'bg-cyan-500/15 text-cyan-400 border-cyan-500/20',
+        'Approved' => 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20',
+        'Paid' => 'bg-purple-500/15 text-purple-400 border-purple-500/20',
+        'Cancelled' => 'bg-rose-500/15 text-rose-400 border-rose-500/20',
+    ];
+    return $map[$status] ?? 'bg-zinc-500/15 text-zinc-400 border-zinc-500/20';
+}
+
+function get_payroll_status_icon(string $status): string {
+    $map = [
+        'Draft' => 'fa-pen-to-square',
+        'Generated' => 'fa-calculator',
+        'Reviewed' => 'fa-magnifying-glass',
+        'Approved' => 'fa-check-circle',
+        'Paid' => 'fa-sack-dollar',
+        'Cancelled' => 'fa-ban',
+    ];
+    return $map[$status] ?? 'fa-circle';
+}
+
+function get_payroll_details_with_components(mysqli $conn, int $payroll_id): ?array {
+    $stmt = $conn->prepare("
+        SELECT p.*, e.name, e.employee_code, e.basic_salary as emp_salary, e.email,
+               d.department_name, pos.position_name
+        FROM payrolls p
+        JOIN employee e ON p.employee_id = e.id
+        LEFT JOIN departments d ON e.department_id = d.id
+        LEFT JOIN positions pos ON e.position_id = pos.id
+        WHERE p.id = ?
+    ");
+    $stmt->bind_param('i', $payroll_id);
+    $stmt->execute();
+    $payroll = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    if (!$payroll) return null;
+
+    $det_stmt = $conn->prepare("SELECT component_type, component_name, amount FROM payroll_details WHERE payroll_id = ? ORDER BY id");
+    $det_stmt->bind_param('i', $payroll_id);
+    $det_stmt->execute();
+    $payroll['details'] = $det_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $det_stmt->close();
+
+    $app_stmt = $conn->prepare("SELECT pa.*, a.name as action_by_name FROM payroll_approvals pa LEFT JOIN admin a ON pa.action_by = a.id WHERE pa.payroll_id = ? ORDER BY pa.created_at ASC");
+    $app_stmt->bind_param('i', $payroll_id);
+    $app_stmt->execute();
+    $payroll['approvals'] = $app_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $app_stmt->close();
+
+    return $payroll;
+}
+
+function get_payroll_months_with_data(mysqli $conn): array {
+    $result = $conn->query("SELECT DISTINCT payroll_month, payroll_year FROM payrolls ORDER BY payroll_year DESC, payroll_month DESC");
+    return $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
+}
+
+function get_dashboard_payroll_stats(mysqli $conn): array {
+    $current_month = (int)mmt_date('m');
+    $current_year = (int)mmt_date('Y');
+    $month_start = sprintf('%04d-%02d-01', $current_year, $current_month);
+    $month_end = date('Y-m-t', strtotime($month_start));
+
+    $stats = [];
+
+    // Total employees
+    $res = $conn->query("SELECT COUNT(*) as cnt FROM employee WHERE status = 'active'");
+    $stats['total_employees'] = (int)$res->fetch_assoc()['cnt'];
+
+    // Current month payroll totals
+    $stmt = $conn->prepare("SELECT COUNT(*) as total_payrolls, COALESCE(SUM(net_salary),0) as total_net, COALESCE(SUM(ot_amount),0) as total_ot, COALESCE(SUM(bonus_amount),0) as total_bonus, COALESCE(SUM(deduction_amount),0) as total_ded FROM payrolls WHERE payroll_month = ? AND payroll_year = ?");
+    $stmt->bind_param('ii', $current_month, $current_year);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    $stats['total_payrolls'] = (int)$row['total_payrolls'];
+    $stats['total_net'] = (float)$row['total_net'];
+    $stats['total_ot'] = (float)$row['total_ot'];
+    $stats['total_bonus'] = (float)$row['total_bonus'];
+    $stats['total_ded'] = (float)$row['total_ded'];
+
+    // Status counts (check column first for migration safety)
+    $has_status = $conn->query("SHOW COLUMNS FROM payrolls LIKE 'status'")->num_rows > 0;
+    $status_counts = ['Draft' => 0, 'Generated' => 0, 'Reviewed' => 0, 'Approved' => 0, 'Paid' => 0, 'Cancelled' => 0];
+    if ($has_status) {
+        $res = $conn->query("SELECT status, COUNT(*) as cnt FROM payrolls WHERE payroll_month = $current_month AND payroll_year = $current_year GROUP BY status");
+        if ($res) while ($r = $res->fetch_assoc()) {
+            $status_counts[$r['status']] = (int)$r['cnt'];
+        }
+    }
+    $stats['status_counts'] = $status_counts;
+    $stats['total_pending'] = $status_counts['Generated'] + $status_counts['Draft'];
+    $stats['total_paid'] = $status_counts['Paid'];
+    $stats['total_approved'] = $status_counts['Approved'];
+
+    // Monthly trend (last 6 months)
+    $trend = [];
+    for ($i = 5; $i >= 0; $i--) {
+        $m = $current_month - $i;
+        $y = $current_year;
+        if ($m < 1) { $m += 12; $y--; }
+        $stmt = $conn->prepare("SELECT COALESCE(SUM(net_salary),0) as total FROM payrolls WHERE payroll_month = ? AND payroll_year = ?");
+        $stmt->bind_param('ii', $m, $y);
+        $stmt->execute();
+        $trend[] = ['month' => date('M', mktime(0,0,0,$m,1)), 'year' => $y, 'total' => (float)$stmt->get_result()->fetch_assoc()['total']];
+        $stmt->close();
+    }
+    $stats['monthly_trend'] = $trend;
+
+    return $stats;
+}
+
+function get_payroll_report_data(mysqli $conn, string $start_date, string $end_date, ?int $department_id = null, ?int $employee_id = null, ?string $status = null): array {
+    $where = ["p.payroll_year >= ? AND p.payroll_year <= ?"];
+    $params = [(int)date('Y', strtotime($start_date)), (int)date('Y', strtotime($end_date))];
+    $types = 'ii';
+
+    if ($department_id) {
+        $where[] = "e.department_id = ?";
+        $params[] = $department_id;
+        $types .= 'i';
+    }
+    if ($employee_id) {
+        $where[] = "p.employee_id = ?";
+        $params[] = $employee_id;
+        $types .= 'i';
+    }
+    if ($status) {
+        $where[] = "p.status = ?";
+        $params[] = $status;
+        $types .= 's';
+    }
+
+    $sql = "SELECT p.*, e.name, e.employee_code, d.department_name, pos.position_name
+            FROM payrolls p
+            JOIN employee e ON p.employee_id = e.id
+            LEFT JOIN departments d ON e.department_id = d.id
+            LEFT JOIN positions pos ON e.position_id = pos.id
+            WHERE " . implode(' AND ', $where) . "
+            ORDER BY p.payroll_year DESC, p.payroll_month DESC, e.name ASC";
+
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param($types, ...$params);
+    $stmt->execute();
+    $data = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+    return $data;
+}
+
+function export_to_csv(array $data, array $headers, string $filename): void {
+    header('Content-Type: text/csv; charset=utf-8');
+    header('Content-Disposition: attachment; filename="' . $filename . '"');
+    $output = fopen('php://output', 'w');
+    fputcsv($output, $headers);
+    foreach ($data as $row) {
+        $line = [];
+        foreach ($headers as $h) {
+            $key = strtolower(str_replace(' ', '_', $h));
+            $line[] = $row[$key] ?? $row[array_search($h, array_keys($row))] ?? '';
+        }
+        fputcsv($output, $line);
+    }
+    fclose($output);
+    exit;
+}
+
+function export_to_excel(array $data, array $headers, string $filename): void {
+    header('Content-Type: application/vnd.ms-excel');
+    header('Content-Disposition: attachment; filename="' . $filename . '.xls"');
+    echo '<table border="1">';
+    echo '<tr>';
+    foreach ($headers as $h) {
+        echo '<th>' . htmlspecialchars($h) . '</th>';
+    }
+    echo '</tr>';
+    foreach ($data as $row) {
+        echo '<tr>';
+        foreach ($row as $val) {
+            echo '<td>' . htmlspecialchars((string)$val) . '</td>';
+        }
+        echo '</tr>';
+    }
+    echo '</table>';
+    exit;
+}
+
+// ─── Overtime Enterprise Helpers ──────────────────────────
+
+function get_overtime_setting(mysqli $conn, string $key, string $default = ''): string {
+    $table_check = $conn->query("SHOW TABLES LIKE 'overtime_settings'");
+    if (!$table_check || $table_check->num_rows === 0) return $default;
+    $stmt = $conn->prepare("SELECT setting_value FROM overtime_settings WHERE setting_key = ? LIMIT 1");
+    $stmt->bind_param('s', $key);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    return $row['setting_value'] ?? $default;
+}
+
+function detect_overtime_type(mysqli $conn, string $ot_date): string {
+    $day_of_week = (int)date('N', strtotime($ot_date));
+    if ($day_of_week >= 6) return 'weekend';
+    $h_check = $conn->prepare("SELECT COUNT(*) as cnt FROM holidays WHERE holiday_date = ?");
+    $h_check->bind_param('s', $ot_date);
+    $h_check->execute();
+    $is_holiday = $h_check->get_result()->fetch_assoc()['cnt'] > 0;
+    $h_check->close();
+    if ($is_holiday) return 'holiday';
+    return 'working_day';
+}
+
+function get_overtime_rate_for_type(string $ot_type): float {
+    return match ($ot_type) {
+        'holiday' => 0.04,
+        'weekend' => 0.03,
+        default => 0.02,
+    };
+}
+
+function get_overtime_time_window(mysqli $conn, string $ot_type): array {
+    $prefix = match ($ot_type) {
+        'weekend' => 'ot_weekend',
+        'holiday' => 'ot_holiday',
+        default => 'ot_working_day',
+    };
+    return [
+        'start' => get_overtime_setting($conn, $prefix . '_start', match ($ot_type) {
+            'weekend', 'holiday' => '09:00',
+            default => '17:00',
+        }),
+        'end' => get_overtime_setting($conn, $prefix . '_end', match ($ot_type) {
+            'weekend', 'holiday' => '17:00',
+            default => '21:00',
+        }),
+    ];
+}
+
+function get_overtime_max_hours(mysqli $conn, string $ot_type): float {
+    $key = match ($ot_type) {
+        'weekend' => 'ot_weekend_max_hours',
+        'holiday' => 'ot_holiday_max_hours',
+        default => 'ot_working_day_max_hours',
+    };
+    return (float)get_overtime_setting($conn, $key, match ($ot_type) {
+        'weekend', 'holiday' => '8',
+        default => '4',
+    });
+}
+
+function validate_overtime_request_rules(mysqli $conn, int $employee_id, string $ot_date, string $start_time, string $end_time, string $reason, int $exclude_id = 0): array {
+    $errors = [];
+    set_mmt_timezone();
+
+    $status_error = validate_employee_active($conn, $employee_id);
+    if ($status_error) { $errors[] = $status_error; return $errors; }
+
+    if (empty($ot_date) || empty($start_time) || empty($end_time)) {
+        $errors[] = 'Please fill in all required fields.';
+        return $errors;
+    }
+
+    if (strtotime($end_time) <= strtotime($start_time)) {
+        $errors[] = 'End time must be later than start time.';
+    }
+
+    $start_ts = strtotime($start_time);
+    $end_ts = strtotime($end_time);
+    $total_hours = round(($end_ts - $start_ts) / 3600, 2);
+    if ($total_hours <= 0) {
+        $errors[] = 'Overtime hours must be greater than zero.';
+    }
+
+    if (has_approved_leave_on_date($conn, $employee_id, $ot_date)) {
+        $errors[] = 'Cannot request overtime on a date with approved leave.';
+    }
+
+    $require_attendance = get_overtime_setting($conn, 'ot_require_attendance', '1') === '1';
+    if ($require_attendance) {
+        $att = has_checked_in_today($conn, $employee_id, $ot_date);
+        $has_completed = $att !== null && $att['check_in'] !== null && $att['check_out'] !== null;
+        if (!$has_completed) {
+            $errors[] = 'Cannot request overtime. No completed attendance found for this date.';
+        }
+    }
+
+    // Check overlapping OT
+    $stmt = $conn->prepare(
+        "SELECT id FROM overtime_requests 
+         WHERE employee_id = ? AND ot_date = ? AND id != ? 
+         AND status IN ('Pending', 'Approved')
+         AND start_time < ? AND end_time > ?"
+    );
+    $stmt->bind_param('isiss', $employee_id, $ot_date, $exclude_id, $end_time, $start_time);
+    $stmt->execute();
+    $stmt->store_result();
+    if ($stmt->num_rows > 0) {
+        $errors[] = 'You already have an overtime request that overlaps with this time period.';
+    }
+    $stmt->close();
+
+    // Detect type and validate time window + max hours
+    $ot_type = detect_overtime_type($conn, $ot_date);
+    $window = get_overtime_time_window($conn, $ot_type);
+    $time_in = date('H:i', $start_ts);
+    $time_out = date('H:i', $end_ts);
+
+    if ($time_in < $window['start']) {
+        $errors[] = "Overtime start time cannot be before {$window['start']} for " . str_replace('_', ' ', $ot_type) . " OT.";
+    }
+    if ($time_out > $window['end']) {
+        $errors[] = "Overtime end time cannot be after {$window['end']} for " . str_replace('_', ' ', $ot_type) . " OT.";
+    }
+
+    $max_hours = get_overtime_max_hours($conn, $ot_type);
+    if ($total_hours > $max_hours) {
+        $errors[] = "Overtime hours cannot exceed $max_hours hours for " . str_replace('_', ' ', $ot_type) . " OT.";
+    }
+
+    // Monthly cap
+    $month_start = date('Y-m-01', strtotime($ot_date));
+    $month_end = date('Y-m-t', strtotime($ot_date));
+    $m_stmt = $conn->prepare(
+        "SELECT COALESCE(SUM(total_hours), 0) as total FROM overtime_requests 
+         WHERE employee_id = ? AND status = 'Approved' AND ot_date BETWEEN ? AND ?"
+    );
+    $m_stmt->bind_param('iss', $employee_id, $month_start, $month_end);
+    $m_stmt->execute();
+    $m_row = $m_stmt->get_result()->fetch_assoc();
+    $m_stmt->close();
+    $monthly_used = (float)($m_row['total'] ?? 0);
+    $monthly_max = (float)get_overtime_setting($conn, 'ot_monthly_max_hours', '60');
+    if (($monthly_used + $total_hours) > $monthly_max) {
+        $remaining = max(0, $monthly_max - $monthly_used);
+        $errors[] = "Would exceed monthly OT cap ($monthly_max h). You have $remaining h remaining this month.";
+    }
+
+    return $errors;
+}
+
+function calculate_overtime_pay_for_request(mysqli $conn, int $employee_id, string $ot_type, float $total_hours): float {
+    $emp_stmt = $conn->prepare("SELECT basic_salary FROM employee WHERE id = ?");
+    $emp_stmt->bind_param('i', $employee_id);
+    $emp_stmt->execute();
+    $emp = $emp_stmt->get_result()->fetch_assoc();
+    $emp_stmt->close();
+    $basic = (float)($emp['basic_salary'] ?? 0);
+
+    $working_days = (int)get_overtime_setting($conn, 'payroll_working_days_per_month', '22');
+    if ($working_days <= 0) $working_days = 22;
+    $hourly_rate = $working_days > 0 ? round($basic / ($working_days * 8), 2) : 0;
+    $rate_multiplier = get_overtime_rate_for_type($ot_type);
+
+    return round($hourly_rate * $rate_multiplier * $total_hours, 2);
+}
+
+function log_overtime_action(mysqli $conn, int $overtime_id, string $action, int $action_by, string $action_by_type = 'admin', ?array $old_values = null, ?array $new_values = null, ?string $remarks = null): void {
+    $table_check = $conn->query("SHOW TABLES LIKE 'overtime_logs'");
+    if (!$table_check || $table_check->num_rows === 0) return;
+
+    $stmt = $conn->prepare("INSERT INTO overtime_logs (overtime_id, action, action_by, action_by_type, old_values, new_values, remarks) VALUES (?, ?, ?, ?, ?, ?, ?)");
+    $old_json = $old_values ? json_encode($old_values) : null;
+    $new_json = $new_values ? json_encode($new_values) : null;
+    $stmt->bind_param('isiss', $overtime_id, $action, $action_by, $action_by_type, $old_json, $new_json, $remarks);
+    $stmt->execute();
+    $stmt->close();
+}
+
+function check_monthly_overtime_remaining(mysqli $conn, int $employee_id, string $ot_date): array {
+    $month_start = date('Y-m-01', strtotime($ot_date));
+    $month_end = date('Y-m-t', strtotime($ot_date));
+
+    $stmt = $conn->prepare(
+        "SELECT COALESCE(SUM(total_hours), 0) as used_hours,
+                COUNT(*) as total_requests,
+                SUM(CASE WHEN status = 'Approved' THEN total_hours ELSE 0 END) as approved_hours,
+                SUM(CASE WHEN status = 'Pending' THEN total_hours ELSE 0 END) as pending_hours
+         FROM overtime_requests 
+         WHERE employee_id = ? AND ot_date BETWEEN ? AND ?"
+    );
+    $stmt->bind_param('iss', $employee_id, $month_start, $month_end);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    $monthly_max = (float)get_overtime_setting($conn, 'ot_monthly_max_hours', '60');
+    $used = (float)($row['used_hours'] ?? 0);
+    return [
+        'monthly_max' => $monthly_max,
+        'used_hours' => $used,
+        'remaining_hours' => max(0, $monthly_max - $used),
+        'approved_hours' => (float)($row['approved_hours'] ?? 0),
+        'pending_hours' => (float)($row['pending_hours'] ?? 0),
+        'total_requests' => (int)($row['total_requests'] ?? 0),
+    ];
+}
+
+function get_overtime_dashboard_stats(mysqli $conn, ?int $month = null, ?int $year = null): array {
+    $month = $month ?? (int)date('m');
+    $year = $year ?? (int)date('Y');
+    $month_start = sprintf('%04d-%02d-01', $year, $month);
+    $month_end = date('Y-m-t', strtotime($month_start));
+
+    $has_ot_type = $conn->query("SHOW COLUMNS FROM overtime_requests LIKE 'ot_type'")->num_rows > 0;
+
+    // Total OT hours for the month
+    $stmt = $conn->prepare(
+        "SELECT COALESCE(SUM(total_hours), 0) as total_hours,
+                COALESCE(SUM(CASE WHEN status = 'Approved' THEN total_hours ELSE 0 END), 0) as approved_hours,
+                COALESCE(SUM(CASE WHEN status = 'Pending' THEN total_hours ELSE 0 END), 0) as pending_hours,
+                COUNT(*) as total_requests,
+                SUM(CASE WHEN status = 'Pending' THEN 1 ELSE 0 END) as pending_count,
+                SUM(CASE WHEN status = 'Approved' THEN 1 ELSE 0 END) as approved_count,
+                SUM(CASE WHEN status = 'Rejected' THEN 1 ELSE 0 END) as rejected_count
+         FROM overtime_requests 
+         WHERE ot_date BETWEEN ? AND ?"
+    );
+    $stmt->bind_param('ss', $month_start, $month_end);
+    $stmt->execute();
+    $stats = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    // OT by type
+    $by_type = [];
+    if ($has_ot_type) {
+        $res = $conn->query("SELECT ot_type, COALESCE(SUM(total_hours), 0) as hours, COUNT(*) as count 
+                              FROM overtime_requests 
+                              WHERE ot_date BETWEEN '$month_start' AND '$month_end' AND status = 'Approved'
+                              GROUP BY ot_type");
+        if ($res) {
+            while ($r = $res->fetch_assoc()) {
+                $by_type[$r['ot_type']] = ['hours' => (float)$r['hours'], 'count' => (int)$r['count']];
+            }
+        }
+    }
+
+    // Top employees by OT
+    $top_emp = $conn->prepare(
+        "SELECT otr.employee_id, e.name, e.employee_code, d.department_name,
+                COALESCE(SUM(otr.total_hours), 0) as total_hours
+         FROM overtime_requests otr
+         JOIN employee e ON otr.employee_id = e.id
+         LEFT JOIN departments d ON e.department_id = d.id
+         WHERE otr.ot_date BETWEEN ? AND ? AND otr.status = 'Approved'
+         GROUP BY otr.employee_id, e.name, e.employee_code, d.department_name
+         ORDER BY total_hours DESC
+         LIMIT 10"
+    );
+    $top_emp->bind_param('ss', $month_start, $month_end);
+    $top_emp->execute();
+    $top_employees = $top_emp->get_result()->fetch_all(MYSQLI_ASSOC);
+    $top_emp->close();
+
+    // Daily OT trend
+    $daily_trend = $conn->prepare(
+        "SELECT otr.ot_date, COALESCE(SUM(otr.total_hours), 0) as hours, COUNT(*) as requests
+         FROM overtime_requests otr
+         WHERE otr.ot_date BETWEEN ? AND ? AND otr.status = 'Approved'
+         GROUP BY otr.ot_date
+         ORDER BY otr.ot_date ASC"
+    );
+    $daily_trend->bind_param('ss', $month_start, $month_end);
+    $daily_trend->execute();
+    $trend_data = $daily_trend->get_result()->fetch_all(MYSQLI_ASSOC);
+    $daily_trend->close();
+
+    $stats['by_type'] = $by_type;
+    $stats['top_employees'] = $top_employees;
+    $stats['daily_trend'] = $trend_data;
+    $stats['month'] = $month;
+    $stats['year'] = $year;
+
+    return $stats;
+}
+
+function get_overtime_payroll_breakdown(mysqli $conn, int $employee_id, string $month_start, string $month_end, float $hourly_rate): array {
+    $has_ot_type = $conn->query("SHOW COLUMNS FROM overtime_requests LIKE 'ot_type'")->num_rows > 0;
+
+    $breakdown = [
+        'working_day' => ['hours' => 0, 'amount' => 0, 'count' => 0],
+        'weekend' => ['hours' => 0, 'amount' => 0, 'count' => 0],
+        'holiday' => ['hours' => 0, 'amount' => 0, 'count' => 0],
+        'total_hours' => 0,
+        'total_amount' => 0,
+        'details' => [],
+    ];
+
+    if ($has_ot_type) {
+        $stmt = $conn->prepare(
+            "SELECT id, ot_date, total_hours, ot_type, ot_rate, ot_pay 
+             FROM overtime_requests 
+             WHERE employee_id = ? AND ot_date BETWEEN ? AND ? AND status = 'Approved'
+             ORDER BY ot_date"
+        );
+    } else {
+        $stmt = $conn->prepare(
+            "SELECT id, ot_date, total_hours 
+             FROM overtime_requests 
+             WHERE employee_id = ? AND ot_date BETWEEN ? AND ? AND status = 'Approved'
+             ORDER BY ot_date"
+        );
+    }
+    $stmt->bind_param('iss', $employee_id, $month_start, $month_end);
+    $stmt->execute();
+    $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+
+    foreach ($rows as $row) {
+        $type = $row['ot_type'] ?? detect_overtime_type($conn, $row['ot_date']);
+        $rate = $row['ot_rate'] !== null ? (float)$row['ot_rate'] : get_overtime_rate_for_type($type);
+        $pay = $row['ot_pay'] !== null ? (float)$row['ot_pay'] : $hourly_rate * $rate * (float)$row['total_hours'];
+        $hours = (float)$row['total_hours'];
+
+        if (isset($breakdown[$type])) {
+            $breakdown[$type]['hours'] += $hours;
+            $breakdown[$type]['amount'] += $pay;
+            $breakdown[$type]['count']++;
+        }
+        $breakdown['total_hours'] += $hours;
+        $breakdown['total_amount'] += $pay;
+        $breakdown['details'][] = [
+            'id' => $row['id'],
+            'date' => $row['ot_date'],
+            'hours' => $hours,
+            'type' => $type,
+            'rate' => $rate,
+            'pay' => $pay,
+        ];
+    }
+
+    return $breakdown;
+}
+
+function get_overtime_type_badge(string $ot_type): string {
+    return match ($ot_type) {
+        'working_day' => '<span class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold bg-blue-500/20 text-blue-400">Working Day</span>',
+        'weekend' => '<span class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold bg-amber-500/20 text-amber-400">Weekend</span>',
+        'holiday' => '<span class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold bg-rose-500/20 text-rose-400">Holiday</span>',
+        default => '<span class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold bg-zinc-500/20 text-zinc-400">' . htmlspecialchars($ot_type) . '</span>',
+    };
+}
+
+function get_overtime_report_data(mysqli $conn, string $from_date, string $to_date, ?int $department_id = null, ?int $employee_id = null, ?string $status = null): array {
+    $where = ["otr.ot_date BETWEEN ? AND ?"];
+    $params = [$from_date, $to_date];
+    $types = 'ss';
+
+    if ($department_id) {
+        $where[] = "e.department_id = ?";
+        $params[] = $department_id;
+        $types .= 'i';
+    }
+    if ($employee_id) {
+        $where[] = "otr.employee_id = ?";
+        $params[] = $employee_id;
+        $types .= 'i';
+    }
+    if ($status) {
+        $where[] = "otr.status = ?";
+        $params[] = $status;
+        $types .= 's';
+    }
+
+    $has_ot_type = $conn->query("SHOW COLUMNS FROM overtime_requests LIKE 'ot_type'")->num_rows > 0;
+    $ot_cols = $has_ot_type ? ', otr.ot_type, otr.ot_rate, otr.ot_pay' : '';
+
+    $has_assigned_by = $conn->query("SHOW COLUMNS FROM overtime_requests LIKE 'assigned_by_id'")->num_rows > 0;
+
+    $sql = "SELECT otr.*$ot_cols, e.name as employee_name, e.employee_code, d.department_name, p.position_name
+            FROM overtime_requests otr
+            JOIN employee e ON otr.employee_id = e.id
+            LEFT JOIN departments d ON e.department_id = d.id
+            LEFT JOIN positions p ON e.position_id = p.id
+            WHERE " . implode(' AND ', $where) . "
+            ORDER BY otr.ot_date DESC, e.name ASC";
+
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param($types, ...$params);
+    $stmt->execute();
+    $data = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+    return $data;
+}
+
+function get_overtime_earnings_summary(mysqli $conn, int $employee_id, string $month_start, string $month_end): array {
+    $has_ot_type = $conn->query("SHOW COLUMNS FROM overtime_requests LIKE 'ot_type'")->num_rows > 0;
+
+    if ($has_ot_type) {
+        $stmt = $conn->prepare(
+            "SELECT ot_type, COALESCE(SUM(total_hours), 0) as total_hours, 
+                    COALESCE(SUM(ot_pay), 0) as total_pay,
+                    COUNT(*) as count
+             FROM overtime_requests 
+             WHERE employee_id = ? AND ot_date BETWEEN ? AND ? AND status = 'Approved'
+             GROUP BY ot_type"
+        );
+    } else {
+        $stmt = $conn->prepare(
+            "SELECT COALESCE(SUM(total_hours), 0) as total_hours, 
+                    COUNT(*) as count
+             FROM overtime_requests 
+             WHERE employee_id = ? AND ot_date BETWEEN ? AND ? AND status = 'Approved'"
+        );
+    }
+    $stmt->bind_param('iss', $employee_id, $month_start, $month_end);
+    $stmt->execute();
+    $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+
+    $summary = ['total_hours' => 0, 'total_pay' => 0, 'by_type' => []];
+    foreach ($rows as $r) {
+        if ($has_ot_type) {
+            $summary['by_type'][$r['ot_type']] = [
+                'hours' => (float)$r['total_hours'],
+                'pay' => (float)$r['total_pay'],
+                'count' => (int)$r['count'],
+            ];
+            $summary['total_hours'] += (float)$r['total_hours'];
+            $summary['total_pay'] += (float)$r['total_pay'];
+        } else {
+            $summary['total_hours'] += (float)$r['total_hours'];
+        }
+    }
+    return $summary;
 }

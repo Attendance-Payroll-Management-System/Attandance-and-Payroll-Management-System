@@ -1,6 +1,8 @@
 <?php
 session_start();
 require_once "../config/db.php";
+require_once "../config/helpers.php";
+require_once "../config/notifications.php";
 if (!isset($_SESSION['logged_in'])) { header('Location: login.php'); exit; }
 
 $employee_id = $_SESSION['employee_id'];
@@ -45,6 +47,34 @@ $employee->bind_param("i", $employee_id);
 $employee->execute();
 $emp_info = $employee->get_result()->fetch_assoc();
 $employee->close();
+
+// Notifications for employee
+$notif_count = 0;
+$payroll_notifications = [];
+$notif_check = $conn->prepare("SELECT COUNT(*) as cnt FROM payroll_notifications WHERE (employee_id = ? OR employee_id IS NULL) AND is_read = 0");
+$notif_check->bind_param("i", $employee_id);
+$notif_check->execute();
+$notif_count = (int)$notif_check->get_result()->fetch_assoc()['cnt'];
+$notif_check->close();
+
+$notif_query = $conn->prepare("SELECT * FROM payroll_notifications WHERE (employee_id = ? OR employee_id IS NULL) AND is_read = 0 ORDER BY created_at DESC LIMIT 20");
+$notif_query->bind_param("i", $employee_id);
+$notif_query->execute();
+$payroll_notifications = $notif_query->get_result()->fetch_all(MYSQLI_ASSOC);
+$notif_query->close();
+
+// Monthly breakdown for chart
+$chart_data = [];
+foreach ($payroll_data as $p) {
+    $month_num = $p['payroll_month'];
+    $chart_data[$month_num] = $p['net_salary'];
+}
+$chart_labels = [];
+$chart_values = [];
+for ($m = 1; $m <= 12; $m++) {
+    $chart_labels[] = date('M', mktime(0, 0, 0, $m, 1));
+    $chart_values[] = $chart_data[$m] ?? 0;
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -198,9 +228,43 @@ $employee->close();
             transform: scale(1.1);
             box-shadow: 0 4px 16px rgba(245,158,11,0.25);
         }
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.375rem;
+            padding: 0.25rem 0.625rem;
+            border-radius: 9999px;
+            font-size: 0.65rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            border: 1px solid transparent;
+        }
+        .notif-badge {
+            position: absolute;
+            top: -0.25rem;
+            right: -0.25rem;
+            min-width: 1.25rem;
+            height: 1.25rem;
+            border-radius: 9999px;
+            background: #F43F5E;
+            color: white;
+            font-size: 0.6rem;
+            font-weight: 800;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 6px rgba(244,63,94,0.4);
+            z-index: 10;
+            line-height: 1;
+            padding: 0 0.25rem;
+        }
+        .chart-container canvas {
+            max-height: 280px;
+        }
     </style>
 </head>
-<body class="bg-slate-50 dark:bg-[#0B1120] text-slate-900 dark:text-white font-sans antialiased emp-page-wrapper">
+<body x-data="{ notifOpen: false }" class="bg-slate-50 dark:bg-[#0B1120] text-slate-900 dark:text-white font-sans antialiased emp-page-wrapper">
     <?php $use_sidebar = true; ?>
     <?php include "../includes/sidebar.php"; ?>
     <div class="main-wrapper flex flex-col min-h-screen">
@@ -209,18 +273,55 @@ $employee->close();
             $page_subtitle = "View salary breakdowns and payslip history.";
             ob_start();
         ?>
-        <form method="GET" class="flex items-center gap-3 glass-strong rounded-xl p-3">
-            <div class="flex items-center gap-2">
-                <div class="w-9 h-9 rounded-lg bg-emerald-500/15 flex items-center justify-center">
-                    <i class="fa-solid fa-clock-rotate-left text-emerald-500 text-sm"></i>
+        <div class="flex items-center gap-3">
+            <!-- Notification Bell -->
+            <div class="relative" @click.outside="notifOpen = false">
+                <button @click="notifOpen = !notifOpen" class="relative p-2.5 text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/[0.06] rounded-xl transition-all duration-200">
+                    <i class="fa-solid fa-bell text-base"></i>
+                    <?php if ($notif_count > 0): ?>
+                        <span class="notif-badge"><?php echo $notif_count > 99 ? '99+' : $notif_count; ?></span>
+                    <?php endif; ?>
+                </button>
+                <div x-show="notifOpen" x-transition:enter="transition-all duration-200 ease-out" x-transition:enter-start="opacity-0 scale-95 -translate-y-2" x-transition:enter-end="opacity-100 scale-100 translate-y-0" x-transition:leave="transition-all duration-150 ease-in" x-transition:leave-start="opacity-100 scale-100 translate-y-0" x-transition:leave-end="opacity-0 scale-95 -translate-y-2" class="absolute left-0 mt-2 w-80 bg-white dark:bg-[#1E293B] rounded-2xl shadow-xl border border-slate-200 dark:border-white/[0.06] z-50 overflow-hidden" style="display: none;">
+                    <div class="px-4 py-3 border-b border-slate-100 dark:border-white/[0.06] flex items-center justify-between">
+                        <h4 class="text-sm font-semibold text-slate-900 dark:text-white">Payroll Notifications</h4>
+                        <?php if ($notif_count > 0): ?>
+                            <a href="mark_payroll_notifications_read.php?ref=<?php echo urlencode(basename($_SERVER['SCRIPT_NAME'])); ?>" class="text-xs font-medium text-sky-600 dark:text-sky-400 hover:text-sky-700 dark:hover:text-sky-300 transition-colors">Mark all read</a>
+                        <?php endif; ?>
+                    </div>
+                    <div class="max-h-80 overflow-y-auto">
+                        <?php if (empty($payroll_notifications)): ?>
+                            <div class="p-6 text-center">
+                                <div class="w-12 h-12 mx-auto mb-3 rounded-full bg-slate-100 dark:bg-white/[0.05] flex items-center justify-center">
+                                    <i class="fa-regular fa-bell-slash text-xl text-slate-300 dark:text-slate-600"></i>
+                                </div>
+                                <p class="text-xs text-slate-500 dark:text-slate-400 font-medium">No payroll notifications</p>
+                            </div>
+                        <?php else: ?>
+                            <?php foreach ($payroll_notifications as $nt): ?>
+                            <a href="mark_payroll_notification_read.php?id=<?php echo $nt['id']; ?>&ref=<?php echo urlencode(basename($_SERVER['SCRIPT_NAME'])); ?>" class="block px-4 py-3 border-b border-slate-50 dark:border-white/[0.04] hover:bg-slate-50 dark:hover:bg-white/[0.02] transition-colors">
+                                <p class="text-xs text-slate-700 dark:text-slate-300 leading-relaxed"><?php echo htmlspecialchars($nt['message']); ?></p>
+                                <p class="text-[10px] text-slate-400 dark:text-slate-500 mt-1"><?php echo date('M d, h:i A', strtotime($nt['created_at'])); ?></p>
+                            </a>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </div>
                 </div>
-                <select name="year" class="bg-white/[0.06] border border-white/10 text-white text-sm rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-emerald-500/30 min-w-[100px]" onchange="this.form.submit()">
-                    <?php for ($y = date('Y') - 3; $y <= date('Y'); $y++): ?>
-                    <option value="<?php echo $y; ?>" <?php echo $y == $selected_year ? 'selected' : ''; ?>><?php echo $y; ?></option>
-                    <?php endfor; ?>
-                </select>
             </div>
-        </form>
+
+            <form method="GET" class="flex items-center gap-3 glass-strong rounded-xl p-3">
+                <div class="flex items-center gap-2">
+                    <div class="w-9 h-9 rounded-lg bg-emerald-500/15 flex items-center justify-center">
+                        <i class="fa-solid fa-clock-rotate-left text-emerald-500 text-sm"></i>
+                    </div>
+                    <select name="year" class="bg-white/[0.06] border border-white/10 text-white text-sm rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-emerald-500/30 min-w-[100px]" onchange="this.form.submit()">
+                        <?php for ($y = date('Y') - 3; $y <= date('Y'); $y++): ?>
+                        <option value="<?php echo $y; ?>" <?php echo $y == $selected_year ? 'selected' : ''; ?>><?php echo $y; ?></option>
+                        <?php endfor; ?>
+                    </select>
+                </div>
+            </form>
+        </div>
         <?php $page_actions = ob_get_clean(); include "../includes/topbar.php"; ?>
         <main class="flex-1 p-6 lg:p-8 overflow-y-auto page-content w-full">
 
@@ -279,6 +380,24 @@ $employee->close();
                 </div>
             </div>
 
+            <!-- Monthly Salary Breakdown Chart -->
+            <?php if (!empty($payroll_data)): ?>
+            <div class="history-table mb-6 animate-fade-in-up stagger-3">
+                <div class="p-5 border-b border-white/[0.06] flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500/20 to-teal-500/10 flex items-center justify-center">
+                        <i class="fa-solid fa-chart-simple text-emerald-500"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-base font-bold text-white">Monthly Salary Breakdown</h3>
+                        <span class="text-xs text-zinc-500"><?php echo $selected_year; ?> net salary per month</span>
+                    </div>
+                </div>
+                <div class="p-5 chart-container">
+                    <canvas id="salaryChart" height="140"></canvas>
+                </div>
+            </div>
+            <?php endif; ?>
+
             <!-- Latest Payslip -->
             <?php if ($latest_payroll): ?>
             <div class="latest-slip-card animate-fade-in-up stagger-3">
@@ -292,9 +411,15 @@ $employee->close();
                             <span class="text-sm text-white/70"><?php echo date('F', mktime(0,0,0,$latest_payroll['payroll_month'],1)); ?> <?php echo $latest_payroll['payroll_year']; ?></span>
                         </div>
                     </div>
-                    <a href="download_slip.php?pid=<?php echo $latest_payroll['id']; ?>" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/20 hover:bg-white/30 text-white text-sm font-semibold backdrop-blur-sm transition-all duration-200 hover:scale-105">
-                        <i class="fa-solid fa-download"></i> Download
-                    </a>
+                    <div class="flex items-center gap-2">
+                        <span class="status-badge <?php echo get_payroll_status_badge($latest_payroll['status'] ?? 'Generated'); ?> bg-white/15 text-white border-white/20">
+                            <i class="fa-solid <?php echo get_payroll_status_icon($latest_payroll['status'] ?? 'Generated'); ?> text-[10px]"></i>
+                            <?php echo $latest_payroll['status'] ?? 'Generated'; ?>
+                        </span>
+                        <a href="download_slip.php?pid=<?php echo $latest_payroll['id']; ?>" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/20 hover:bg-white/30 text-white text-sm font-semibold backdrop-blur-sm transition-all duration-200 hover:scale-105">
+                            <i class="fa-solid fa-download"></i> Download
+                        </a>
+                    </div>
                 </div>
 
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
@@ -400,6 +525,7 @@ $employee->close();
                         <thead class="text-white text-xs font-bold uppercase tracking-wider">
                             <tr>
                                 <th class="px-6 py-4">Period</th>
+                                <th class="px-6 py-4 text-center">Status</th>
                                 <th class="px-6 py-4 text-right">Basic</th>
                                 <th class="px-6 py-4 text-right">OT</th>
                                 <th class="px-6 py-4 text-right">Bonus</th>
@@ -407,6 +533,7 @@ $employee->close();
                                 <th class="px-6 py-4 text-right">Gross</th>
                                 <th class="px-6 py-4 text-right font-bold">Net</th>
                                 <th class="px-6 py-4 text-center">Slip</th>
+                                <th class="px-6 py-4 text-center">Details</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-white/[0.06]">
@@ -419,6 +546,12 @@ $employee->close();
                                         </div>
                                         <span class="font-semibold text-white"><?php echo date('F', mktime(0,0,0,$p['payroll_month'],1)); ?> <?php echo $p['payroll_year']; ?></span>
                                     </div>
+                                </td>
+                                <td class="px-6 py-4 text-center">
+                                    <span class="status-badge <?php echo get_payroll_status_badge($p['status'] ?? 'Generated'); ?>">
+                                        <i class="fa-solid <?php echo get_payroll_status_icon($p['status'] ?? 'Generated'); ?> text-[10px]"></i>
+                                        <?php echo $p['status'] ?? 'Generated'; ?>
+                                    </span>
                                 </td>
                                 <td class="px-6 py-4 text-right font-mono text-white font-medium">$<?php echo number_format($p['basic_salary'], 2); ?></td>
                                 <td class="px-6 py-4 text-right">
@@ -459,6 +592,11 @@ $employee->close();
                                         <i class="fa-solid fa-file-pdf"></i>
                                     </a>
                                 </td>
+                                <td class="px-6 py-4 text-center">
+                                    <a href="payroll_detail.php?pid=<?php echo $p['id']; ?>" class="inline-flex items-center gap-1 text-xs font-semibold text-sky-400 hover:text-sky-300 transition-colors">
+                                        <i class="fa-solid fa-eye"></i> View
+                                    </a>
+                                </td>
                             </tr>
                             <?php endforeach; ?>
                         </tbody>
@@ -477,5 +615,76 @@ $employee->close();
         </footer>
     </div>
     <?php include "../includes/employee_bottom_nav.php"; ?>
+
+    <?php if (!empty($payroll_data)): ?>
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        var ctx = document.getElementById('salaryChart').getContext('2d');
+        var isDark = document.documentElement.classList.contains('dark');
+        var gridColor = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.06)';
+        var textColor = isDark ? '#94A3B8' : '#64748B';
+
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: <?php echo json_encode($chart_labels); ?>,
+                datasets: [{
+                    label: 'Net Salary',
+                    data: <?php echo json_encode($chart_values); ?>,
+                    backgroundColor: [
+                        'rgba(59,130,246,0.6)', 'rgba(99,102,241,0.6)', 'rgba(139,92,246,0.6)',
+                        'rgba(168,85,247,0.6)', 'rgba(217,70,239,0.6)', 'rgba(236,72,153,0.6)',
+                        'rgba(244,63,94,0.6)', 'rgba(249,115,22,0.6)', 'rgba(234,179,8,0.6)',
+                        'rgba(16,185,129,0.6)', 'rgba(20,184,166,0.6)', 'rgba(6,182,212,0.6)'
+                    ],
+                    borderColor: [
+                        '#3B82F6', '#6366F1', '#8B5CF6', '#A855F7', '#D946EF', '#EC4899',
+                        '#F43F5E', '#F97316', '#EAB308', '#10B981', '#14B8A6', '#06B6D4'
+                    ],
+                    borderWidth: 2,
+                    borderRadius: 6,
+                    borderSkipped: false,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: isDark ? 'rgba(15,23,42,0.95)' : 'rgba(255,255,255,0.95)',
+                        titleColor: isDark ? '#F1F5F9' : '#1E293B',
+                        bodyColor: isDark ? '#F1F5F9' : '#1E293B',
+                        borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
+                        borderWidth: 1,
+                        padding: 12,
+                        cornerRadius: 12,
+                        callbacks: {
+                            label: function(context) {
+                                return '$' + context.parsed.y.toFixed(2);
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: { color: gridColor },
+                        ticks: {
+                            color: textColor,
+                            font: { size: 11 },
+                            callback: function(value) { return '$' + value.toFixed(0); }
+                        }
+                    },
+                    x: {
+                        grid: { display: false },
+                        ticks: { color: textColor, font: { size: 11 } }
+                    }
+                }
+            }
+        });
+    });
+    </script>
+    <?php endif; ?>
 </body>
 </html>

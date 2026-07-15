@@ -23,6 +23,23 @@ function generate_salary_slip_pdf($data, $month_name, $year)
     $tax = number_format($data['tax_amount'] ?? 0, 2);
     $leave_ded = number_format($data['leave_deduction'] ?? 0, 2);
     $awol_ded = number_format($data['awol_deduction'] ?? 0, 2);
+    $present = $data['present_days'] ?? 0;
+    $half = $data['half_days'] ?? 0;
+    $late = $data['late_days'] ?? 0;
+    $absent = $data['absent_days'] ?? 0;
+    $paid_leave = $data['paid_leave_days'] ?? 0;
+    $unpaid_leave = $data['unpaid_leave_days'] ?? 0;
+    $ot_hours = number_format($data['overtime_hours'] ?? 0, 1);
+    $working_days = $data['working_days'] ?? 0;
+    $position = $data['position_name'] ?? ($data['department'] ?? 'General');
+    $payroll_status = $data['status'] ?? 'Generated';
+    $late_ded_fmt = number_format($data['late_deduction'] ?? 0, 2);
+    $unpaid_leave_ded_fmt = number_format($data['unpaid_leave_deduction'] ?? 0, 2);
+    $leave_ded_fmt = number_format(($data['leave_deduction'] ?? 0), 2);
+    $absent_ded_fmt = number_format(($data['absent_deduction'] ?? 0), 2);
+    $half_ded_fmt = number_format(($data['half_day_deduction'] ?? 0), 2);
+    $paid_leave_ded = number_format(($data['paid_leave_deduction'] ?? 0), 2);
+    $total_deductions = number_format(($data['deduction_amount'] ?? 0) + ($data['late_deduction'] ?? 0) + ($data['unpaid_leave_deduction'] ?? 0) + ($data['tax_amount'] ?? 0), 2);
 
     $html = '
 <!DOCTYPE html>
@@ -244,8 +261,14 @@ body {
             <tr>
                 <td class="label">Department</td>
                 <td class="value">' . htmlspecialchars($data['department'] ?? 'General') . '</td>
+                <td class="label">Position</td>
+                <td class="value">' . htmlspecialchars($data['position_name'] ?? $position) . '</td>
+            </tr>
+            <tr>
                 <td class="label">Pay Period</td>
                 <td class="value">' . $month_name . ' ' . $year . '</td>
+                <td class="label">Status</td>
+                <td class="value">' . $payroll_status . '</td>
             </tr>
         </table>
     </div>
@@ -259,7 +282,9 @@ body {
                 <td><div class="att-num" style="color:#0d9488">' . ($data['half_days'] ?? 0) . '</div><div class="att-label">Half Day</div></td>
                 <td><div class="att-num" style="color:#d97706">' . ($data['late_days'] ?? 0) . '</div><div class="att-label">Late</div></td>
                 <td><div class="att-num" style="color:#dc2626">' . ($data['absent_days'] ?? 0) . '</div><div class="att-label">Absent</div></td>
-                <td><div class="att-num" style="color:#7c3aed">' . number_format($data['overtime_hours'] ?? 0, 1) . 'h</div><div class="att-label">OT Hours</div></td>
+                <td><div class="att-num" style="color:#7c3aed">' . $ot_hours . 'h</div><div class="att-label">OT Hours</div></td>
+                <td><div class="att-num" style="color:#2563eb">' . ($paid_leave) . '</div><div class="att-label">Paid Leave</div></td>
+                <td><div class="att-num" style="color:#f97316">' . ($unpaid_leave) . '</div><div class="att-label">Unpaid Leave</div></td>
             </tr>
         </table>
     </div>
@@ -275,6 +300,7 @@ body {
                 <tr><td>Overtime Pay</td><td class="amount">$' . $ot . '</td></tr>
                 <tr><td>Bonuses</td><td class="amount">$' . $bonus . '</td></tr>
                 <tr class="total-row"><td>GROSS SALARY</td><td class="amount">$' . $gross . '</td></tr>
+                <tr><td>Paid Leave (Full Pay)</td><td class="amount">$0.00</td></tr>
             </tbody>
         </table>
     </div>
@@ -285,13 +311,14 @@ body {
                 <tr><th>DEDUCTIONS</th><th class="amount">Amount</th></tr>
             </thead>
             <tbody>
-                <tr><td>Absent Deduction</td><td class="amount">-$' . number_format(($data['late_deduction'] ?? 0) + ($data['unpaid_leave_deduction'] ?? 0), 2) . '</td></tr>
-                <tr><td>Late Deduction</td><td class="amount">-$' . number_format($data['late_deduction'] ?? 0, 2) . '</td></tr>
-                <tr><td>Unpaid Leave Ded.</td><td class="amount">-$' . number_format($data['unpaid_leave_deduction'] ?? 0, 2) . '</td></tr>' . ($awol_ded !== '0.00' ? '
+                <tr><td>Absent Deduction</td><td class="amount">-$' . ($absent_ded_fmt !== '0.00' ? $absent_ded_fmt : '0.00') . '</td></tr>
+                <tr><td>Half-Day Deduction</td><td class="amount">-$' . ($half_ded_fmt !== '0.00' ? $half_ded_fmt : '0.00') . '</td></tr>
+                <tr><td>Late Deduction</td><td class="amount">-$' . $late_ded_fmt . '</td></tr>
+                <tr><td>Unpaid Leave Ded.</td><td class="amount">-$' . $unpaid_leave_ded_fmt . '</td></tr>' . ($awol_ded !== '0.00' ? '
                 <tr><td>Pension Fund Deduction (2%)</td><td class="amount">-$' . $awol_ded . '</td></tr>' : '') . '
                 <tr><td>Other Deductions</td><td class="amount">-$' . $deduction . '</td></tr>
                 <tr><td>Tax</td><td class="amount">-$' . $tax . '</td></tr>
-                <tr class="total-row"><td>TOTAL DEDUCTIONS</td><td class="amount">-$' . number_format(($data['deduction_amount'] ?? 0) + ($data['late_deduction'] ?? 0) + ($data['unpaid_leave_deduction'] ?? 0) + ($data['tax_amount'] ?? 0), 2) . '</td></tr>
+                <tr class="total-row"><td>TOTAL DEDUCTIONS</td><td class="amount">-$' . $total_deductions . '</td></tr>
             </tbody>
         </table>
     </div>
@@ -304,7 +331,7 @@ body {
     </div>
 
     <div style="text-align:center; margin-bottom: 16px;">
-        <span class="badge">&#10003; PAYMENT CONFIRMED</span>
+        <span class="badge">&#10003; ' . strtoupper($payroll_status === 'Paid' ? 'PAYMENT CONFIRMED' : 'STATUS: ' . $payroll_status) . '</span>
     </div>
 
     <div class="signature">
@@ -328,7 +355,8 @@ body {
 </html>';
 
     $dompdf->loadHtml($html);
-    $dompdf->setPaper('A4', 'portrait');
+        $dompdf->setPaper('A4', 'portrait');
+
     $dompdf->render();
 
     return $dompdf->output();

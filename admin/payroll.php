@@ -18,65 +18,16 @@ $month_end = date('Y-m-t', strtotime($month_start));
 
 // Run batch payroll calculation
 if (isset($_POST['run_payroll'])) {
-    $emp_query = $conn->query("SELECT id, basic_salary FROM employee WHERE status = 'active'");
+    $admin_id = $_SESSION['admin_id'] ?? null;
+    $emp_query = $conn->query("SELECT id FROM employee WHERE status = 'active'");
     $inserted = 0;
 
     while ($emp = $emp_query->fetch_assoc()) {
         $eid = $emp['id'];
-        $payroll = calculate_payroll_for_employee($conn, $eid, $selected_month, $selected_year);
-
-        // Upsert into payrolls with all new columns
-        $upsert = $conn->prepare("INSERT INTO payrolls (employee_id, payroll_month, payroll_year, basic_salary, ot_amount, allowance_amount, bonus_amount, deduction_amount, tax_amount, leave_deduction, late_deduction, unpaid_leave_deduction, gross_salary, net_salary, working_days, present_days, half_days, late_days, absent_days, paid_leave_days, unpaid_leave_days, overtime_hours, generated_date)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURDATE())
-            ON DUPLICATE KEY UPDATE basic_salary=VALUES(basic_salary), ot_amount=VALUES(ot_amount), allowance_amount=VALUES(allowance_amount),
-            bonus_amount=VALUES(bonus_amount), deduction_amount=VALUES(deduction_amount), leave_deduction=VALUES(leave_deduction),
-            late_deduction=VALUES(late_deduction), unpaid_leave_deduction=VALUES(unpaid_leave_deduction),
-            gross_salary=VALUES(gross_salary), net_salary=VALUES(net_salary), working_days=VALUES(working_days),
-            present_days=VALUES(present_days), half_days=VALUES(half_days), late_days=VALUES(late_days),
-            absent_days=VALUES(absent_days), paid_leave_days=VALUES(paid_leave_days), unpaid_leave_days=VALUES(unpaid_leave_days),
-            overtime_hours=VALUES(overtime_hours), generated_date=CURDATE()");
-        $total_deductions = $payroll['total_attendance_deduction'] + $payroll['other_deductions'];
-        $upsert->bind_param('iiidddddddddddiiiiiiid', 
-            $eid, $selected_month, $selected_year, $payroll['basic_salary'], $payroll['ot_amount'],
-            $payroll['allowance_amount'], $payroll['bonus_amount'], $total_deductions,
-            $payroll['unpaid_leave_deduction'], $payroll['late_deduction'], $payroll['unpaid_leave_deduction'],
-            $payroll['gross_salary'], $payroll['net_salary'], $payroll['working_days'],
-            $payroll['present_days'], $payroll['half_days'], $payroll['late_days'],
-            $payroll['absent_days'], $payroll['paid_leave_days'], $payroll['unpaid_leave_days'],
-            $payroll['overtime_hours']
-        );
-        $upsert->execute();
-        $upsert->close();
-
-        // Insert payroll details for audit trail
-        $payroll_id = $conn->insert_id;
-        if ($payroll_id > 0) {
-            // Clear existing details for re-run
-            $conn->query("DELETE FROM payroll_details WHERE payroll_id = $payroll_id");
-            $detail_stmt = $conn->prepare("INSERT INTO payroll_details (payroll_id, component_type, component_name, amount) VALUES (?, ?, ?, ?)");
-
-            $components = [
-                ['earning', 'Basic Salary', $payroll['basic_salary']],
-                ['earning', 'Allowance', $payroll['allowance_amount']],
-                ['earning', 'Overtime Pay', $payroll['ot_amount']],
-                ['earning', 'Bonuses', $payroll['bonus_amount']],
-                ['deduction', 'Absent Deduction (' . $payroll['absent_days'] . ' days)', $payroll['absent_deduction']],
-                ['deduction', 'Half-Day Deduction (' . $payroll['half_days'] . ' days)', $payroll['half_day_deduction']],
-                ['deduction', 'Unpaid Leave Deduction (' . $payroll['unpaid_leave_days'] . ' days)', $payroll['unpaid_leave_deduction']],
-                ['deduction', 'Late Deduction (' . $payroll['late_days'] . ' occurrences)', $payroll['late_deduction']],
-                ['deduction', 'Other Deductions', $payroll['other_deductions']],
-            ];
-
-            foreach ($components as $comp) {
-                if ($comp[2] > 0) {
-                    $detail_stmt->bind_param('issd', $payroll_id, $comp[0], $comp[1], $comp[2]);
-                    $detail_stmt->execute();
-                }
-            }
-            $detail_stmt->close();
+        $payroll_id = generate_payroll_for_employee($conn, $eid, $selected_month, $selected_year, 'Generated', $admin_id);
+        if ($payroll_id) {
+            $inserted++;
         }
-
-        $inserted++;
     }
     $emp_query->close();
     $message = "Payroll calculated for $inserted employees. (Working days: " . get_working_days_in_month($selected_year, $selected_month) . ")";
@@ -547,8 +498,9 @@ foreach ($payroll_data as $p) {
                                         <span class="net-highlight">$<?php echo number_format($p['net_salary'], 2); ?></span>
                                     </td>
                                     <td class="px-6 py-4 text-center">
-                                        <span class="status-badge status-calculated">
-                                            <i class="fa-solid fa-check-circle text-[10px]"></i> Calculated
+                                        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold border <?php echo get_payroll_status_badge($p['status'] ?? 'Generated'); ?>">
+                                            <i class="fa-solid <?php echo get_payroll_status_icon($p['status'] ?? 'Generated'); ?> text-[9px]"></i>
+                                            <?php echo $p['status'] ?? 'Generated'; ?>
                                         </span>
                                     </td>
                                 </tr>

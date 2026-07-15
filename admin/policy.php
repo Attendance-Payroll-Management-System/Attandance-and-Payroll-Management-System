@@ -29,7 +29,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $message = 'Policy updated successfully.';
         } else {
             $stmt = $conn->prepare("INSERT INTO policies (title, category, content, created_by) VALUES (?, ?, ?, ?)");
-            $stmt->bind_param("sssi", $title, $category, $content, $_SESSION['admin_id'] ?? null);
+            $admin_id = $_SESSION['admin_id'] ?? null;
+            $stmt->bind_param("sssi", $title, $category, $content, $admin_id);
             $message = 'Policy added successfully.';
         }
         $stmt->execute();

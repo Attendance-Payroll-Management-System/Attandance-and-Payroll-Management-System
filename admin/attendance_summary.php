@@ -36,8 +36,8 @@ $emp_query = "SELECT e.id, e.name, e.employee_code, e.basic_salary, d.department
 
 $params = [];
 $types = '';
-for ($i = 0; $i < 12; $i++) { $params[] = $month_start; $types .= 's'; }
-for ($i = 0; $i < 12; $i++) { $params[] = $month_end; $types .= 's'; }
+for ($i = 0; $i < 11; $i++) { $params[] = $month_start; $types .= 's'; }
+for ($i = 0; $i < 11; $i++) { $params[] = $month_end; $types .= 's'; }
 
 if ($dept_filter > 0) {
     $emp_query .= " AND e.department_id = ?";
