@@ -20,8 +20,11 @@ $unread_notifications = get_unread_count($conn, $employee_id);
 $is_inactive = validate_employee_active($conn, $employee_id) !== null;
 
 $has_source = $conn->query("SHOW COLUMNS FROM overtime_requests LIKE 'source'")->num_rows > 0;
+$has_request_type = $conn->query("SHOW COLUMNS FROM overtime_requests LIKE 'request_type'")->num_rows > 0;
 $has_assigned_by = $conn->query("SHOW COLUMNS FROM overtime_requests LIKE 'assigned_by_id'")->num_rows > 0;
 $has_ot_type = $conn->query("SHOW COLUMNS FROM overtime_requests LIKE 'ot_type'")->num_rows > 0;
+$has_ot_pay = $conn->query("SHOW COLUMNS FROM overtime_requests LIKE 'ot_pay'")->num_rows > 0;
+$has_remarks = $conn->query("SHOW COLUMNS FROM overtime_requests LIKE 'remarks'")->num_rows > 0;
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['submit_ot'])) {
     if (!validate_csrf_token()) { $message = "Invalid request."; $message_type = "error"; } else {
@@ -47,17 +50,20 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['submit_ot'])) {
             $ot_rate = get_overtime_rate_for_type($ot_type);
             $ot_pay = calculate_overtime_pay_for_request($conn, $employee_id, $ot_type, $total_hours);
 
-            $has_ot_type_col = $conn->query("SHOW COLUMNS FROM overtime_requests LIKE 'ot_type'")->num_rows > 0;
-            if ($has_ot_type_col) {
-                $stmt = $conn->prepare("INSERT INTO overtime_requests (employee_id, ot_date, start_time, end_time, total_hours, reason, source, ot_type, ot_rate, ot_pay) VALUES (?, ?, ?, ?, ?, ?, 'employee_request', ?, ?, ?)");
-                $stmt->bind_param('isssdssdd', $employee_id, $ot_date, $start_time, $end_time, $total_hours, $reason, $ot_type, $ot_rate, $ot_pay);
-            } elseif ($has_source) {
-                $stmt = $conn->prepare("INSERT INTO overtime_requests (employee_id, ot_date, start_time, end_time, total_hours, reason, source) VALUES (?, ?, ?, ?, ?, ?, 'employee_request')");
-                $stmt->bind_param('isssds', $employee_id, $ot_date, $start_time, $end_time, $total_hours, $reason);
-            } else {
-                $stmt = $conn->prepare("INSERT INTO overtime_requests (employee_id, ot_date, start_time, end_time, total_hours, reason) VALUES (?, ?, ?, ?, ?, ?)");
-                $stmt->bind_param('isssds', $employee_id, $ot_date, $start_time, $end_time, $total_hours, $reason);
-            }
+            $cols = ['employee_id', 'ot_date', 'start_time', 'end_time', 'total_hours', 'reason', 'status'];
+            $vals = [$employee_id, $ot_date, $start_time, $end_time, $total_hours, $reason, 'Pending'];
+            $types = 'isssds';
+
+            if ($has_source)       { $cols[] = 'source';       $vals[] = 'employee_request';  $types .= 's'; }
+            if ($has_request_type) { $cols[] = 'request_type'; $vals[] = 'employee_request';  $types .= 's'; }
+            if ($has_ot_type)      { $cols[] = 'ot_type';      $vals[] = $ot_type;             $types .= 's'; }
+            if ($has_ot_type)      { $cols[] = 'ot_rate';      $vals[] = $ot_rate;             $types .= 'd'; }
+            if ($has_ot_pay)       { $cols[] = 'ot_pay';       $vals[] = $ot_pay;              $types .= 'd'; }
+
+            $placeholders = implode(', ', array_fill(0, count($cols), '?'));
+            $stmt = $conn->prepare("INSERT INTO overtime_requests (" . implode(', ', $cols) . ") VALUES ($placeholders)");
+            $stmt->bind_param($types, ...$vals);
+
             if ($stmt->execute()) {
                 $new_id = $stmt->insert_id;
                 $stmt->close();
@@ -96,10 +102,18 @@ if ($has_source && $_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['respond
                 $r_stmt->close();
                 if ($ot_row) {
                     $ot_type = detect_overtime_type($conn, $ot_row['ot_date']);
-                    $ot_rate = get_overtime_rate_for_type($ot_type);
-                    $ot_pay = calculate_overtime_pay_for_request($conn, $employee_id, $ot_type, (float)$ot_row['total_hours']);
-                    $u_stmt = $conn->prepare("UPDATE overtime_requests SET ot_type = ?, ot_rate = ?, ot_pay = ? WHERE id = ?");
-                    $u_stmt->bind_param('sddi', $ot_type, $ot_rate, $ot_pay, $request_id);
+                    $has_ot_rate_col = $conn->query("SHOW COLUMNS FROM overtime_requests LIKE 'ot_rate'")->num_rows > 0;
+                    $has_ot_pay_col = $conn->query("SHOW COLUMNS FROM overtime_requests LIKE 'ot_pay'")->num_rows > 0;
+
+                    if ($has_ot_rate_col && $has_ot_pay_col) {
+                        $ot_rate = get_overtime_rate_for_type($ot_type);
+                        $ot_pay = calculate_overtime_pay_for_request($conn, $employee_id, $ot_type, (float)$ot_row['total_hours']);
+                        $u_stmt = $conn->prepare("UPDATE overtime_requests SET ot_type = ?, ot_rate = ?, ot_pay = ? WHERE id = ?");
+                        $u_stmt->bind_param('sddi', $ot_type, $ot_rate, $ot_pay, $request_id);
+                    } else {
+                        $u_stmt = $conn->prepare("UPDATE overtime_requests SET ot_type = ? WHERE id = ?");
+                        $u_stmt->bind_param('si', $ot_type, $request_id);
+                    }
                     $u_stmt->execute();
                     $u_stmt->close();
                 }
@@ -335,7 +349,7 @@ $monthly_remaining = check_monthly_overtime_remaining($conn, $employee_id, mmt_d
                                             <?php endif; ?>
                                         </td>
                                         <td class="py-3 font-mono text-sm">
-                                            <?php if ($row['ot_pay'] !== null && $row['ot_pay'] > 0): ?>
+                                            <?php if ($has_ot_pay && isset($row['ot_pay']) && $row['ot_pay'] > 0): ?>
                                                 <span class="text-emerald-400 font-semibold">$<?php echo number_format($row['ot_pay'], 2); ?></span>
                                             <?php else: ?>
                                                 <span class="text-zinc-500">-</span>
@@ -437,27 +451,17 @@ function otForm() {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
-    const validDates = <?php
-        $dates = $conn->prepare("SELECT attendance_date FROM attendance WHERE employee_id = ? AND check_in IS NOT NULL AND check_out IS NOT NULL ORDER BY attendance_date DESC");
-        $dates->bind_param('i', $employee_id);
-        $dates->execute();
-        $date_rows = $dates->get_result()->fetch_all(MYSQLI_ASSOC);
-        $dates->close();
-        echo json_encode(array_column($date_rows, 'attendance_date'));
-    ?>;
-
     flatpickr('#ot_date_picker', {
         dateFormat: 'Y-m-d',
-        minDate: null,
-        maxDate: '<?php echo mmt_date(); ?>',
-        enable: validDates,
+        minDate: 'today',
         locale: { firstDayOfWeek: 1 },
         disableMobile: true,
         onChange: function(selectedDates, dateStr) {
             const alpineEl = document.querySelector('[x-data]');
-            if (alpineEl && alpineEl.__x) {
-                alpineEl.__x.$data.otDate = dateStr;
-                alpineEl.__x.$data.onDateChange();
+            if (alpineEl && alpineEl._x_dataStack) {
+                const data = alpineEl._x_dataStack[0];
+                data.otDate = dateStr;
+                data.onDateChange();
             }
         }
     });

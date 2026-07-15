@@ -12,6 +12,7 @@ $to_date = $_GET['to_date'] ?? date('Y-m-t');
 $department_id = $_GET['department_id'] ?? '';
 $employee_id = $_GET['employee_id'] ?? '';
 $status_filter = $_GET['status'] ?? '';
+$request_type_filter = $_GET['request_type'] ?? '';
 $export = $_GET['export'] ?? '';
 
 $has_ot_type = $conn->query("SHOW COLUMNS FROM overtime_requests LIKE 'ot_type'")->num_rows > 0;
@@ -27,7 +28,7 @@ if ($department_id) {
     $emp_stmt->close();
 }
 
-$records = get_overtime_report_data($conn, $from_date, $to_date, $department_id ? (int)$department_id : null, $employee_id ? (int)$employee_id : null, $status_filter ?: null);
+$records = get_overtime_report_data($conn, $from_date, $to_date, $department_id ? (int)$department_id : null, $employee_id ? (int)$employee_id : null, $status_filter ?: null, $request_type_filter ?: null);
 
 // Calculate stats
 $total_hours = 0; $approved_hours = 0; $pending_hours = 0; $total_pay = 0;
@@ -42,7 +43,7 @@ foreach ($records as $r) {
 
 // Handle export
 if ($export && in_array($export, ['csv', 'excel'])) {
-    $headers = ['Employee Name', 'Employee Code', 'Department', 'Position', 'OT Date', 'Start Time', 'End Time', 'Hours', 'Type', 'OT Rate', 'OT Pay', 'Reason', 'Status', 'Submitted'];
+    $headers = ['Employee Name', 'Employee Code', 'Department', 'Position', 'OT Date', 'Start Time', 'End Time', 'Hours', 'Type', 'Request Type', 'OT Rate', 'OT Pay', 'Reason', 'Status', 'Submitted'];
     $data = [];
     foreach ($records as $r) {
         $data[] = [
@@ -55,6 +56,7 @@ if ($export && in_array($export, ['csv', 'excel'])) {
             'end_time' => $r['end_time'],
             'total_hours' => $r['total_hours'] . 'h',
             'ot_type' => $r['ot_type'] ?? detect_overtime_type($conn, $r['ot_date']),
+            'request_type' => $r['request_type'] ?? '-',
             'ot_rate' => isset($r['ot_rate']) ? $r['ot_rate'] : '-',
             'ot_pay' => isset($r['ot_pay']) && $r['ot_pay'] > 0 ? '$' . number_format($r['ot_pay'], 2) : '-',
             'reason' => $r['reason'],
@@ -135,6 +137,11 @@ if ($export === 'pdf') {
                 <option value="Approved" <?php echo $status_filter == 'Approved' ? 'selected' : ''; ?>>Approved</option>
                 <option value="Rejected" <?php echo $status_filter == 'Rejected' ? 'selected' : ''; ?>>Rejected</option>
             </select>
+            <select name="request_type" class="bg-white/[0.06] border border-white/[0.06] text-white text-xs rounded-xl px-3 py-2 focus:outline-none">
+                <option value="">All Types</option>
+                <option value="employee_request" <?php echo $request_type_filter == 'employee_request' ? 'selected' : ''; ?>>Employee Request</option>
+                <option value="admin_assignment" <?php echo $request_type_filter == 'admin_assignment' ? 'selected' : ''; ?>>Admin Assignment</option>
+            </select>
             <button type="submit" class="rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs px-4 py-2 shadow-sm transition flex items-center gap-1.5">
                 <i class="fa-solid fa-magnifying-glass"></i> Filter
             </button>
@@ -187,6 +194,7 @@ if ($export === 'pdf') {
                                 <th class="px-5 py-3">Time</th>
                                 <th class="px-5 py-3">Hours</th>
                                 <th class="px-5 py-3">Type</th>
+                                <th class="px-5 py-3">Source</th>
                                 <th class="px-5 py-3">Rate</th>
                                 <th class="px-5 py-3">Pay</th>
                                 <th class="px-5 py-3">Reason</th>
@@ -196,7 +204,7 @@ if ($export === 'pdf') {
                         <tbody class="divide-y divide-white/[0.04]">
                             <?php if (empty($records)): ?>
                             <tr>
-                                <td colspan="11" class="px-5 py-12 text-center text-zinc-500">
+                                <td colspan="12" class="px-5 py-12 text-center text-zinc-500">
                                     <p class="text-lg mb-1">No records found for the selected filters.</p>
                                     <p class="text-xs text-zinc-600">Try adjusting the date range or filters.</p>
                                 </td>
@@ -218,6 +226,13 @@ if ($export === 'pdf') {
                                     <td class="px-5 py-3 font-mono text-xs text-zinc-300"><?php echo date('h:i A', strtotime($r['start_time'])); ?> - <?php echo date('h:i A', strtotime($r['end_time'])); ?></td>
                                     <td class="px-5 py-3 font-semibold"><?php echo $r['total_hours']; ?>h</td>
                                     <td class="px-5 py-3"><?php echo get_overtime_type_badge($type); ?></td>
+                                    <td class="px-5 py-3">
+                                        <?php if (isset($r['request_type']) && $r['request_type'] === 'admin_assignment'): ?>
+                                            <span class="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold bg-purple-500/20 text-purple-400">Admin</span>
+                                        <?php else: ?>
+                                            <span class="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold bg-blue-500/20 text-blue-400">Employee</span>
+                                        <?php endif; ?>
+                                    </td>
                                     <td class="px-5 py-3 font-mono text-xs text-zinc-400"><?php echo $rate_display; ?></td>
                                     <td class="px-5 py-3 font-mono text-sm <?php echo $pay_display !== '-' ? 'text-emerald-400 font-semibold' : 'text-zinc-500'; ?>"><?php echo $pay_display; ?></td>
                                     <td class="px-5 py-3 text-zinc-400 max-w-[120px] truncate text-xs" title="<?php echo htmlspecialchars($r['reason']); ?>"><?php echo htmlspecialchars($r['reason']); ?></td>

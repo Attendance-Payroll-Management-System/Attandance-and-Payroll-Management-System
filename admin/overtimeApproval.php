@@ -20,6 +20,8 @@ if (isset($_GET['mark_read'])) {
 }
 
 $has_ot_type = $conn->query("SHOW COLUMNS FROM overtime_requests LIKE 'ot_type'")->num_rows > 0;
+$has_ot_rate = $conn->query("SHOW COLUMNS FROM overtime_requests LIKE 'ot_rate'")->num_rows > 0;
+$has_ot_pay = $conn->query("SHOW COLUMNS FROM overtime_requests LIKE 'ot_pay'")->num_rows > 0;
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (!validate_csrf_token()) { http_response_code(403); exit('CSRF validation failed.'); }
@@ -45,8 +47,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $ot_rate = get_overtime_rate_for_type($ot_type);
             $ot_pay = calculate_overtime_pay_for_request($conn, $old_row['employee_id'], $ot_type, (float)$old_row['total_hours']);
 
-            $stmt = $conn->prepare("UPDATE overtime_requests SET status = ?, ot_type = ?, ot_rate = ?, ot_pay = ?, approved_by = ?, approved_at = NOW() WHERE id = ?");
-            $stmt->bind_param('sdddis', $status, $ot_type, $ot_rate, $ot_pay, $admin_id, $request_id);
+            $set_clauses = ['status = ?', 'ot_type = ?'];
+            $params = [$status, $ot_type];
+            $types = 'ss';
+            if ($has_ot_rate) { $set_clauses[] = 'ot_rate = ?'; $params[] = $ot_rate; $types .= 'd'; }
+            if ($has_ot_pay) { $set_clauses[] = 'ot_pay = ?'; $params[] = $ot_pay; $types .= 'd'; }
+            $set_clauses[] = 'approved_by = ?'; $params[] = $admin_id; $types .= 'i';
+            $set_clauses[] = 'approved_at = NOW()';
+            $params[] = $request_id; $types .= 'i';
+            $stmt = $conn->prepare("UPDATE overtime_requests SET " . implode(', ', $set_clauses) . " WHERE id = ?");
+            $stmt->bind_param($types, ...$params);
         } else {
             $stmt = $conn->prepare("UPDATE overtime_requests SET status = ?, approved_by = ?, approved_at = NOW() WHERE id = ?");
             $stmt->bind_param('sii', $status, $admin_id, $request_id);
@@ -81,31 +91,32 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 }
 
 $has_source = $conn->query("SHOW COLUMNS FROM overtime_requests LIKE 'source'")->num_rows > 0;
+$has_request_type = $conn->query("SHOW COLUMNS FROM overtime_requests LIKE 'request_type'")->num_rows > 0;
 $has_assigned_by = $conn->query("SHOW COLUMNS FROM overtime_requests LIKE 'assigned_by_id'")->num_rows > 0;
-$has_ot_type = $conn->query("SHOW COLUMNS FROM overtime_requests LIKE 'ot_type'")->num_rows > 0;
 
-$ot_cols = $has_ot_type ? ', otr.ot_type, otr.ot_rate, otr.ot_pay' : '';
+$ot_cols = '';
+if ($has_ot_type) $ot_cols .= ', otr.ot_type';
+if ($has_ot_rate) $ot_cols .= ', otr.ot_rate';
+if ($has_ot_pay) $ot_cols .= ', otr.ot_pay';
 
-if ($has_source) {
-    $result = $conn->query("
-        SELECT otr.*$ot_cols, e.name as employee_name, e.employee_code, e.basic_salary, d.department_name, p.position_name
-        FROM overtime_requests otr
-        JOIN employee e ON otr.employee_id = e.id
-        LEFT JOIN departments d ON e.department_id = d.id
-        LEFT JOIN positions p ON e.position_id = p.id
-        WHERE (otr.source IS NULL OR otr.source = 'employee_request')
-        ORDER BY otr.created_at DESC
-    ");
+// Show only employee requests (not admin assignments) for approval
+if ($has_request_type) {
+    $where_filter = "otr.request_type = 'employee_request'";
+} elseif ($has_source) {
+    $where_filter = "(otr.source IS NULL OR otr.source = 'employee_request')";
 } else {
-    $result = $conn->query("
-        SELECT otr.*$ot_cols, e.name as employee_name, e.employee_code, e.basic_salary, d.department_name, p.position_name
-        FROM overtime_requests otr
-        JOIN employee e ON otr.employee_id = e.id
-        LEFT JOIN departments d ON e.department_id = d.id
-        LEFT JOIN positions p ON e.position_id = p.id
-        ORDER BY otr.created_at DESC
-    ");
+    $where_filter = "1=1";
 }
+
+$result = $conn->query("
+    SELECT otr.*$ot_cols, e.name as employee_name, e.employee_code, e.basic_salary, d.department_name, p.position_name
+    FROM overtime_requests otr
+    JOIN employee e ON otr.employee_id = e.id
+    LEFT JOIN departments d ON e.department_id = d.id
+    LEFT JOIN positions p ON e.position_id = p.id
+    WHERE $where_filter
+    ORDER BY otr.created_at DESC
+");
 $requests = $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
 
 $pending_count = 0;
@@ -217,7 +228,7 @@ foreach ($requests as $r) {
                                 <td class="px-6 py-4 font-semibold"><?php echo $req['total_hours']; ?>h</td>
                                 <td class="px-6 py-4"><?php echo $ot_type_display; ?></td>
                                 <td class="px-6 py-4 font-mono text-sm">
-                                    <?php if ($req['ot_pay'] !== null && $req['ot_pay'] > 0): ?>
+                                    <?php if ($has_ot_pay && isset($req['ot_pay']) && $req['ot_pay'] > 0): ?>
                                         <span class="text-emerald-400 font-semibold">$<?php echo number_format($req['ot_pay'], 2); ?></span>
                                     <?php else: ?>
                                         <span class="text-zinc-500">-</span>

@@ -1707,7 +1707,7 @@ function get_overtime_max_hours(mysqli $conn, string $ot_type): float {
     });
 }
 
-function validate_overtime_request_rules(mysqli $conn, int $employee_id, string $ot_date, string $start_time, string $end_time, string $reason, int $exclude_id = 0): array {
+function validate_overtime_request_rules(mysqli $conn, int $employee_id, string $ot_date, string $start_time, string $end_time, string $reason, int $exclude_id = 0, string $request_type = 'employee_request'): array {
     $errors = [];
     set_mmt_timezone();
 
@@ -1716,6 +1716,13 @@ function validate_overtime_request_rules(mysqli $conn, int $employee_id, string 
 
     if (empty($ot_date) || empty($start_time) || empty($end_time)) {
         $errors[] = 'Please fill in all required fields.';
+        return $errors;
+    }
+
+    // Past date validation
+    $today = mmt_date();
+    if ($ot_date < $today) {
+        $errors[] = 'You cannot submit an overtime request for a past date.';
         return $errors;
     }
 
@@ -1735,7 +1742,7 @@ function validate_overtime_request_rules(mysqli $conn, int $employee_id, string 
     }
 
     $require_attendance = get_overtime_setting($conn, 'ot_require_attendance', '1') === '1';
-    if ($require_attendance) {
+    if ($require_attendance && $ot_date <= $today && $request_type !== 'admin_assignment') {
         $att = has_checked_in_today($conn, $employee_id, $ot_date);
         $has_completed = $att !== null && $att['check_in'] !== null && $att['check_out'] !== null;
         if (!$has_completed) {
@@ -1893,6 +1900,32 @@ function get_overtime_dashboard_stats(mysqli $conn, ?int $month = null, ?int $ye
         }
     }
 
+    // OT by request type (employee vs admin)
+    $has_request_type = $conn->query("SHOW COLUMNS FROM overtime_requests LIKE 'request_type'")->num_rows > 0;
+    $by_request_type = [];
+    if ($has_request_type) {
+        $res2 = $conn->query("SELECT request_type, COALESCE(SUM(total_hours), 0) as hours, COUNT(*) as count,
+                              COALESCE(SUM(ot_pay), 0) as total_pay
+                              FROM overtime_requests
+                              WHERE ot_date BETWEEN '$month_start' AND '$month_end' AND status = 'Approved'
+                              GROUP BY request_type");
+        if ($res2) {
+            while ($r = $res2->fetch_assoc()) {
+                $by_request_type[$r['request_type']] = ['hours' => (float)$r['hours'], 'count' => (int)$r['count'], 'pay' => (float)$r['total_pay']];
+            }
+        }
+    }
+    $stats['by_request_type'] = $by_request_type;
+
+    // Total OT earnings for the month
+    $earn_check = $conn->query("SHOW COLUMNS FROM overtime_requests LIKE 'ot_pay'")->num_rows > 0;
+    if ($earn_check) {
+        $earn_res = $conn->query("SELECT COALESCE(SUM(ot_pay), 0) as total_earnings FROM overtime_requests WHERE ot_date BETWEEN '$month_start' AND '$month_end' AND status = 'Approved'");
+        $stats['total_earnings'] = $earn_res ? (float)$earn_res->fetch_assoc()['total_earnings'] : 0;
+    } else {
+        $stats['total_earnings'] = 0;
+    }
+
     // Top employees by OT
     $top_emp = $conn->prepare(
         "SELECT otr.employee_id, e.name, e.employee_code, d.department_name,
@@ -1999,7 +2032,7 @@ function get_overtime_type_badge(string $ot_type): string {
     };
 }
 
-function get_overtime_report_data(mysqli $conn, string $from_date, string $to_date, ?int $department_id = null, ?int $employee_id = null, ?string $status = null): array {
+function get_overtime_report_data(mysqli $conn, string $from_date, string $to_date, ?int $department_id = null, ?int $employee_id = null, ?string $status = null, ?string $request_type = null): array {
     $where = ["otr.ot_date BETWEEN ? AND ?"];
     $params = [$from_date, $to_date];
     $types = 'ss';
@@ -2019,9 +2052,19 @@ function get_overtime_report_data(mysqli $conn, string $from_date, string $to_da
         $params[] = $status;
         $types .= 's';
     }
+    if ($request_type) {
+        $has_rt = $conn->query("SHOW COLUMNS FROM overtime_requests LIKE 'request_type'")->num_rows > 0;
+        if ($has_rt) {
+            $where[] = "otr.request_type = ?";
+            $params[] = $request_type;
+            $types .= 's';
+        }
+    }
 
     $has_ot_type = $conn->query("SHOW COLUMNS FROM overtime_requests LIKE 'ot_type'")->num_rows > 0;
+    $has_request_type = $conn->query("SHOW COLUMNS FROM overtime_requests LIKE 'request_type'")->num_rows > 0;
     $ot_cols = $has_ot_type ? ', otr.ot_type, otr.ot_rate, otr.ot_pay' : '';
+    if ($has_request_type) $ot_cols .= ', otr.request_type';
 
     $has_assigned_by = $conn->query("SHOW COLUMNS FROM overtime_requests LIKE 'assigned_by_id'")->num_rows > 0;
 

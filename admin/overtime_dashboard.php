@@ -79,17 +79,17 @@ if ($next_month > 12) { $next_month = 1; $next_year++; }
                 </div>
                 <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-5">
                     <div class="flex items-center justify-between mb-2">
-                        <span class="text-xs font-bold uppercase tracking-wider text-zinc-500">Rejected</span>
-                        <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-red-500/20 to-rose-500/10 flex items-center justify-center"><i class="fa-solid fa-circle-xmark text-red-400 text-sm"></i></div>
+                        <span class="text-xs font-bold uppercase tracking-wider text-zinc-500">Total OT Earnings</span>
+                        <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500/20 to-green-500/10 flex items-center justify-center"><i class="fa-solid fa-dollar-sign text-emerald-400 text-sm"></i></div>
                     </div>
-                    <p class="text-2xl font-bold text-red-400"><?php echo number_format(($stats['rejected_count'] ?? 0), 0); ?></p>
-                    <p class="text-[10px] text-zinc-500 mt-1">rejected requests</p>
+                    <p class="text-2xl font-bold text-emerald-400">$<?php echo number_format($stats['total_earnings'] ?? 0, 2); ?></p>
+                    <p class="text-[10px] text-zinc-500 mt-1">approved OT pay</p>
                 </div>
             </section>
 
             <?php if ($has_ot_type): ?>
             <!-- Type Breakdown + Monthly Cap -->
-            <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <section class="grid grid-cols-1 lg:grid-cols-4 gap-6">
                 <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-5">
                     <h3 class="font-bold text-white mb-4 text-sm"><i class="fa-solid fa-chart-pie text-blue-400 mr-2"></i>OT by Type</h3>
                     <div class="space-y-3">
@@ -148,6 +148,37 @@ if ($next_month > 12) { $next_month = 1; $next_year++; }
                     <div class="flex justify-between text-xs text-zinc-500 mt-2">
                         <span><?php echo number_format($used_hours, 1); ?>h used</span>
                         <span><?php echo number_format(max(0, $monthly_cap - $used_hours), 1); ?>h remaining</span>
+                    </div>
+                </div>
+
+                <?php
+                $emp_req = $stats['by_request_type']['employee_request'] ?? ['hours' => 0, 'count' => 0, 'pay' => 0];
+                $adm_req = $stats['by_request_type']['admin_assignment'] ?? ['hours' => 0, 'count' => 0, 'pay' => 0];
+                $total_rt_hours = $emp_req['hours'] + $adm_req['hours'];
+                ?>
+                <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-5">
+                    <h3 class="font-bold text-white mb-4 text-sm"><i class="fa-solid fa-users-gear text-cyan-400 mr-2"></i>Request Source</h3>
+                    <div class="space-y-3">
+                        <div>
+                            <div class="flex justify-between text-xs mb-1">
+                                <span class="text-blue-400 font-semibold">Employee Requests</span>
+                                <span class="text-zinc-400"><?php echo number_format($emp_req['hours'], 1); ?>h (<?php echo $emp_req['count']; ?>)</span>
+                            </div>
+                            <div class="h-2 bg-white/[0.06] rounded-full overflow-hidden">
+                                <div class="h-full bg-blue-500 rounded-full transition-all" style="width: <?php echo $total_rt_hours > 0 ? ($emp_req['hours'] / $total_rt_hours * 100) : 0; ?>%"></div>
+                            </div>
+                            <p class="text-[10px] text-zinc-500 mt-0.5">$<?php echo number_format($emp_req['pay'], 2); ?> earnings</p>
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-xs mb-1">
+                                <span class="text-purple-400 font-semibold">Admin Assignments</span>
+                                <span class="text-zinc-400"><?php echo number_format($adm_req['hours'], 1); ?>h (<?php echo $adm_req['count']; ?>)</span>
+                            </div>
+                            <div class="h-2 bg-white/[0.06] rounded-full overflow-hidden">
+                                <div class="h-full bg-purple-500 rounded-full transition-all" style="width: <?php echo $total_rt_hours > 0 ? ($adm_req['hours'] / $total_rt_hours * 100) : 0; ?>%"></div>
+                            </div>
+                            <p class="text-[10px] text-zinc-500 mt-0.5">$<?php echo number_format($adm_req['pay'], 2); ?> earnings</p>
+                        </div>
                     </div>
                 </div>
             </section>

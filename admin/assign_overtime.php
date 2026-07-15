@@ -70,22 +70,42 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['assign_ot'])) {
     $end_time = $_POST['end_time'] ?? '';
     $reason = $_POST['reason'] ?? '';
 
+    $has_source = $conn->query("SHOW COLUMNS FROM overtime_requests LIKE 'source'")->num_rows > 0;
+    $has_request_type = $conn->query("SHOW COLUMNS FROM overtime_requests LIKE 'request_type'")->num_rows > 0;
+    $has_assigned_by = $conn->query("SHOW COLUMNS FROM overtime_requests LIKE 'assigned_by_id'")->num_rows > 0;
+    $has_ot_type = $conn->query("SHOW COLUMNS FROM overtime_requests LIKE 'ot_type'")->num_rows > 0;
+    $has_ot_rate = $conn->query("SHOW COLUMNS FROM overtime_requests LIKE 'ot_rate'")->num_rows > 0;
+    $has_ot_pay = $conn->query("SHOW COLUMNS FROM overtime_requests LIKE 'ot_pay'")->num_rows > 0;
+    $has_remarks = $conn->query("SHOW COLUMNS FROM overtime_requests LIKE 'remarks'")->num_rows > 0;
+
     if (!$employee_id || empty($ot_date) || empty($start_time) || empty($end_time)) {
         $message = 'Please fill in all required fields.';
         $message_type = 'error';
     } elseif (strtotime($end_time) <= strtotime($start_time)) {
         $message = 'End time must be after start time.';
         $message_type = 'error';
+    } elseif ($ot_date < mmt_date()) {
+        $message = 'You cannot assign overtime to a past date.';
+        $message_type = 'error';
     } else {
         $start_ts = strtotime($start_time);
         $end_ts = strtotime($end_time);
         $total_hours = round(($end_ts - $start_ts) / 3600, 2);
 
-        $emp = $conn->prepare("SELECT name FROM employee WHERE id = ?");
+        // Get employee info
+        $emp = $conn->prepare("SELECT name, department_id, position_id FROM employee WHERE id = ?");
         $emp->bind_param('i', $employee_id);
         $emp->execute();
-        $emp_name = $emp->get_result()->fetch_assoc()['name'] ?? 'Employee';
+        $emp_row = $emp->get_result()->fetch_assoc();
+        $emp_name = $emp_row['name'] ?? 'Employee';
+        $emp_dept_id = $emp_row['department_id'] ?? null;
+        $emp_pos_id = $emp_row['position_id'] ?? null;
         $emp->close();
+
+        // Auto-detect OT type, rate, pay
+        $ot_type = detect_overtime_type($conn, $ot_date);
+        $ot_rate = get_overtime_rate_for_type($ot_type);
+        $ot_pay = calculate_overtime_pay_for_request($conn, $employee_id, $ot_type, $total_hours);
 
         // Use the selected manager from the dropdown
         $assigned_by_id   = intval($_POST['assigned_by_id'] ?? 0);
@@ -113,25 +133,44 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['assign_ot'])) {
             }
         }
 
+        // Build dynamic INSERT
+        $cols = ['employee_id', 'ot_date', 'start_time', 'end_time', 'total_hours', 'reason', 'status'];
+        $vals = [$employee_id, $ot_date, $start_time, $end_time, $total_hours, $reason, 'Approved'];
+        $types = 'isssds';
+
+        if ($has_source)       { $cols[] = 'source';       $vals[] = 'admin_assignment'; $types .= 's'; }
+        if ($has_request_type) { $cols[] = 'request_type'; $vals[] = 'admin_assignment'; $types .= 's'; }
         if ($has_assigned_by) {
-            $stmt = $conn->prepare("INSERT INTO overtime_requests (employee_id, ot_date, start_time, end_time, total_hours, reason, source, status, assigned_by_id, assigned_by_name, assigned_by_department, assigned_by_position, assigned_at) VALUES (?, ?, ?, ?, ?, ?, 'admin_assigned', 'Pending', ?, ?, ?, ?, NOW())");
-            $stmt->bind_param('isssdsisss', $employee_id, $ot_date, $start_time, $end_time, $total_hours, $reason, $assigned_by_id, $assigned_by_name, $assigned_by_dept, $assigned_by_pos);
-        } elseif ($has_source) {
-            $stmt = $conn->prepare("INSERT INTO overtime_requests (employee_id, ot_date, start_time, end_time, total_hours, reason, source, status) VALUES (?, ?, ?, ?, ?, ?, 'admin_assigned', 'Pending')");
-            $stmt->bind_param('isssds', $employee_id, $ot_date, $start_time, $end_time, $total_hours, $reason);
-        } else {
-            $stmt = $conn->prepare("INSERT INTO overtime_requests (employee_id, ot_date, start_time, end_time, total_hours, reason, status) VALUES (?, ?, ?, ?, ?, ?, 'Pending')");
-            $stmt->bind_param('isssds', $employee_id, $ot_date, $start_time, $end_time, $total_hours, $reason);
+            $cols[] = 'assigned_by_id';         $vals[] = $assigned_by_id;   $types .= 'i';
+            $cols[] = 'assigned_by_name';       $vals[] = $assigned_by_name; $types .= 's';
+            $cols[] = 'assigned_by_department'; $vals[] = $assigned_by_dept; $types .= 's';
+            $cols[] = 'assigned_by_position';   $vals[] = $assigned_by_pos;  $types .= 's';
+            $cols[] = 'assigned_at';            $vals[] = date('Y-m-d H:i:s'); $types .= 's';
         }
+        if ($has_ot_type) { $cols[] = 'ot_type'; $vals[] = $ot_type; $types .= 's'; }
+        if ($has_ot_rate) { $cols[] = 'ot_rate'; $vals[] = $ot_rate; $types .= 'd'; }
+        if ($has_ot_pay)  { $cols[] = 'ot_pay';  $vals[] = $ot_pay;  $types .= 'd'; }
+        if ($emp_dept_id) { $cols[] = 'department_id'; $vals[] = $emp_dept_id; $types .= 'i'; }
+        if ($emp_pos_id)  { $cols[] = 'position_id';   $vals[] = $emp_pos_id;  $types .= 'i'; }
+        if ($has_remarks && !empty($reason)) { $cols[] = 'remarks'; $vals[] = $reason; $types .= 's'; }
+
+        $placeholders = implode(', ', array_fill(0, count($cols), '?'));
+        $stmt = $conn->prepare("INSERT INTO overtime_requests (" . implode(', ', $cols) . ") VALUES ($placeholders)");
+        $stmt->bind_param($types, ...$vals);
+
         if ($stmt->execute()) {
-            create_notification($conn, $employee_id, 'ot_assigned', "Overtime has been assigned to you by $assigned_by_name ($assigned_by_pos, $assigned_by_dept). OT Date: $ot_date (" . number_format($total_hours, 1) . "h).", 'overtimerequest.php');
-            $message = "Overtime assigned to $emp_name successfully.";
+            $new_id = $stmt->insert_id;
+            $stmt->close();
+
+            log_overtime_action($conn, $new_id, 'created', $admin_id, 'admin');
+
+            create_notification($conn, $employee_id, 'ot_assigned', "Overtime has been assigned to you by $assigned_by_name ($assigned_by_pos, $assigned_by_dept). OT Date: $ot_date (" . number_format($total_hours, 1) . "h - " . str_replace('_', ' ', $ot_type) . ").", 'overtimerequest.php');
+            $message = "Overtime assigned to $emp_name successfully. (Auto-approved)";
             $message_type = 'success';
         } else {
             $message = 'Error assigning overtime.';
             $message_type = 'error';
         }
-        $stmt->close();
     }
 }
 ?>
@@ -213,7 +252,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['assign_ot'])) {
                         <?php endif; ?>
                         <div>
                             <label class="text-xs font-semibold text-zinc-400 block mb-1.5">OT Date</label>
-                            <input type="date" name="ot_date" required class="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white placeholder-zinc-500 shadow-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30">
+                            <input type="date" name="ot_date" required min="<?php echo mmt_date(); ?>" class="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white placeholder-zinc-500 shadow-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30">
                         </div>
                         <div class="grid grid-cols-2 gap-4">
                             <div>
