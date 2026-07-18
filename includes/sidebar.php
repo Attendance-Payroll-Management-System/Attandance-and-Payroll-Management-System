@@ -198,7 +198,6 @@ if ($sidebar_role === 'admin') {
                 ['page' => 'dailyattendance.php', 'href' => 'dailyattendance.php', 'label' => 'Daily Attendance'],
                 ['page' => 'attendance_settings.php', 'href' => 'attendance_settings.php', 'label' => 'Settings'],
                 ['page' => 'attendance_corrections.php', 'href' => 'attendance_corrections.php', 'label' => 'Corrections'],
-                ['page' => 'attendance_reports.php', 'href' => 'attendance_reports.php', 'label' => 'Reports'],
                 ['page' => 'attendance_management.php', 'href' => 'attendance_management.php', 'label' => 'Management'],
             ], $current_page, $pending_corrections, 'emerald'); ?>
             <?php echo nav_section('Leave', 'paper-plane', [
@@ -206,18 +205,18 @@ if ($sidebar_role === 'admin') {
                 ['page' => 'leavereport.php', 'href' => 'leavereport.php', 'label' => 'Leave Report'],
             ], $current_page, $pending_leaves, 'amber'); ?>
             <?php echo nav_section('Overtime', 'stopwatch', [
-                ['page' => 'overtime_dashboard.php', 'href' => 'overtime_dashboard.php', 'label' => 'Dashboard'],
+                // ['page' => 'overtime_dashboard.php', 'href' => 'overtime_dashboard.php', 'label' => 'Dashboard'],
                 ['page' => 'overtimeApproval.php', 'href' => 'overtimeApproval.php', 'label' => 'OT Approvals'],
                 ['page' => 'assign_overtime.php', 'href' => 'assign_overtime.php', 'label' => 'Assign OT'],
                 ['page' => 'overtimereport.php', 'href' => 'overtimereport.php', 'label' => 'OT Report'],
-                ['page' => 'overtime_reports.php', 'href' => 'overtime_reports.php', 'label' => 'OT Reports (New)'],
+
             ], $current_page, $pending_ot, 'orange'); ?>
             <?php echo nav_section('Payroll', 'money-bill-wave', [
-                ['page' => 'payroll_dashboard.php', 'href' => 'payroll_dashboard.php', 'label' => 'Dashboard'],
+                // ['page' => 'payroll_dashboard.php', 'href' => 'payroll_dashboard.php', 'label' => 'Dashboard'],
                 ['page' => 'payroll.php', 'href' => 'payroll.php', 'label' => 'Generate Payroll'],
-                ['page' => 'payroll_list.php', 'href' => 'payroll_list.php', 'label' => 'Payroll List'],
-                ['page' => 'salary_structure.php', 'href' => 'salary_structure.php', 'label' => 'Salary Structure'],
-                ['page' => 'salaryreport.php', 'href' => 'salaryreport.php', 'label' => 'Salary Report'],
+                // ['page' => 'payroll_list.php', 'href' => 'payroll_list.php', 'label' => 'Payroll List'],
+                // ['page' => 'salary_structure.php', 'href' => 'salary_structure.php', 'label' => 'Salary Structure'],
+                // ['page' => 'salaryreport.php', 'href' => 'salaryreport.php', 'label' => 'Salary Report'],
                 ['page' => 'salary_slip.php', 'href' => 'salary_slip.php', 'label' => 'Salary Slips'],
                 ['page' => 'bonous.php', 'href' => 'bonous.php', 'label' => 'Bonuses'],
                 ['page' => 'deduction.php', 'href' => 'deduction.php', 'label' => 'Deductions'],

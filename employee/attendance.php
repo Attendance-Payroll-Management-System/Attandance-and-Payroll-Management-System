@@ -64,7 +64,8 @@ $conn->query("CREATE TABLE IF NOT EXISTS attendance_corrections (
     FOREIGN KEY (reviewed_by) REFERENCES employee(id) ON DELETE SET NULL
 )");
 
-function has_approved_overtime_after($conn, int $employee_id, string $date, string $after_time): bool {
+function has_approved_overtime_after($conn, int $employee_id, string $date, string $after_time): bool
+{
     $stmt = $conn->prepare("SELECT COUNT(*) as cnt FROM overtime_requests WHERE employee_id = ? AND ot_date = ? AND status = 'Approved' AND end_time > ?");
     $stmt->bind_param('iss', $employee_id, $date, $after_time);
     $stmt->execute();
@@ -73,7 +74,8 @@ function has_approved_overtime_after($conn, int $employee_id, string $date, stri
     return ($row['cnt'] ?? 0) > 0;
 }
 
-function get_approved_ot_end_time($conn, int $employee_id, string $date): ?string {
+function get_approved_ot_end_time($conn, int $employee_id, string $date): ?string
+{
     $stmt = $conn->prepare("SELECT end_time FROM overtime_requests WHERE employee_id = ? AND ot_date = ? AND status = 'Approved' ORDER BY end_time DESC LIMIT 1");
     $stmt->bind_param('is', $employee_id, $date);
     $stmt->execute();
@@ -82,7 +84,8 @@ function get_approved_ot_end_time($conn, int $employee_id, string $date): ?strin
     return $row ? $row['end_time'] : null;
 }
 
-function log_attendance_action($conn, $employee_id, $attendance_id, $action, $old_value, $new_value) {
+function log_attendance_action($conn, $employee_id, $attendance_id, $action, $old_value, $new_value)
+{
     $ip = $_SERVER['REMOTE_ADDR'] ?? null;
     $ua = $_SERVER['HTTP_USER_AGENT'] ?? '';
     $stmt = $conn->prepare("INSERT INTO attendance_logs (employee_id, attendance_id, action, old_value, new_value, ip_address, user_agent, performed_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
@@ -142,8 +145,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['check_in']) && !$is_in
             $stmt->close();
         } else {
             $note = $_POST['check_in_note'] ?? '';
-            $stmt = $conn->prepare("INSERT INTO attendance (employee_id, attendance_date, check_in, status, is_late, check_in_ip, check_in_source, check_in_note) VALUES (?, ?, ?, ?, ?, ?, 'web', ?)");
-            $stmt->bind_param('isssiss', $employee_id, $today, $current_time, $status, $is_late, $ip, $note);
+            $stmt = $conn->prepare("INSERT INTO attendance (employee_id, attendance_date, check_in, status, is_late) VALUES (?, ?, ?, ?, ?)");
+            $stmt->bind_param('isssi', $employee_id, $today, $current_time, $status, $is_late);
             if ($stmt->execute()) {
                 $att_id = $conn->insert_id;
                 log_attendance_action($conn, $employee_id, $att_id, 'check_in', null, "$current_time|$status");
@@ -313,6 +316,7 @@ $corr_stmt->close();
 ?>
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -320,17 +324,41 @@ $corr_stmt->close();
     <link rel="icon" type="image/svg+xml" href="../favicon.svg">
     <?php include "../includes/header.php"; ?>
     <style>
-        .check-in-btn { --btn-gradient: from-blue-600 to-indigo-600; --btn-shadow: rgba(59,130,246,0.3); }
-        .check-out-btn { --btn-gradient: from-orange-500 to-rose-500; --btn-shadow: rgba(249,115,22,0.3); }
-        .pulse-ring { animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
-        @keyframes pulse-ring { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .check-in-btn {
+            --btn-gradient: from-blue-600 to-indigo-600;
+            --btn-shadow: rgba(59, 130, 246, 0.3);
+        }
+
+        .check-out-btn {
+            --btn-gradient: from-orange-500 to-rose-500;
+            --btn-shadow: rgba(249, 115, 22, 0.3);
+        }
+
+        .pulse-ring {
+            animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+
+        @keyframes pulse-ring {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
+        }
     </style>
 </head>
+
 <body x-data="{ activeTab: 'today', showCorrection: false }" class="bg-slate-50 dark:bg-[#0B1120] text-slate-900 dark:text-white font-sans antialiased emp-page-wrapper">
     <?php $use_sidebar = true; ?>
     <?php include "../includes/sidebar.php"; ?>
     <div class="main-wrapper flex flex-col min-h-screen">
-        <?php $page_title = "Attendance"; $page_subtitle = format_mmt($today, 'l, F j, Y') . ' (MMT)'; include "../includes/topbar.php"; ?>
+        <?php $page_title = "Attendance";
+        $page_subtitle = format_mmt($today, 'l, F j, Y') . ' (MMT)';
+        include "../includes/topbar.php"; ?>
 
         <main class="p-4 sm:p-6 lg:p-8 space-y-6 flex-1 page-content w-full">
 
@@ -574,7 +602,9 @@ $corr_stmt->close();
                                     </tr>
                                 <?php endwhile; ?>
                                 <?php if ($recent_result->num_rows == 0): ?>
-                                    <tr><td colspan="5" class="py-6 text-center text-zinc-500">No attendance records yet.</td></tr>
+                                    <tr>
+                                        <td colspan="5" class="py-6 text-center text-zinc-500">No attendance records yet.</td>
+                                    </tr>
                                 <?php endif; ?>
                             </tbody>
                         </table>
@@ -618,10 +648,11 @@ $corr_stmt->close();
                                     $date_result = $dates->get_result();
                                     while ($d = $date_result->fetch_assoc()):
                                     ?>
-                                    <option value="<?php echo $d['attendance_date']; ?>">
-                                        <?php echo date('M d, Y', strtotime($d['attendance_date'])) . ' (In: ' . ($d['check_in'] ? date('h:i A', strtotime($d['check_in'])) : '--') . ' | Out: ' . ($d['check_out'] ? date('h:i A', strtotime($d['check_out'])) : '--') . ')'; ?>
-                                    </option>
-                                    <?php endwhile; $dates->close(); ?>
+                                        <option value="<?php echo $d['attendance_date']; ?>">
+                                            <?php echo date('M d, Y', strtotime($d['attendance_date'])) . ' (In: ' . ($d['check_in'] ? date('h:i A', strtotime($d['check_in'])) : '--') . ' | Out: ' . ($d['check_out'] ? date('h:i A', strtotime($d['check_out'])) : '--') . ')'; ?>
+                                        </option>
+                                    <?php endwhile;
+                                    $dates->close(); ?>
                                 </select>
                             </div>
                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -650,39 +681,40 @@ $corr_stmt->close();
     </div>
     <?php include "../includes/employee_bottom_nav.php"; ?>
     <script>
-    // Live clock
-    function updateClock() {
-        var now = new Date();
-        var mmtOffset = 6.5 * 60 * 60 * 1000;
-        var utc = now.getTime() + now.getTimezoneOffset() * 60000;
-        var mmt = new Date(utc + mmtOffset);
-        var h = String(mmt.getHours()).padStart(2, '0');
-        var m = String(mmt.getMinutes()).padStart(2, '0');
-        var s = String(mmt.getSeconds()).padStart(2, '0');
-        var ampm = h >= 12 ? 'PM' : 'AM';
-        h = h % 12 || 12;
-        var el = document.getElementById('liveClock');
-        if (el) el.textContent = String(h).padStart(2, '0') + ':' + m + ':' + s + ' ' + ampm;
-    }
-    setInterval(updateClock, 1000);
-    updateClock();
-
-    // Elapsed timer
-    var timerEl = document.getElementById('elapsedTimer');
-    if (timerEl) {
-        var checkinTs = parseInt(timerEl.getAttribute('data-checkin'));
-        if (checkinTs) {
-            function updateElapsed() {
-                var now = Date.now();
-                var elapsed = Math.floor((now / 1000) - checkinTs);
-                var h = Math.floor(elapsed / 3600);
-                var m = Math.floor((elapsed % 3600) / 60);
-                timerEl.textContent = 'Elapsed: ' + h + 'h ' + m + 'm';
-            }
-            setInterval(updateElapsed, 60000);
-            updateElapsed();
+        // Live clock
+        function updateClock() {
+            var now = new Date();
+            var mmtOffset = 6.5 * 60 * 60 * 1000;
+            var utc = now.getTime() + now.getTimezoneOffset() * 60000;
+            var mmt = new Date(utc + mmtOffset);
+            var h = String(mmt.getHours()).padStart(2, '0');
+            var m = String(mmt.getMinutes()).padStart(2, '0');
+            var s = String(mmt.getSeconds()).padStart(2, '0');
+            var ampm = h >= 12 ? 'PM' : 'AM';
+            h = h % 12 || 12;
+            var el = document.getElementById('liveClock');
+            if (el) el.textContent = String(h).padStart(2, '0') + ':' + m + ':' + s + ' ' + ampm;
         }
-    }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        // Elapsed timer
+        var timerEl = document.getElementById('elapsedTimer');
+        if (timerEl) {
+            var checkinTs = parseInt(timerEl.getAttribute('data-checkin'));
+            if (checkinTs) {
+                function updateElapsed() {
+                    var now = Date.now();
+                    var elapsed = Math.floor((now / 1000) - checkinTs);
+                    var h = Math.floor(elapsed / 3600);
+                    var m = Math.floor((elapsed % 3600) / 60);
+                    timerEl.textContent = 'Elapsed: ' + h + 'h ' + m + 'm';
+                }
+                setInterval(updateElapsed, 60000);
+                updateElapsed();
+            }
+        }
     </script>
 </body>
+
 </html>

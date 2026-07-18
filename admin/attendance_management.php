@@ -55,7 +55,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             $is_late = ($check_in && is_late_checkin($check_in)) ? 1 : 0;
 
-            $stmt = $conn->prepare("INSERT INTO attendance (employee_id, attendance_date, check_in, check_out, status, is_late, total_working_hours, remarks, is_manual, check_in_source) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, 'manual')");
+            $stmt = $conn->prepare("INSERT INTO attendance (employee_id, attendance_date, check_in, check_out, status, is_late, total_working_hours,remarks) VALUES (?, ?, ?, ?, ?, ?, ?,?)");
             $stmt->bind_param('issssids', $emp_id, $att_date, $check_in, $check_out, $status, $is_late, $total_hours, $remarks);
             if ($stmt->execute()) {
                 $message = 'Manual attendance record added successfully.';
@@ -261,6 +261,7 @@ if (isset($_GET['export'])) {
 ?>
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -268,6 +269,7 @@ if (isset($_GET['export'])) {
     <link rel="icon" type="image/svg+xml" href="../favicon.svg">
     <?php include "../includes/header.php"; ?>
 </head>
+
 <body x-data="{ 
     showAddModal: false, 
     showEditModal: false, 
@@ -285,10 +287,10 @@ if (isset($_GET['export'])) {
         <main class="p-6 lg:p-8 space-y-6 flex-1 page-content w-full page-enter">
 
             <?php if ($message): ?>
-            <div class="flex items-center gap-3 p-4 rounded-xl border text-sm <?php echo $message_type === 'success' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-red-500/10 border-red-500/20 text-red-400'; ?>">
-                <i class="fa-solid <?php echo $message_type === 'success' ? 'fa-check-circle' : 'fa-circle-exclamation'; ?>"></i>
-                <?php echo htmlspecialchars($message); ?>
-            </div>
+                <div class="flex items-center gap-3 p-4 rounded-xl border text-sm <?php echo $message_type === 'success' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-red-500/10 border-red-500/20 text-red-400'; ?>">
+                    <i class="fa-solid <?php echo $message_type === 'success' ? 'fa-check-circle' : 'fa-circle-exclamation'; ?>"></i>
+                    <?php echo htmlspecialchars($message); ?>
+                </div>
             <?php endif; ?>
 
             <!-- Header -->
@@ -326,7 +328,7 @@ if (isset($_GET['export'])) {
                         <select name="department" class="w-full bg-white/[0.06] border border-white/10 text-white rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500/30">
                             <option value="0">All</option>
                             <?php foreach ($departments as $d): ?>
-                            <option value="<?php echo $d['id']; ?>" <?php echo $filter_dept === (int)$d['id'] ? 'selected' : ''; ?>><?php echo htmlspecialchars($d['department_name']); ?></option>
+                                <option value="<?php echo $d['id']; ?>" <?php echo $filter_dept === (int)$d['id'] ? 'selected' : ''; ?>><?php echo htmlspecialchars($d['department_name']); ?></option>
                             <?php endforeach; ?>
                         </select>
                     </div>
@@ -335,7 +337,7 @@ if (isset($_GET['export'])) {
                         <select name="position" class="w-full bg-white/[0.06] border border-white/10 text-white rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500/30">
                             <option value="0">All</option>
                             <?php foreach ($positions as $p): ?>
-                            <option value="<?php echo $p['id']; ?>" <?php echo $filter_position === (int)$p['id'] ? 'selected' : ''; ?>><?php echo htmlspecialchars($p['position_name']); ?></option>
+                                <option value="<?php echo $p['id']; ?>" <?php echo $filter_position === (int)$p['id'] ? 'selected' : ''; ?>><?php echo htmlspecialchars($p['position_name']); ?></option>
                             <?php endforeach; ?>
                         </select>
                     </div>
@@ -344,7 +346,7 @@ if (isset($_GET['export'])) {
                         <select name="employee" class="w-full bg-white/[0.06] border border-white/10 text-white rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500/30">
                             <option value="0">All</option>
                             <?php foreach ($employees as $e): ?>
-                            <option value="<?php echo $e['id']; ?>" <?php echo $filter_employee === (int)$e['id'] ? 'selected' : ''; ?>><?php echo htmlspecialchars($e['name'] . ' (' . $e['employee_code'] . ')'); ?></option>
+                                <option value="<?php echo $e['id']; ?>" <?php echo $filter_employee === (int)$e['id'] ? 'selected' : ''; ?>><?php echo htmlspecialchars($e['name'] . ' (' . $e['employee_code'] . ')'); ?></option>
                             <?php endforeach; ?>
                         </select>
                     </div>
@@ -353,7 +355,7 @@ if (isset($_GET['export'])) {
                         <select name="att_status" class="w-full bg-white/[0.06] border border-white/10 text-white rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500/30">
                             <option value="">All</option>
                             <?php foreach ($statuses as $s): ?>
-                            <option value="<?php echo $s; ?>" <?php echo $filter_status === $s ? 'selected' : ''; ?>><?php echo get_attendance_status_label($s); ?></option>
+                                <option value="<?php echo $s; ?>" <?php echo $filter_status === $s ? 'selected' : ''; ?>><?php echo get_attendance_status_label($s); ?></option>
                             <?php endforeach; ?>
                         </select>
                     </div>
@@ -387,7 +389,7 @@ if (isset($_GET['export'])) {
                     <select name="per_page" onchange="window.location.href='?per_page='+this.value+'&<?php echo http_build_query(array_filter(['department' => $filter_dept, 'position' => $filter_position, 'employee' => $filter_employee, 'att_status' => $filter_status, 'date_from' => $date_from, 'date_to' => $date_to, 'search' => $search])); ?>'"
                         class="bg-white/[0.06] border border-white/10 text-white rounded-lg px-2 py-1.5 text-xs outline-none">
                         <?php foreach ([5, 10, 25, 50] as $pp): ?>
-                        <option value="<?php echo $pp; ?>" <?php echo $per_page === $pp ? 'selected' : ''; ?>><?php echo $pp; ?></option>
+                            <option value="<?php echo $pp; ?>" <?php echo $per_page === $pp ? 'selected' : ''; ?>><?php echo $pp; ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
@@ -412,73 +414,76 @@ if (isset($_GET['export'])) {
                         </thead>
                         <tbody class="divide-y divide-white/[0.06]">
                             <?php if (empty($records)): ?>
-                            <tr><td colspan="9" class="px-6 py-16 text-center text-zinc-500">No attendance records found.</td></tr>
-                            <?php else: foreach ($records as $r): ?>
-                            <tr class="hover:bg-white/[0.02] transition-colors">
-                                <td class="px-5 py-3 font-medium text-white whitespace-nowrap"><?php echo date('M d, Y', strtotime($r['attendance_date'])); ?></td>
-                                <td class="px-4 py-3">
-                                    <div class="font-semibold text-white text-xs"><?php echo htmlspecialchars($r['employee_name']); ?></div>
-                                    <div class="text-[10px] text-zinc-500"><?php echo htmlspecialchars($r['employee_code']); ?></div>
-                                </td>
-                                <td class="px-4 py-3 text-zinc-400 text-xs"><?php echo htmlspecialchars($r['department_name'] ?? 'N/A'); ?></td>
-                                <td class="px-4 py-3 text-center font-mono text-xs <?php echo $r['check_in'] ? ($r['is_late'] ? 'text-amber-400' : 'text-emerald-400') : 'text-zinc-600'; ?>">
-                                    <?php echo $r['check_in'] ? date('h:i A', strtotime($r['check_in'])) : '—'; ?>
-                                </td>
-                                <td class="px-4 py-3 text-center font-mono text-xs text-zinc-300">
-                                    <?php echo $r['check_out'] ? date('h:i A', strtotime($r['check_out'])) : '—'; ?>
-                                </td>
-                                <td class="px-4 py-3 text-center text-xs text-zinc-300">
-                                    <?php echo $r['total_working_hours'] ? number_format($r['total_working_hours'], 1) . 'h' : '—'; ?>
-                                </td>
-                                <td class="px-4 py-3 text-center">
-                                    <span class="inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold <?php echo get_attendance_status_badge_class($r['status']); ?>">
-                                        <?php echo get_attendance_status_label($r['status']); ?>
-                                    </span>
-                                </td>
-                                <td class="px-4 py-3 text-center">
-                                    <?php if ($r['is_late']): ?>
-                                        <span class="text-amber-400 text-xs"><i class="fa-solid fa-clock"></i></span>
-                                    <?php else: ?>
-                                        <span class="text-zinc-600">—</span>
-                                    <?php endif; ?>
-                                </td>
-                                <td class="px-5 py-3 text-center">
-                                    <div class="flex items-center justify-center gap-1.5">
-                                        <button @click="editId=<?php echo $r['id']; ?>; editCheckIn='<?php echo $r['check_in'] ? date('H:i', strtotime($r['check_in'])) : ''; ?>'; editCheckOut='<?php echo $r['check_out'] ? date('H:i', strtotime($r['check_out'])) : ''; ?>'; editStatus='<?php echo $r['status']; ?>'; editRemarks='<?php echo htmlspecialchars(addslashes($r['remarks'] ?? ''), ENT_QUOTES); ?>'; showEditModal=true"
-                                            class="w-8 h-8 rounded-lg bg-sky-500/10 text-sky-400 hover:bg-sky-500/20 transition-all flex items-center justify-center text-xs" title="Edit">
-                                            <i class="fa-solid fa-pen"></i>
-                                        </button>
-                                        <button @click="deleteId=<?php echo $r['id']; ?>; showDeleteModal=true"
-                                            class="w-8 h-8 rounded-lg bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 transition-all flex items-center justify-center text-xs" title="Delete">
-                                            <i class="fa-solid fa-trash"></i>
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                            <?php endforeach; endif; ?>
+                                <tr>
+                                    <td colspan="9" class="px-6 py-16 text-center text-zinc-500">No attendance records found.</td>
+                                </tr>
+                                <?php else: foreach ($records as $r): ?>
+                                    <tr class="hover:bg-white/[0.02] transition-colors">
+                                        <td class="px-5 py-3 font-medium text-white whitespace-nowrap"><?php echo date('M d, Y', strtotime($r['attendance_date'])); ?></td>
+                                        <td class="px-4 py-3">
+                                            <div class="font-semibold text-white text-xs"><?php echo htmlspecialchars($r['employee_name']); ?></div>
+                                            <div class="text-[10px] text-zinc-500"><?php echo htmlspecialchars($r['employee_code']); ?></div>
+                                        </td>
+                                        <td class="px-4 py-3 text-zinc-400 text-xs"><?php echo htmlspecialchars($r['department_name'] ?? 'N/A'); ?></td>
+                                        <td class="px-4 py-3 text-center font-mono text-xs <?php echo $r['check_in'] ? ($r['is_late'] ? 'text-amber-400' : 'text-emerald-400') : 'text-zinc-600'; ?>">
+                                            <?php echo $r['check_in'] ? date('h:i A', strtotime($r['check_in'])) : '—'; ?>
+                                        </td>
+                                        <td class="px-4 py-3 text-center font-mono text-xs text-zinc-300">
+                                            <?php echo $r['check_out'] ? date('h:i A', strtotime($r['check_out'])) : '—'; ?>
+                                        </td>
+                                        <td class="px-4 py-3 text-center text-xs text-zinc-300">
+                                            <?php echo $r['total_working_hours'] ? number_format($r['total_working_hours'], 1) . 'h' : '—'; ?>
+                                        </td>
+                                        <td class="px-4 py-3 text-center">
+                                            <span class="inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold <?php echo get_attendance_status_badge_class($r['status']); ?>">
+                                                <?php echo get_attendance_status_label($r['status']); ?>
+                                            </span>
+                                        </td>
+                                        <td class="px-4 py-3 text-center">
+                                            <?php if ($r['is_late']): ?>
+                                                <span class="text-amber-400 text-xs"><i class="fa-solid fa-clock"></i></span>
+                                            <?php else: ?>
+                                                <span class="text-zinc-600">—</span>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td class="px-5 py-3 text-center">
+                                            <div class="flex items-center justify-center gap-1.5">
+                                                <button @click="editId=<?php echo $r['id']; ?>; editCheckIn='<?php echo $r['check_in'] ? date('H:i', strtotime($r['check_in'])) : ''; ?>'; editCheckOut='<?php echo $r['check_out'] ? date('H:i', strtotime($r['check_out'])) : ''; ?>'; editStatus='<?php echo $r['status']; ?>'; editRemarks='<?php echo htmlspecialchars(addslashes($r['remarks'] ?? ''), ENT_QUOTES); ?>'; showEditModal=true"
+                                                    class="w-8 h-8 rounded-lg bg-sky-500/10 text-sky-400 hover:bg-sky-500/20 transition-all flex items-center justify-center text-xs" title="Edit">
+                                                    <i class="fa-solid fa-pen"></i>
+                                                </button>
+                                                <button @click="deleteId=<?php echo $r['id']; ?>; showDeleteModal=true"
+                                                    class="w-8 h-8 rounded-lg bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 transition-all flex items-center justify-center text-xs" title="Delete">
+                                                    <i class="fa-solid fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                            <?php endforeach;
+                            endif; ?>
                         </tbody>
                     </table>
                 </div>
 
                 <!-- Pagination -->
                 <?php if ($total_pages > 1): ?>
-                <div class="px-5 py-4 border-t border-white/[0.06] flex items-center justify-between">
-                    <p class="text-xs text-zinc-500">Page <?php echo $page; ?> of <?php echo $total_pages; ?></p>
-                    <div class="flex items-center gap-1">
-                        <?php if ($page > 1): ?>
-                        <a href="?page=<?php echo $page - 1; ?>&per_page=<?php echo $per_page; ?>&<?php echo http_build_query(array_filter(['department' => $filter_dept, 'position' => $filter_position, 'employee' => $filter_employee, 'att_status' => $filter_status, 'date_from' => $date_from, 'date_to' => $date_to, 'search' => $search])); ?>"
-                            class="px-3 py-1.5 rounded-lg text-xs bg-white/[0.06] hover:bg-white/[0.10] text-zinc-300 transition-all">Prev</a>
-                        <?php endif; ?>
-                        <?php for ($i = max(1, $page - 2); $i <= min($total_pages, $page + 2); $i++): ?>
-                        <a href="?page=<?php echo $i; ?>&per_page=<?php echo $per_page; ?>&<?php echo http_build_query(array_filter(['department' => $filter_dept, 'position' => $filter_position, 'employee' => $filter_employee, 'att_status' => $filter_status, 'date_from' => $date_from, 'date_to' => $date_to, 'search' => $search])); ?>"
-                            class="px-3 py-1.5 rounded-lg text-xs <?php echo $i === $page ? 'bg-emerald-500/20 text-emerald-400 font-semibold' : 'bg-white/[0.06] hover:bg-white/[0.10] text-zinc-300'; ?> transition-all"><?php echo $i; ?></a>
-                        <?php endfor; ?>
-                        <?php if ($page < $total_pages): ?>
-                        <a href="?page=<?php echo $page + 1; ?>&per_page=<?php echo $per_page; ?>&<?php echo http_build_query(array_filter(['department' => $filter_dept, 'position' => $filter_position, 'employee' => $filter_employee, 'att_status' => $filter_status, 'date_from' => $date_from, 'date_to' => $date_to, 'search' => $search])); ?>"
-                            class="px-3 py-1.5 rounded-lg text-xs bg-white/[0.06] hover:bg-white/[0.10] text-zinc-300 transition-all">Next</a>
-                        <?php endif; ?>
+                    <div class="px-5 py-4 border-t border-white/[0.06] flex items-center justify-between">
+                        <p class="text-xs text-zinc-500">Page <?php echo $page; ?> of <?php echo $total_pages; ?></p>
+                        <div class="flex items-center gap-1">
+                            <?php if ($page > 1): ?>
+                                <a href="?page=<?php echo $page - 1; ?>&per_page=<?php echo $per_page; ?>&<?php echo http_build_query(array_filter(['department' => $filter_dept, 'position' => $filter_position, 'employee' => $filter_employee, 'att_status' => $filter_status, 'date_from' => $date_from, 'date_to' => $date_to, 'search' => $search])); ?>"
+                                    class="px-3 py-1.5 rounded-lg text-xs bg-white/[0.06] hover:bg-white/[0.10] text-zinc-300 transition-all">Prev</a>
+                            <?php endif; ?>
+                            <?php for ($i = max(1, $page - 2); $i <= min($total_pages, $page + 2); $i++): ?>
+                                <a href="?page=<?php echo $i; ?>&per_page=<?php echo $per_page; ?>&<?php echo http_build_query(array_filter(['department' => $filter_dept, 'position' => $filter_position, 'employee' => $filter_employee, 'att_status' => $filter_status, 'date_from' => $date_from, 'date_to' => $date_to, 'search' => $search])); ?>"
+                                    class="px-3 py-1.5 rounded-lg text-xs <?php echo $i === $page ? 'bg-emerald-500/20 text-emerald-400 font-semibold' : 'bg-white/[0.06] hover:bg-white/[0.10] text-zinc-300'; ?> transition-all"><?php echo $i; ?></a>
+                            <?php endfor; ?>
+                            <?php if ($page < $total_pages): ?>
+                                <a href="?page=<?php echo $page + 1; ?>&per_page=<?php echo $per_page; ?>&<?php echo http_build_query(array_filter(['department' => $filter_dept, 'position' => $filter_position, 'employee' => $filter_employee, 'att_status' => $filter_status, 'date_from' => $date_from, 'date_to' => $date_to, 'search' => $search])); ?>"
+                                    class="px-3 py-1.5 rounded-lg text-xs bg-white/[0.06] hover:bg-white/[0.10] text-zinc-300 transition-all">Next</a>
+                            <?php endif; ?>
+                        </div>
                     </div>
-                </div>
                 <?php endif; ?>
             </div>
 
@@ -497,7 +502,7 @@ if (isset($_GET['export'])) {
                                 <select name="employee_id" required class="w-full bg-white/[0.06] border border-white/10 text-white rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500/30">
                                     <option value="">Select Employee</option>
                                     <?php foreach ($active_employees as $e): ?>
-                                    <option value="<?php echo $e['id']; ?>"><?php echo htmlspecialchars($e['name'] . ' (' . $e['employee_code'] . ')'); ?></option>
+                                        <option value="<?php echo $e['id']; ?>"><?php echo htmlspecialchars($e['name'] . ' (' . $e['employee_code'] . ')'); ?></option>
                                     <?php endforeach; ?>
                                 </select>
                             </div>
@@ -517,7 +522,7 @@ if (isset($_GET['export'])) {
                                 <label class="block text-sm font-semibold text-zinc-300 mb-1">Status *</label>
                                 <select name="status" required class="w-full bg-white/[0.06] border border-white/10 text-white rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500/30">
                                     <?php foreach ($statuses as $s): ?>
-                                    <option value="<?php echo $s; ?>"><?php echo get_attendance_status_label($s); ?></option>
+                                        <option value="<?php echo $s; ?>"><?php echo get_attendance_status_label($s); ?></option>
                                     <?php endforeach; ?>
                                 </select>
                             </div>
@@ -557,7 +562,7 @@ if (isset($_GET['export'])) {
                                 <label class="block text-sm font-semibold text-zinc-300 mb-1">Status</label>
                                 <select name="status" x-model="editStatus" class="w-full bg-white/[0.06] border border-white/10 text-white rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-sky-500/30">
                                     <?php foreach ($statuses as $s): ?>
-                                    <option value="<?php echo $s; ?>"><?php echo get_attendance_status_label($s); ?></option>
+                                        <option value="<?php echo $s; ?>"><?php echo get_attendance_status_label($s); ?></option>
                                     <?php endforeach; ?>
                                 </select>
                             </div>
@@ -596,4 +601,5 @@ if (isset($_GET['export'])) {
         </main>
     </div>
 </body>
+
 </html>
