@@ -22,11 +22,15 @@ if (isset($_GET['mark_read'])) {
 $has_ot_type = $conn->query("SHOW COLUMNS FROM overtime_requests LIKE 'ot_type'")->num_rows > 0;
 $has_ot_rate = $conn->query("SHOW COLUMNS FROM overtime_requests LIKE 'ot_rate'")->num_rows > 0;
 $has_ot_pay = $conn->query("SHOW COLUMNS FROM overtime_requests LIKE 'ot_pay'")->num_rows > 0;
+$has_approver_id = $conn->query("SHOW COLUMNS FROM overtime_requests LIKE 'approver_id'")->num_rows > 0;
+$has_approver_type = $conn->query("SHOW COLUMNS FROM overtime_requests LIKE 'approver_type'")->num_rows > 0;
+$has_remarks = $conn->query("SHOW COLUMNS FROM overtime_requests LIKE 'remarks'")->num_rows > 0;
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (!validate_csrf_token()) { http_response_code(403); exit('CSRF validation failed.'); }
     $request_id = $_POST['request_id'] ?? 0;
     $action = $_POST['action'] ?? '';
+    $remarks = trim($_POST['remarks'] ?? '');
 
     if ($action == 'approve') {
         $status = 'Approved';
@@ -42,7 +46,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $old_row = $old_stmt->get_result()->fetch_assoc();
         $old_stmt->close();
 
-        if ($status === 'Approved' && $has_ot_type) {
+        if (!$old_row) {
+            $message = "Overtime request not found.";
+            $message_type = "error";
+        } elseif ($old_row['status'] !== 'Pending') {
+            $message = "This request has already been processed.";
+            $message_type = "error";
+        } elseif ($has_approver_id && !empty($old_row['approver_id']) && (int)$old_row['approver_id'] !== (int)$admin_id) {
+            $message = "You are not authorized to approve this request.";
+            $message_type = "error";
+        } elseif ($status === 'Approved' && $has_ot_type) {
             $ot_type = detect_overtime_type($conn, $old_row['ot_date']);
             $ot_rate = get_overtime_rate_for_type($ot_type);
             $ot_pay = calculate_overtime_pay_for_request($conn, $old_row['employee_id'], $ot_type, (float)$old_row['total_hours']);
@@ -52,17 +65,23 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $types = 'ss';
             if ($has_ot_rate) { $set_clauses[] = 'ot_rate = ?'; $params[] = $ot_rate; $types .= 'd'; }
             if ($has_ot_pay) { $set_clauses[] = 'ot_pay = ?'; $params[] = $ot_pay; $types .= 'd'; }
+            if ($has_remarks) { $set_clauses[] = 'remarks = ?'; $params[] = $remarks; $types .= 's'; }
             $set_clauses[] = 'approved_by = ?'; $params[] = $admin_id; $types .= 'i';
             $set_clauses[] = 'approved_at = NOW()';
             $params[] = $request_id; $types .= 'i';
             $stmt = $conn->prepare("UPDATE overtime_requests SET " . implode(', ', $set_clauses) . " WHERE id = ?");
             $stmt->bind_param($types, ...$params);
         } else {
-            $stmt = $conn->prepare("UPDATE overtime_requests SET status = ?, approved_by = ?, approved_at = NOW() WHERE id = ?");
-            $stmt->bind_param('sii', $status, $admin_id, $request_id);
+            if ($has_remarks) {
+                $stmt = $conn->prepare("UPDATE overtime_requests SET status = ?, remarks = ?, approved_by = ?, approved_at = NOW() WHERE id = ?");
+                $stmt->bind_param('ssii', $status, $remarks, $admin_id, $request_id);
+            } else {
+                $stmt = $conn->prepare("UPDATE overtime_requests SET status = ?, approved_by = ?, approved_at = NOW() WHERE id = ?");
+                $stmt->bind_param('sii', $status, $admin_id, $request_id);
+            }
         }
 
-        if ($stmt->execute()) {
+        if (isset($stmt) && $stmt->execute()) {
             $message = "Overtime request $status successfully.";
             $message_type = "success";
 
@@ -98,15 +117,33 @@ $ot_cols = '';
 if ($has_ot_type) $ot_cols .= ', otr.ot_type';
 if ($has_ot_rate) $ot_cols .= ', otr.ot_rate';
 if ($has_ot_pay) $ot_cols .= ', otr.ot_pay';
+if ($has_remarks) $ot_cols .= ', otr.remarks';
+if ($has_approver_id) $ot_cols .= ', otr.approver_id';
+if ($has_approver_type) $ot_cols .= ', otr.approver_type';
 
-// Show only employee requests (not admin assignments) for approval
-if ($has_request_type) {
-    $where_filter = "otr.request_type = 'employee_request'";
-} elseif ($has_source) {
-    $where_filter = "(otr.source IS NULL OR otr.source = 'employee_request')";
-} else {
-    $where_filter = "1=1";
+// Show only requests assigned to this admin (or unassigned employee requests)
+$where_parts = ["otr.status = 'Pending'"];
+if ($has_approver_id) {
+    $where_parts[] = "(otr.approver_id = $admin_id OR otr.approver_id IS NULL)";
 }
+if ($has_request_type) {
+    $where_parts[] = "otr.request_type = 'employee_request'";
+} elseif ($has_source) {
+    $where_parts[] = "(otr.source IS NULL OR otr.source = 'employee_request')";
+}
+$where_filter = implode(' AND ', $where_parts);
+
+// Also fetch non-pending for history
+$history_where = ["otr.status != 'Pending'"];
+if ($has_approver_id) {
+    $history_where[] = "(otr.approver_id = $admin_id OR otr.approved_by = $admin_id)";
+}
+if ($has_request_type) {
+    $history_where[] = "otr.request_type = 'employee_request'";
+} elseif ($has_source) {
+    $history_where[] = "(otr.source IS NULL OR otr.source = 'employee_request')";
+}
+$history_filter = implode(' AND ', $history_where);
 
 $result = $conn->query("
     SELECT otr.*$ot_cols, e.name as employee_name, e.employee_code, e.basic_salary, d.department_name, p.position_name
@@ -118,6 +155,19 @@ $result = $conn->query("
     ORDER BY otr.created_at DESC
 ");
 $requests = $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
+
+// Fetch history (approved/rejected)
+$history_result = $conn->query("
+    SELECT otr.*$ot_cols, e.name as employee_name, e.employee_code, e.basic_salary, d.department_name, p.position_name
+    FROM overtime_requests otr
+    JOIN employee e ON otr.employee_id = e.id
+    LEFT JOIN departments d ON e.department_id = d.id
+    LEFT JOIN positions p ON e.position_id = p.id
+    WHERE $history_filter
+    ORDER BY otr.approved_at DESC
+    LIMIT 50
+");
+$history = $history_result ? $history_result->fetch_all(MYSQLI_ASSOC) : [];
 
 $pending_count = 0;
 foreach ($requests as $r) {
@@ -245,15 +295,20 @@ foreach ($requests as $r) {
                                 </td>
                                 <td class="px-6 py-4 text-right whitespace-nowrap">
                                     <?php if ($req['status'] == 'Pending'): ?>
-                                    <form method="POST" class="inline">
+                                    <form method="POST" class="inline-flex flex-col gap-2">
                                     <?php echo csrf_field(); ?>
                                         <input type="hidden" name="request_id" value="<?php echo $req['id']; ?>">
-                                        <button type="submit" name="action" value="approve" class="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs px-4 py-2 shadow-sm transition">
-                                            <i class="fa-solid fa-check"></i> Approve
-                                        </button>
-                                        <button type="submit" name="action" value="reject" class="rounded-xl border border-red-500/30 hover:bg-red-500/10 text-red-400 font-semibold text-xs px-4 py-2 transition">
-                                            <i class="fa-solid fa-times"></i> Reject
-                                        </button>
+                                        <?php if ($has_remarks): ?>
+                                        <input type="text" name="remarks" placeholder="Remarks (optional)" class="text-xs px-2 py-1 rounded-lg bg-white/[0.06] border border-white/10 text-white w-40 focus:outline-blue-500">
+                                        <?php endif; ?>
+                                        <div class="flex gap-1">
+                                            <button type="submit" name="action" value="approve" class="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs px-4 py-2 shadow-sm transition">
+                                                <i class="fa-solid fa-check"></i> Approve
+                                            </button>
+                                            <button type="submit" name="action" value="reject" class="rounded-xl border border-red-500/30 hover:bg-red-500/10 text-red-400 font-semibold text-xs px-4 py-2 transition">
+                                                <i class="fa-solid fa-times"></i> Reject
+                                            </button>
+                                        </div>
                                     </form>
                                     <?php endif; ?>
                                 </td>
@@ -261,6 +316,53 @@ foreach ($requests as $r) {
                             <?php endforeach; ?>
                         </tbody>
                     </table>
+                </div>
+            </div>
+            <?php endif; ?>
+
+            <?php if (!empty($history)): ?>
+            <div class="mt-8">
+                <h3 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                    <i class="fa-solid fa-clock-rotate-left text-zinc-400"></i> Recent Decisions
+                </h3>
+                <div class="card-hover glass-strong rounded-2xl overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm">
+                            <thead class="text-zinc-500 text-xs font-bold uppercase tracking-wider border-b border-white/[0.06]">
+                                <tr>
+                                    <th class="px-6 py-3">Employee</th>
+                                    <th class="px-6 py-3">OT Date</th>
+                                    <th class="px-6 py-3">Hours</th>
+                                    <th class="px-6 py-3">Status</th>
+                                    <th class="px-6 py-3">Remarks</th>
+                                    <th class="px-6 py-3">Decision Date</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-white/[0.06] text-zinc-300">
+                                <?php foreach ($history as $h): ?>
+                                <tr class="hover:bg-white/[0.02] transition">
+                                    <td class="px-6 py-3">
+                                        <div class="font-medium text-white text-sm"><?php echo htmlspecialchars($h['employee_name']); ?></div>
+                                        <div class="text-[10px] text-zinc-500"><?php echo htmlspecialchars($h['employee_code']); ?></div>
+                                    </td>
+                                    <td class="px-6 py-3 text-sm"><?php echo date('M d, Y', strtotime($h['ot_date'])); ?></td>
+                                    <td class="px-6 py-3 font-semibold text-sm"><?php echo $h['total_hours']; ?>h</td>
+                                    <td class="px-6 py-3">
+                                        <span class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold
+                                            <?php echo $h['status'] == 'Approved' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'; ?>
+                                        "><?php echo $h['status']; ?></span>
+                                    </td>
+                                    <td class="px-6 py-3 text-sm text-zinc-400 max-w-[200px] truncate" title="<?php echo htmlspecialchars($h['remarks'] ?? ''); ?>">
+                                        <?php echo htmlspecialchars($h['remarks'] ?? '-'); ?>
+                                    </td>
+                                    <td class="px-6 py-3 text-xs text-zinc-500">
+                                        <?php echo $h['approved_at'] ? date('M d, h:i A', strtotime($h['approved_at'])) : '-'; ?>
+                                    </td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
             <?php endif; ?>
@@ -274,5 +376,30 @@ foreach ($requests as $r) {
             </span>
         </footer>
     </div>
+    <script>
+    (function() {
+        var lastCount = <?php echo $pending_count; ?>;
+        var badge = document.getElementById('pending-badge');
+        function pollPending() {
+            fetch('ot_pending_count.php', { credentials: 'include' })
+                .then(function(r) { return r.json(); })
+                .then(function(d) {
+                    if (d.pending_count !== undefined && d.pending_count !== lastCount) {
+                        if (d.pending_count > lastCount) {
+                            var toast = document.createElement('div');
+                            toast.className = 'fixed top-4 right-4 z-50 px-4 py-3 rounded-lg bg-amber-500/20 border border-amber-500/30 text-amber-400 text-sm font-medium shadow-lg animate-pulse';
+                            toast.innerHTML = '<i class="fa-solid fa-bell mr-2"></i>New OT request received!';
+                            document.body.appendChild(toast);
+                            setTimeout(function() { toast.remove(); }, 5000);
+                        }
+                        lastCount = d.pending_count;
+                        if (badge) badge.textContent = d.pending_count;
+                    }
+                })
+                .catch(function() {});
+        }
+        setInterval(pollPending, 15000);
+    })();
+    </script>
 </body>
 </html>

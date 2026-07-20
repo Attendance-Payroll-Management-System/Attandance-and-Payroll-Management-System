@@ -219,91 +219,6 @@ function validate_leave_request(mysqli $conn, int $employee_id, string $leave_ty
     return $errors;
 }
 
-// ─── Overtime Validation ────────────────────────────────────────
-function validate_overtime_request(mysqli $conn, int $employee_id, string $ot_date, string $start_time, string $end_time, string $reason, int $exclude_id = 0): array {
-    $errors = [];
-    set_mmt_timezone();
-
-    // 1. Active employee check
-    $status_error = validate_employee_active($conn, $employee_id);
-    if ($status_error) {
-        $errors[] = $status_error;
-        return $errors;
-    }
-
-    // 2. Date validation
-    if (empty($ot_date) || empty($start_time) || empty($end_time)) {
-        $errors[] = 'Please fill in all required fields.';
-        return $errors;
-    }
-
-    // 3. Time validation
-    if (strtotime($end_time) <= strtotime($start_time)) {
-        $errors[] = 'End time must be later than start time.';
-    }
-
-    // 4. Check if date has approved leave
-    if (has_approved_leave_on_date($conn, $employee_id, $ot_date)) {
-        $errors[] = 'Cannot request overtime on a date with approved leave.';
-    }
-
-    // 5. Check if date has completed attendance
-    $att = has_checked_in_today($conn, $employee_id, $ot_date);
-    $has_completed_attendance = $att !== null && $att['check_in'] !== null && $att['check_out'] !== null;
-    if (!$has_completed_attendance) {
-        $errors[] = 'Cannot request overtime. No completed attendance found for this date. You must check in and check out first.';
-    }
-
-    // 6. Check for overlapping OT requests
-    $stmt = $conn->prepare(
-        "SELECT id FROM overtime_requests 
-         WHERE employee_id = ? AND ot_date = ? AND id != ? 
-         AND status IN ('Pending', 'Approved')
-         AND start_time < ? AND end_time > ?"
-    );
-    $stmt->bind_param('isiss', $employee_id, $ot_date, $exclude_id, $end_time, $start_time);
-    $stmt->execute();
-    $stmt->store_result();
-    if ($stmt->num_rows > 0) {
-        $errors[] = 'You already have an overtime request that overlaps with this time period.';
-    }
-    $stmt->close();
-
-    // 7. Max hours per day check
-    $start_ts = strtotime($start_time);
-    $end_ts = strtotime($end_time);
-    $total_hours = round(($end_ts - $start_ts) / 3600, 2);
-    if ($total_hours <= 0) {
-        $errors[] = 'Overtime hours must be greater than zero.';
-    }
-
-    $max_policy = $conn->query("SELECT policy_value FROM company_policies WHERE policy_key = 'max_overtime_hours_per_day'")->fetch_assoc();
-    $max_hours = (float)($max_policy['policy_value'] ?? 4);
-    if ($total_hours > $max_hours) {
-        $errors[] = "Overtime hours cannot exceed $max_hours hours per day.";
-    }
-
-    // 8. Monthly max check
-    $month_start = date('Y-m-01', strtotime($ot_date));
-    $month_end = date('Y-m-t', strtotime($ot_date));
-    $m_stmt = $conn->prepare(
-        "SELECT COALESCE(SUM(total_hours), 0) as total FROM overtime_requests 
-         WHERE employee_id = ? AND status = 'Approved' AND ot_date BETWEEN ? AND ?"
-    );
-    $m_stmt->bind_param('iss', $employee_id, $month_start, $month_end);
-    $m_stmt->execute();
-    $m_row = $m_stmt->get_result()->fetch_assoc();
-    $m_stmt->close();
-    $monthly_total = (float)($m_row['total'] ?? 0) + $total_hours;
-    $max_monthly_policy = $conn->query("SELECT policy_value FROM company_policies WHERE policy_key = 'max_overtime_hours_per_month'")->fetch_assoc();
-    $max_monthly = (float)($max_monthly_policy['policy_value'] ?? 60);
-    if ($monthly_total > $max_monthly) {
-        $errors[] = "Total overtime hours would exceed the monthly limit of $max_monthly hours.";
-    }
-
-    return $errors;
-}
-
 // ─── Payroll helpers ────────────────────────────────────────────
 function get_working_days_in_month(int $year, int $month): int {
     $total_days = cal_days_in_month(CAL_GREGORIAN, $month, $year);
@@ -357,18 +272,20 @@ function get_attendance_summary_for_payroll(mysqli $conn, int $employee_id, stri
 }
 
 function calculate_overtime_amount_for_payroll(mysqli $conn, int $employee_id, string $month_start, string $month_end, float $hourly_rate): float {
+    $total_ot_amount = 0;
+
+    // 1. From overtime_requests table
     $has_ot_type = $conn->query("SHOW COLUMNS FROM overtime_requests LIKE 'ot_type'")->num_rows > 0;
 
     if ($has_ot_type) {
         $stmt = $conn->prepare(
-            "SELECT ot_date, total_hours, ot_type, ot_rate, ot_pay FROM overtime_requests 
+            "SELECT ot_date, total_hours, ot_type, ot_rate, ot_pay FROM overtime_requests
              WHERE employee_id = ? AND ot_date BETWEEN ? AND ? AND status = 'Approved'"
         );
         $stmt->bind_param('iss', $employee_id, $month_start, $month_end);
         $stmt->execute();
         $result = $stmt->get_result();
 
-        $total_ot_amount = 0;
         while ($row = $result->fetch_assoc()) {
             if ($row['ot_pay'] !== null) {
                 $total_ot_amount += (float)$row['ot_pay'];
@@ -382,39 +299,54 @@ function calculate_overtime_amount_for_payroll(mysqli $conn, int $employee_id, s
             }
         }
         $stmt->close();
-        return round($total_ot_amount, 2);
-    }
+    } else {
+        // Fallback: old logic without ot_type column
+        $stmt = $conn->prepare(
+            "SELECT ot_date, start_time, end_time, total_hours FROM overtime_requests
+             WHERE employee_id = ? AND ot_date BETWEEN ? AND ? AND status = 'Approved'"
+        );
+        $stmt->bind_param('iss', $employee_id, $month_start, $month_end);
+        $stmt->execute();
+        $result = $stmt->get_result();
 
-    // Fallback: old logic without ot_type column
-    $stmt = $conn->prepare(
-        "SELECT ot_date, start_time, end_time, total_hours FROM overtime_requests 
-         WHERE employee_id = ? AND ot_date BETWEEN ? AND ? AND status = 'Approved'"
-    );
-    $stmt->bind_param('iss', $employee_id, $month_start, $month_end);
-    $stmt->execute();
-    $result = $stmt->get_result();
+        while ($row = $result->fetch_assoc()) {
+            $day_of_week = date('N', strtotime($row['ot_date']));
+            $is_weekend = $day_of_week >= 6;
+            $is_holiday = false;
+            $h_check = $conn->prepare("SELECT COUNT(*) as cnt FROM holidays WHERE holiday_date = ?");
+            $h_check->bind_param('s', $row['ot_date']);
+            $h_check->execute();
+            if ($h_check->get_result()->fetch_assoc()['cnt'] > 0) {
+                $is_holiday = true;
+            }
+            $h_check->close();
 
-    $total_ot_amount = 0;
-    while ($row = $result->fetch_assoc()) {
-        $day_of_week = date('N', strtotime($row['ot_date']));
-        $is_weekend = $day_of_week >= 6;
-        $is_holiday = false;
-        $h_check = $conn->prepare("SELECT COUNT(*) as cnt FROM holidays WHERE holiday_date = ?");
-        $h_check->bind_param('s', $row['ot_date']);
-        $h_check->execute();
-        if ($h_check->get_result()->fetch_assoc()['cnt'] > 0) {
-            $is_holiday = true;
+            $rate_multiplier = match (true) {
+                $is_holiday => 0.04,
+                $is_weekend => 0.03,
+                default => 0.02,
+            };
+            $total_ot_amount += $hourly_rate * $rate_multiplier * $row['total_hours'];
         }
-        $h_check->close();
-
-        $rate_multiplier = match (true) {
-            $is_holiday => 0.04,
-            $is_weekend => 0.03,
-            default => 0.02,
-        };
-        $total_ot_amount += $hourly_rate * $rate_multiplier * $row['total_hours'];
+        $stmt->close();
     }
-    $stmt->close();
+
+    // 2. From overtime_records table (assignment module)
+    $has_or = $conn->query("SHOW TABLES LIKE 'overtime_records'")->num_rows > 0;
+    if ($has_or) {
+        $or_stmt = $conn->prepare(
+            "SELECT ot_pay FROM overtime_records
+             WHERE employee_id = ? AND ot_date BETWEEN ? AND ? AND status = 'Approved' AND payroll_id IS NULL"
+        );
+        $or_stmt->bind_param('iss', $employee_id, $month_start, $month_end);
+        $or_stmt->execute();
+        $or_result = $or_stmt->get_result();
+        while ($or_row = $or_result->fetch_assoc()) {
+            $total_ot_amount += (float)$or_row['ot_pay'];
+        }
+        $or_stmt->close();
+    }
+
     return round($total_ot_amount, 2);
 }
 
@@ -1309,7 +1241,7 @@ function get_salary_structure(mysqli $conn, int $employee_id): ?array {
 }
 
 function get_salary_structure_history(mysqli $conn, int $employee_id): array {
-    $stmt = $conn->prepare("SELECT ss.*, a.name as created_by_name FROM salary_structures ss LEFT JOIN admin a ON ss.created_by = a.id WHERE ss.employee_id = ? ORDER BY ss.effective_date DESC");
+    $stmt = $conn->prepare("SELECT ss.*, a.name as created_by_name FROM salary_structures ss LEFT JOIN employee a ON ss.created_by = a.id WHERE ss.employee_id = ? ORDER BY ss.effective_date DESC");
     $stmt->bind_param('i', $employee_id);
     $stmt->execute();
     $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
@@ -1501,7 +1433,7 @@ function get_payroll_details_with_components(mysqli $conn, int $payroll_id): ?ar
     $payroll['details'] = $det_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     $det_stmt->close();
 
-    $app_stmt = $conn->prepare("SELECT pa.*, a.name as action_by_name FROM payroll_approvals pa LEFT JOIN admin a ON pa.action_by = a.id WHERE pa.payroll_id = ? ORDER BY pa.created_at ASC");
+    $app_stmt = $conn->prepare("SELECT pa.*, a.name as action_by_name FROM payroll_approvals pa LEFT JOIN employee a ON pa.action_by = a.id WHERE pa.payroll_id = ? ORDER BY pa.created_at ASC");
     $app_stmt->bind_param('i', $payroll_id);
     $app_stmt->execute();
     $payroll['approvals'] = $app_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
@@ -1741,13 +1673,10 @@ function validate_overtime_request_rules(mysqli $conn, int $employee_id, string 
         $errors[] = 'Cannot request overtime on a date with approved leave.';
     }
 
-    $require_attendance = get_overtime_setting($conn, 'ot_require_attendance', '1') === '1';
-    if ($require_attendance && $ot_date <= $today && $request_type !== 'admin_assignment') {
-        $att = has_checked_in_today($conn, $employee_id, $ot_date);
-        $has_completed = $att !== null && $att['check_in'] !== null && $att['check_out'] !== null;
-        if (!$has_completed) {
-            $errors[] = 'Cannot request overtime. No completed attendance found for this date.';
-        }
+    $absent_statuses = ['awol', 'absent', 'full_absent', 'half_absent'];
+    $att = has_checked_in_today($conn, $employee_id, $ot_date);
+    if ($att && in_array(strtolower($att['status'] ?? ''), $absent_statuses)) {
+        $errors[] = 'Cannot request overtime. Your attendance status is Absent for this date.';
     }
 
     // Check overlapping OT
@@ -1827,7 +1756,7 @@ function log_overtime_action(mysqli $conn, int $overtime_id, string $action, int
     $stmt = $conn->prepare("INSERT INTO overtime_logs (overtime_id, action, action_by, action_by_type, old_values, new_values, remarks) VALUES (?, ?, ?, ?, ?, ?, ?)");
     $old_json = $old_values ? json_encode($old_values) : null;
     $new_json = $new_values ? json_encode($new_values) : null;
-    $stmt->bind_param('isiss', $overtime_id, $action, $action_by, $action_by_type, $old_json, $new_json, $remarks);
+    $stmt->bind_param('isissss', $overtime_id, $action, $action_by, $action_by_type, $old_json, $new_json, $remarks);
     $stmt->execute();
     $stmt->close();
 }
@@ -1837,10 +1766,10 @@ function check_monthly_overtime_remaining(mysqli $conn, int $employee_id, string
     $month_end = date('Y-m-t', strtotime($ot_date));
 
     $stmt = $conn->prepare(
-        "SELECT COALESCE(SUM(total_hours), 0) as used_hours,
+        "SELECT COALESCE(SUM(CASE WHEN status IN ('Approved','Pending') THEN total_hours ELSE 0 END), 0) as used_hours,
                 COUNT(*) as total_requests,
-                SUM(CASE WHEN status = 'Approved' THEN total_hours ELSE 0 END) as approved_hours,
-                SUM(CASE WHEN status = 'Pending' THEN total_hours ELSE 0 END) as pending_hours
+                COALESCE(SUM(CASE WHEN status = 'Approved' THEN total_hours ELSE 0 END), 0) as approved_hours,
+                COALESCE(SUM(CASE WHEN status = 'Pending' THEN total_hours ELSE 0 END), 0) as pending_hours
          FROM overtime_requests 
          WHERE employee_id = ? AND ot_date BETWEEN ? AND ?"
     );
@@ -2124,4 +2053,700 @@ function get_overtime_earnings_summary(mysqli $conn, int $employee_id, string $m
         }
     }
     return $summary;
+}
+
+// ─── Overtime Assignment Module Helpers ──────────────────────
+
+/**
+ * Generate a unique assignment code like OTA-2026-07-001
+ */
+function generate_assignment_code(mysqli $conn): string {
+    set_mmt_timezone();
+    $prefix = 'OTA-' . date('Y-m') . '-';
+    $stmt = $conn->prepare("SELECT assignment_code FROM overtime_assignments WHERE assignment_code LIKE ? ORDER BY id DESC LIMIT 1");
+    $like = $prefix . '%';
+    $stmt->bind_param('s', $like);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    if ($row) {
+        $last_num = (int)substr($row['assignment_code'], -3);
+        $new_num = $last_num + 1;
+    } else {
+        $new_num = 1;
+    }
+    return $prefix . str_pad($new_num, 3, '0', STR_PAD_LEFT);
+}
+
+/**
+ * Validate a single employee for overtime assignment on a specific date.
+ * Returns ['valid' => bool, 'errors' => [], 'warnings' => []]
+ */
+function validate_employee_for_overtime(mysqli $conn, int $employee_id, string $ot_date, bool $check_attendance = true): array {
+    $errors = [];
+    $warnings = [];
+    set_mmt_timezone();
+
+    // 1. Employee exists and is active
+    $stmt = $conn->prepare("SELECT id, status, name FROM employee WHERE id = ?");
+    $stmt->bind_param('i', $employee_id);
+    $stmt->execute();
+    $emp = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    if (!$emp) {
+        $errors[] = 'Employee record not found.';
+        return ['valid' => false, 'errors' => $errors, 'warnings' => $warnings];
+    }
+
+    $status = strtolower(trim($emp['status'] ?? ''));
+    if ($status !== 'active') {
+        $errors[] = 'Employee is ' . ucfirst($status) . '. Overtime cannot be assigned.';
+        return ['valid' => false, 'errors' => $errors, 'warnings' => $warnings];
+    }
+
+    // 2. Check if employee is on approved leave
+    if (has_approved_leave_on_date($conn, $employee_id, $ot_date)) {
+        $errors[] = 'Employee is on approved leave for this date.';
+        return ['valid' => false, 'errors' => $errors, 'warnings' => $warnings];
+    }
+
+    // Attendance checks (skippable for department pre-assignment)
+    if ($check_attendance) {
+        // 3. Check attendance record exists
+        $att = has_checked_in_today($conn, $employee_id, $ot_date);
+        if ($att === null) {
+            $errors[] = 'Employee must attend work before overtime can be assigned.';
+            return ['valid' => false, 'errors' => $errors, 'warnings' => $warnings];
+        }
+
+        // 4. Must have check-in
+        if (empty($att['check_in'])) {
+            $errors[] = 'Employee must check in before overtime can be assigned.';
+            return ['valid' => false, 'errors' => $errors, 'warnings' => $warnings];
+        }
+
+        // 5. Must have check-out
+        if (empty($att['check_out'])) {
+            $errors[] = 'Employee must check out before overtime can be assigned.';
+            return ['valid' => false, 'errors' => $errors, 'warnings' => $warnings];
+        }
+
+        // 6. Check attendance status is not absent/AWOL
+        $att_status = strtolower($att['status'] ?? '');
+        if (in_array($att_status, ['awol', 'absent', 'full_absent', 'half_absent'])) {
+            $errors[] = 'Employee is absent. Overtime assignment is not allowed.';
+            return ['valid' => false, 'errors' => $errors, 'warnings' => $warnings];
+        }
+    }
+
+    return ['valid' => true, 'errors' => $errors, 'warnings' => $warnings];
+}
+
+/**
+ * Validate overtime time rules based on OT type.
+ * Returns ['valid' => bool, 'errors' => []]
+ */
+function validate_overtime_time_rules(string $ot_type, string $start_time, string $end_time): array {
+    $errors = [];
+
+    $start_ts = strtotime($start_time);
+    $end_ts = strtotime($end_time);
+
+    if ($end_ts <= $start_ts) {
+        $errors[] = 'End time must be after start time.';
+        return ['valid' => false, 'errors' => $errors];
+    }
+
+    $total_hours = round(($end_ts - $start_ts) / 3600, 2);
+    $time_in = date('H:i', $start_ts);
+    $time_out = date('H:i', $end_ts);
+
+    switch ($ot_type) {
+        case 'working_day':
+            if ($time_in < '17:00') {
+                $errors[] = 'Working day OT start time must be at or after 5:00 PM.';
+            }
+            if ($time_out > '21:00') {
+                $errors[] = 'Working day OT end time must be at or before 9:00 PM.';
+            }
+            if ($total_hours > 4) {
+                $errors[] = 'Working day OT cannot exceed 4 hours per day.';
+            }
+            break;
+
+        case 'weekend':
+        case 'holiday':
+            $label = $ot_type === 'weekend' ? 'Weekend' : 'Holiday';
+            if ($time_in < '09:00') {
+                $errors[] = "$label OT start time must be at or after 9:00 AM.";
+            }
+            if ($time_out > '17:00') {
+                $errors[] = "$label OT end time must be at or before 5:00 PM.";
+            }
+            if ($total_hours > 8) {
+                $errors[] = "$label OT cannot exceed 8 hours per day.";
+            }
+            break;
+    }
+
+    return ['valid' => empty($errors), 'errors' => $errors];
+}
+
+/**
+ * Check if employee would exceed monthly OT limit (60h).
+ * Returns ['within_limit' => bool, 'current_hours' => float, 'new_total' => float, 'max' => float, 'error' => string]
+ */
+function check_monthly_ot_limit(mysqli $conn, int $employee_id, string $ot_date, float $new_hours): array {
+    $month_start = date('Y-m-01', strtotime($ot_date));
+    $month_end = date('Y-m-t', strtotime($ot_date));
+
+    // Check overtime_requests table
+    $stmt1 = $conn->prepare(
+        "SELECT COALESCE(SUM(total_hours), 0) as total FROM overtime_requests
+         WHERE employee_id = ? AND ot_date BETWEEN ? AND ? AND status IN ('Approved', 'Pending')"
+    );
+    $stmt1->bind_param('iss', $employee_id, $month_start, $month_end);
+    $stmt1->execute();
+    $row1 = $stmt1->get_result()->fetch_assoc();
+    $stmt1->close();
+    $ot_requests_hours = (float)($row1['total'] ?? 0);
+
+    // Check overtime_records table
+    $has_or_table = $conn->query("SHOW TABLES LIKE 'overtime_records'")->num_rows > 0;
+    $ot_records_hours = 0;
+    if ($has_or_table) {
+        $stmt2 = $conn->prepare(
+            "SELECT COALESCE(SUM(total_hours), 0) as total FROM overtime_records
+             WHERE employee_id = ? AND ot_date BETWEEN ? AND ? AND status IN ('Approved', 'Pending')"
+        );
+        $stmt2->bind_param('iss', $employee_id, $month_start, $month_end);
+        $stmt2->execute();
+        $row2 = $stmt2->get_result()->fetch_assoc();
+        $stmt2->close();
+        $ot_records_hours = (float)($row2['total'] ?? 0);
+    }
+
+    $current_hours = $ot_requests_hours + $ot_records_hours;
+    $max_monthly = (float)get_overtime_setting($conn, 'ot_monthly_max_hours', '60');
+    $new_total = $current_hours + $new_hours;
+    $within_limit = $new_total <= $max_monthly;
+
+    $error = '';
+    if (!$within_limit) {
+        $remaining = max(0, $max_monthly - $current_hours);
+        $error = "Monthly overtime limit exceeded. Current: {$current_hours}h, New: {$new_hours}h, Total: {$new_total}h, Max: {$max_monthly}h. Remaining: {$remaining}h.";
+    }
+
+    return [
+        'within_limit' => $within_limit,
+        'current_hours' => $current_hours,
+        'new_total' => $new_total,
+        'max' => $max_monthly,
+        'error' => $error,
+    ];
+}
+
+/**
+ * Check for duplicate/overlapping OT assignments for an employee.
+ * Returns true if a duplicate exists.
+ */
+function check_duplicate_assignment(mysqli $conn, int $employee_id, string $ot_date, string $start_time, string $end_time, int $exclude_assignment_id = 0): bool {
+    // Check overtime_requests table
+    $stmt = $conn->prepare(
+        "SELECT id FROM overtime_requests
+         WHERE employee_id = ? AND ot_date = ? AND id != ?
+         AND status IN ('Pending', 'Approved')
+         AND start_time < ? AND end_time > ?"
+    );
+    $exclude_id = 0; // overtime_requests uses different ID space
+    $stmt->bind_param('isisi', $employee_id, $ot_date, $exclude_id, $end_time, $start_time);
+    $stmt->execute();
+    $stmt->store_result();
+    $has_dup = $stmt->num_rows > 0;
+    $stmt->close();
+
+    if ($has_dup) return true;
+
+    // Check overtime_records table
+    $has_or = $conn->query("SHOW TABLES LIKE 'overtime_records'")->num_rows > 0;
+    if ($has_or) {
+        $stmt2 = $conn->prepare(
+            "SELECT id FROM overtime_records
+             WHERE employee_id = ? AND ot_date = ?
+             AND status IN ('Approved', 'Pending')
+             AND start_time < ? AND end_time > ?"
+        );
+        $stmt2->bind_param('isis', $employee_id, $ot_date, $end_time, $start_time);
+        $stmt2->execute();
+        $stmt2->store_result();
+        $has_dup = $stmt2->num_rows > 0;
+        $stmt2->close();
+        if ($has_dup) return true;
+    }
+
+    // Check overtime_assignments -> overtime_assignment_employees for pending/assigned
+    $has_oae = $conn->query("SHOW TABLES LIKE 'overtime_assignment_employees'")->num_rows > 0;
+    if ($has_oae) {
+        $stmt3 = $conn->prepare(
+            "SELECT oae.id FROM overtime_assignment_employees oae
+             JOIN overtime_assignments oa ON oae.assignment_id = oa.id
+             WHERE oae.employee_id = ? AND oa.ot_date = ? AND oa.id != ?
+             AND oae.status IN ('Assigned', 'Accepted')
+             AND oa.start_time < ? AND oa.end_time > ?"
+        );
+        $stmt3->bind_param('isisi', $employee_id, $ot_date, $exclude_assignment_id, $end_time, $start_time);
+        $stmt3->execute();
+        $stmt3->store_result();
+        $has_dup = $stmt3->num_rows > 0;
+        $stmt3->close();
+        if ($has_dup) return true;
+    }
+
+    return false;
+}
+
+/**
+ * Validate all employees in a department for overtime assignment.
+ * Returns ['eligible' => [...], 'ineligible' => [...], 'errors' => [...]]
+ */
+function validate_department_assignment(mysqli $conn, int $department_id, string $ot_date, string $start_time, string $end_time): array {
+    $eligible = [];
+    $ineligible = [];
+    $global_errors = [];
+
+    // Detect OT type
+    $ot_type = detect_overtime_type($conn, $ot_date);
+
+    // Validate time rules
+    $time_validation = validate_overtime_time_rules($ot_type, $start_time, $end_time);
+    if (!$time_validation['valid']) {
+        $global_errors = $time_validation['errors'];
+        return ['eligible' => $eligible, 'ineligible' => $ineligible, 'errors' => $global_errors];
+    }
+
+    // Get all active employees in department
+    $stmt = $conn->prepare("SELECT id, name, employee_code FROM employee WHERE department_id = ? AND status = 'active' ORDER BY name");
+    $stmt->bind_param('i', $department_id);
+    $stmt->execute();
+    $employees = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+
+    if (empty($employees)) {
+        $global_errors[] = 'No active employees found in this department.';
+        return ['eligible' => $eligible, 'ineligible' => $ineligible, 'errors' => $global_errors];
+    }
+
+    $start_ts = strtotime($start_time);
+    $end_ts = strtotime($end_time);
+    $total_hours = round(($end_ts - $start_ts) / 3600, 2);
+
+    foreach ($employees as $emp) {
+        $eid = (int)$emp['id'];
+        $validation = validate_employee_for_overtime($conn, $eid, $ot_date, false);
+
+        // Check monthly limit
+        $monthly = check_monthly_ot_limit($conn, $eid, $ot_date, $total_hours);
+        if (!$monthly['within_limit']) {
+            $validation['valid'] = false;
+            $validation['errors'][] = $monthly['error'];
+        }
+
+        // Check duplicate
+        if (check_duplicate_assignment($conn, $eid, $ot_date, $start_time, $end_time)) {
+            $validation['valid'] = false;
+            $validation['errors'][] = 'Duplicate overtime assignment exists for this employee.';
+        }
+
+        $entry = [
+            'id' => $eid,
+            'name' => $emp['name'],
+            'employee_code' => $emp['employee_code'],
+            'eligible' => $validation['valid'],
+            'errors' => $validation['errors'],
+            'warnings' => $validation['warnings'] ?? [],
+        ];
+
+        if ($validation['valid']) {
+            $eligible[] = $entry;
+        } else {
+            $ineligible[] = $entry;
+        }
+    }
+
+    return ['eligible' => $eligible, 'ineligible' => $ineligible, 'errors' => $global_errors];
+}
+
+/**
+ * Create overtime assignment and related records.
+ * Returns assignment ID on success, null on failure.
+ */
+function create_overtime_assignment(mysqli $conn, array $data): ?int {
+    set_mmt_timezone();
+
+    $assignment_code = generate_assignment_code($conn);
+    $assignment_type = $data['assignment_type'];
+    $department_id = $data['department_id'] ?? null;
+    $employee_id = $data['employee_id'] ?? null;
+    $assigned_by = $data['assigned_by'];
+    $assigned_by_name = $data['assigned_by_name'] ?? '';
+    $assigned_by_position = $data['assigned_by_position'] ?? '';
+    $ot_date = $data['ot_date'];
+    $start_time = $data['start_time'];
+    $end_time = $data['end_time'];
+    $reason = $data['reason'] ?? '';
+    $ot_type = detect_overtime_type($conn, $ot_date);
+
+    $start_ts = strtotime($start_time);
+    $end_ts = strtotime($end_time);
+    $total_hours = round(($end_ts - $start_ts) / 3600, 2);
+
+    // Begin transaction
+    $conn->begin_transaction();
+
+    try {
+        // Insert assignment header
+        $stmt = $conn->prepare(
+            "INSERT INTO overtime_assignments
+             (assignment_code, assignment_type, department_id, employee_id, assigned_by, assigned_by_name, assigned_by_position,
+              ot_date, start_time, end_time, total_hours, reason, ot_type, status)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Assigned')"
+        );
+        $stmt->bind_param('ssiiissssdsss',
+            $assignment_code, $assignment_type, $department_id, $employee_id,
+            $assigned_by, $assigned_by_name, $assigned_by_position,
+            $ot_date, $start_time, $end_time, $total_hours, $reason, $ot_type
+        );
+        $stmt->execute();
+        $assignment_id = $conn->insert_id;
+        $stmt->close();
+
+        if ($assignment_id <= 0) {
+            throw new Exception('Failed to create assignment record.');
+        }
+
+        // Determine which employees to process
+        if ($assignment_type === 'department' && $department_id) {
+            $emp_stmt = $conn->prepare("SELECT id, basic_salary FROM employee WHERE department_id = ? AND status = 'active'");
+            $emp_stmt->bind_param('i', $department_id);
+            $emp_stmt->execute();
+            $employees = $emp_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+            $emp_stmt->close();
+        } else {
+            $emp_stmt = $conn->prepare("SELECT id, basic_salary FROM employee WHERE id = ?");
+            $emp_stmt->bind_param('i', $employee_id);
+            $emp_stmt->execute();
+            $employees = $emp_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+            $emp_stmt->close();
+        }
+
+        $ot_rate = get_overtime_rate_for_type($ot_type);
+        $processed = 0;
+        $skipped = 0;
+
+        $oae_stmt = $conn->prepare(
+            "INSERT INTO overtime_assignment_employees (assignment_id, employee_id, ot_rate, ot_pay, status, validation_notes)
+             VALUES (?, ?, ?, ?, 'Assigned', ?)"
+        );
+
+        $or_stmt = $conn->prepare(
+            "INSERT INTO overtime_records (assignment_id, employee_id, ot_date, start_time, end_time, total_hours, ot_type, ot_rate, ot_pay, hourly_salary, status)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Approved')"
+        );
+
+        foreach ($employees as $emp) {
+            $eid = (int)$emp['id'];
+            $basic = (float)($emp['basic_salary'] ?? 0);
+
+            // Validate each employee (skip attendance check for department pre-assignment)
+            $validation = validate_employee_for_overtime($conn, $eid, $ot_date, $assignment_type !== 'employee');
+            $monthly = check_monthly_ot_limit($conn, $eid, $ot_date, $total_hours);
+            $is_dup = check_duplicate_assignment($conn, $eid, $ot_date, $start_time, $end_time);
+
+            $all_errors = array_merge($validation['errors']);
+            if ($is_dup) $all_errors[] = 'Duplicate overtime assignment exists.';
+            if (!$monthly['within_limit'] && !empty($monthly['error'])) $all_errors[] = $monthly['error'];
+
+            if (!empty($all_errors)) {
+                // Record as skipped
+                $notes = implode('; ', $all_errors);
+                $zero_pay = 0.0;
+                $oae_stmt->bind_param('iidds', $assignment_id, $eid, $ot_rate, $zero_pay, $notes);
+                $oae_stmt->execute();
+                $skipped++;
+                continue;
+            }
+
+            // Calculate OT pay
+            $working_days = (int)get_overtime_setting($conn, 'payroll_working_days_per_month', '22');
+            if ($working_days <= 0) $working_days = 22;
+            $hourly_salary = $basic > 0 ? round($basic / ($working_days * 8), 2) : 0;
+            $ot_pay = round($hourly_salary * $ot_rate * $total_hours, 2);
+
+            // Insert assignment employee record
+            $oae_stmt->bind_param('iidds', $assignment_id, $eid, $ot_rate, $ot_pay, '');
+            $oae_stmt->execute();
+
+            // Insert overtime record
+            $or_stmt->bind_param('iisssdsddd',
+                $assignment_id, $eid, $ot_date, $start_time, $end_time,
+                $total_hours, $ot_type, $ot_rate, $ot_pay, $hourly_salary
+            );
+            $or_stmt->execute();
+
+            $processed++;
+        }
+
+        $oae_stmt->close();
+        $or_stmt->close();
+
+        // Update assignment status based on results
+        if ($processed === 0 && $skipped > 0) {
+            $upd = $conn->prepare("UPDATE overtime_assignments SET status = 'Cancelled' WHERE id = ?");
+            $upd->bind_param('i', $assignment_id);
+            $upd->execute();
+            $upd->close();
+        }
+
+        $conn->commit();
+        return $assignment_id;
+
+    } catch (Exception $e) {
+        $conn->rollback();
+        return null;
+    }
+}
+
+/**
+ * Get overtime assignment with employee details.
+ */
+function get_overtime_assignment_detail(mysqli $conn, int $assignment_id): ?array {
+    $stmt = $conn->prepare("SELECT * FROM overtime_assignments WHERE id = ?");
+    $stmt->bind_param('i', $assignment_id);
+    $stmt->execute();
+    $assignment = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    if (!$assignment) return null;
+
+    // Get employees
+    $emp_stmt = $conn->prepare(
+        "SELECT oae.*, e.name as employee_name, e.employee_code, d.department_name, p.position_name
+         FROM overtime_assignment_employees oae
+         JOIN employee e ON oae.employee_id = e.id
+         LEFT JOIN departments d ON e.department_id = d.id
+         LEFT JOIN positions p ON e.position_id = p.id
+         WHERE oae.assignment_id = ?
+         ORDER BY e.name"
+    );
+    $emp_stmt->bind_param('i', $assignment_id);
+    $emp_stmt->execute();
+    $assignment['employees'] = $emp_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $emp_stmt->close();
+
+    // Department name
+    if ($assignment['department_id']) {
+        $dept_stmt = $conn->prepare("SELECT department_name FROM departments WHERE id = ?");
+        $dept_stmt->bind_param('i', $assignment['department_id']);
+        $dept_stmt->execute();
+        $dept_row = $dept_stmt->get_result()->fetch_assoc();
+        $dept_stmt->close();
+        $assignment['department_name'] = $dept_row['department_name'] ?? '';
+    }
+
+    return $assignment;
+}
+
+/**
+ * Get list of overtime assignments with filters.
+ */
+function get_overtime_assignments(mysqli $conn, array $filters = []): array {
+    $where = ["1=1"];
+    $params = [];
+    $types = '';
+
+    if (!empty($filters['from_date'])) {
+        $where[] = "oa.ot_date >= ?";
+        $params[] = $filters['from_date'];
+        $types .= 's';
+    }
+    if (!empty($filters['to_date'])) {
+        $where[] = "oa.ot_date <= ?";
+        $params[] = $filters['to_date'];
+        $types .= 's';
+    }
+    if (!empty($filters['status'])) {
+        $where[] = "oa.status = ?";
+        $params[] = $filters['status'];
+        $types .= 's';
+    }
+    if (!empty($filters['assignment_type'])) {
+        $where[] = "oa.assignment_type = ?";
+        $params[] = $filters['assignment_type'];
+        $types .= 's';
+    }
+    if (!empty($filters['department_id'])) {
+        $where[] = "oa.department_id = ?";
+        $params[] = (int)$filters['department_id'];
+        $types .= 'i';
+    }
+
+    $sql = "SELECT oa.*,
+            d.department_name,
+            e.name as employee_name,
+            (SELECT COUNT(*) FROM overtime_assignment_employees WHERE assignment_id = oa.id) as total_employees,
+            (SELECT COUNT(*) FROM overtime_assignment_employees WHERE assignment_id = oa.id AND eligible = 1 OR (validation_notes IS NULL OR validation_notes = '')) as eligible_count
+            FROM overtime_assignments oa
+            LEFT JOIN departments d ON oa.department_id = d.id
+            LEFT JOIN employee e ON oa.employee_id = e.id
+            WHERE " . implode(' AND ', $where) . "
+            ORDER BY oa.created_at DESC";
+
+    $stmt = $conn->prepare($sql);
+    if ($types) {
+        $stmt->bind_param($types, ...$params);
+    }
+    $stmt->execute();
+    $result = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+
+    return $result;
+}
+
+/**
+ * Cancel an overtime assignment and its related records.
+ */
+function cancel_overtime_assignment(mysqli $conn, int $assignment_id): bool {
+    $conn->begin_transaction();
+    try {
+        // Update assignment status
+        $stmt = $conn->prepare("UPDATE overtime_assignments SET status = 'Cancelled' WHERE id = ?");
+        $stmt->bind_param('i', $assignment_id);
+        $stmt->execute();
+        $stmt->close();
+
+        // Update all employee records
+        $stmt2 = $conn->prepare("UPDATE overtime_assignment_employees SET status = 'Cancelled' WHERE assignment_id = ?");
+        $stmt2->bind_param('i', $assignment_id);
+        $stmt2->execute();
+        $stmt2->close();
+
+        // Cancel overtime_records linked to this assignment
+        $has_or = $conn->query("SHOW TABLES LIKE 'overtime_records'")->num_rows > 0;
+        if ($has_or) {
+            $stmt3 = $conn->prepare("UPDATE overtime_records SET status = 'Cancelled' WHERE assignment_id = ? AND payroll_id IS NULL");
+            $stmt3->bind_param('i', $assignment_id);
+            $stmt3->execute();
+            $stmt3->close();
+        }
+
+        $conn->commit();
+        return true;
+    } catch (Exception $e) {
+        $conn->rollback();
+        return false;
+    }
+}
+
+// ─── Checkout Reminder System ────────────────────────────────────
+
+function needs_checkout_reminder(mysqli $conn, int $employee_id): ?string {
+    set_mmt_timezone();
+    $today = mmt_date();
+    $current_time = mmt_time();
+
+    if (!is_working_day($conn, $today)) return null;
+
+    if (has_approved_leave_on_date($conn, $employee_id, $today)) return null;
+
+    $att = has_checked_in_today($conn, $employee_id, $today);
+    if (!$att || !$att['check_in']) return null;
+    if ($att['check_out'] !== null) return null;
+
+    $work_end = strtotime(get_work_end_time());
+    $now = strtotime($current_time);
+
+    if ($now < $work_end) return null;
+
+    $minutes_past = ($now - $work_end) / 60;
+
+    if ($minutes_past >= 120) return 'final';
+    if ($minutes_past >= 60) return 'second';
+    return 'first';
+}
+
+function get_checkout_reminder_message(string $level): string {
+    set_mmt_timezone();
+    $now = mmt_time('h:i A');
+    return match($level) {
+        'first'  => "Don't forget to check out for today! Work hours ended at 5:00 PM.",
+        'second' => "Reminder: You haven't checked out yet. It's been over 1 hour past work hours.",
+        'final'  => "Important: You are still not checked out. Please check out immediately to avoid AWOL status.",
+        default  => "Please check out for today."
+    };
+}
+
+function get_checkout_reminder_urgency(string $level): string {
+    return match($level) {
+        'first'  => 'info',
+        'second' => 'warning',
+        'final'  => 'danger',
+        default  => 'info'
+    };
+}
+
+function log_checkout_reminder(mysqli $conn, int $employee_id, string $level): int {
+    $att = has_checked_in_today($conn, $employee_id);
+    $att_id = $att ? $att['id'] : null;
+
+    $stmt = $conn->prepare("INSERT INTO checkout_reminders (employee_id, attendance_id, reminder_type, reminder_level) VALUES (?, ?, 'checkout', ?)");
+    $stmt->bind_param('iis', $employee_id, $att_id, $level);
+    $stmt->execute();
+    $id = $conn->insert_id;
+    $stmt->close();
+    return $id;
+}
+
+function get_latest_pending_reminder(mysqli $conn, int $employee_id): ?array {
+    set_mmt_timezone();
+    $today = mmt_date();
+
+    $stmt = $conn->prepare("SELECT id, reminder_level, notification_status, sent_at FROM checkout_reminders WHERE employee_id = ? AND DATE(sent_at) = ? ORDER BY sent_at DESC LIMIT 1");
+    $stmt->bind_param('is', $employee_id, $today);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    return $row;
+}
+
+function dismiss_checkout_reminder(mysqli $conn, int $reminder_id): void {
+    $stmt = $conn->prepare("UPDATE checkout_reminders SET notification_status = 'dismissed', dismissed_at = NOW() WHERE id = ?");
+    $stmt->bind_param('i', $reminder_id);
+    $stmt->execute();
+    $stmt->close();
+}
+
+function get_unread_checkout_reminder_count(mysqli $conn, int $employee_id): int {
+    set_mmt_timezone();
+    $today = mmt_date();
+
+    $stmt = $conn->prepare("SELECT COUNT(*) as cnt FROM checkout_reminders WHERE employee_id = ? AND DATE(sent_at) = ? AND notification_status = 'sent'");
+    $stmt->bind_param('is', $employee_id, $today);
+    $stmt->execute();
+    $cnt = (int)$stmt->get_result()->fetch_assoc()['cnt'];
+    $stmt->close();
+    return $cnt;
+}
+
+function should_send_new_reminder(mysqli $conn, int $employee_id, string $level): bool {
+    set_mmt_timezone();
+    $today = mmt_date();
+
+    $stmt = $conn->prepare("SELECT COUNT(*) as cnt FROM checkout_reminders WHERE employee_id = ? AND DATE(sent_at) = ? AND reminder_level = ?");
+    $stmt->bind_param('iss', $employee_id, $today, $level);
+    $stmt->execute();
+    $cnt = (int)$stmt->get_result()->fetch_assoc()['cnt'];
+    $stmt->close();
+    return $cnt === 0;
 }

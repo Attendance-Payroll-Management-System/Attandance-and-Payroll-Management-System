@@ -6,170 +6,150 @@ require_once '../config/db.php';
 require_once '../config/helpers.php';
 require_once '../config/notifications.php';
 
+set_mmt_timezone();
+
 $message = '';
 $message_type = '';
 $unread_notifications = get_unread_count($conn);
 $notifications = get_notifications($conn, null, 10);
-
-$has_source = $conn->query("SHOW COLUMNS FROM overtime_requests LIKE 'source'")->num_rows > 0;
-$has_assigned_by = $conn->query("SHOW COLUMNS FROM overtime_requests LIKE 'assigned_by_id'")->num_rows > 0;
-
-$employees = $conn->query("SELECT e.id, e.name, e.employee_code, e.department_id, d.department_name, p.position_name FROM employee e LEFT JOIN departments d ON e.department_id = d.id LEFT JOIN positions p ON e.position_id = p.id WHERE e.status = 'active' ORDER BY e.name")->fetch_all(MYSQLI_ASSOC);
 
 $admin_id = $_SESSION['admin_id'];
 $admin_name = $_SESSION['admin_name'];
 $admin_department = $_SESSION['admin_department'] ?? '';
 $admin_position = $_SESSION['admin_position'] ?? '';
 
-// Build employee -> department mapping for JS
-$emp_dept_map = [];
-foreach ($employees as $emp) {
-    $emp_dept_map[$emp['id']] = intval($emp['department_id'] ?? 0);
-}
+// Fetch departments
+$departments = $conn->query("SELECT id, department_name FROM departments ORDER BY department_name")->fetch_all(MYSQLI_ASSOC);
 
-// Fetch all managers (position containing 'manager' or 'lead', or first employee per dept)
-$managers = $conn->query("
-    SELECT
-        e.id AS manager_id,
-        e.name AS manager_name,
-        e.department_id,
-        d.department_name,
-        p.position_name AS manager_position
+// Fetch employees grouped by department
+$employees = $conn->query("
+    SELECT e.id, e.name, e.employee_code, e.department_id, d.department_name, p.position_name
     FROM employee e
     LEFT JOIN departments d ON e.department_id = d.id
     LEFT JOIN positions p ON e.position_id = p.id
     WHERE e.status = 'active'
-    AND e.department_id IS NOT NULL
-    AND (
-        LOWER(p.position_name) LIKE '%manager%'
-        OR LOWER(p.position_name) LIKE '%lead%'
-        OR e.id IN (
-            SELECT MIN(e2.id) FROM employee e2
-            WHERE e2.status = 'active' AND e2.department_id IS NOT NULL
-            GROUP BY e2.department_id
-        )
-    )
     ORDER BY d.department_name, e.name
 ")->fetch_all(MYSQLI_ASSOC);
 
-// Build department -> managers mapping for JS
-$dept_managers_map = [];
-foreach ($managers as $m) {
-    $dept_managers_map[$m['department_id']][] = [
-        'id' => $m['manager_id'],
-        'name' => $m['manager_name'],
-        'department' => $m['department_name'],
-        'position' => $m['manager_position'] ?? '-'
-    ];
+// Build department -> employee count mapping
+$dept_emp_count = [];
+foreach ($employees as $emp) {
+    $did = $emp['department_id'] ?? 0;
+    if (!isset($dept_emp_count[$did])) $dept_emp_count[$did] = 0;
+    $dept_emp_count[$did]++;
 }
 
+// Handle form submission
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['assign_ot'])) {
-    $employee_id = $_POST['employee_id'] ?? 0;
-    $ot_date = $_POST['ot_date'] ?? '';
-    $start_time = $_POST['start_time'] ?? '';
-    $end_time = $_POST['end_time'] ?? '';
-    $reason = $_POST['reason'] ?? '';
-
-    $has_source = $conn->query("SHOW COLUMNS FROM overtime_requests LIKE 'source'")->num_rows > 0;
-    $has_request_type = $conn->query("SHOW COLUMNS FROM overtime_requests LIKE 'request_type'")->num_rows > 0;
-    $has_assigned_by = $conn->query("SHOW COLUMNS FROM overtime_requests LIKE 'assigned_by_id'")->num_rows > 0;
-    $has_ot_type = $conn->query("SHOW COLUMNS FROM overtime_requests LIKE 'ot_type'")->num_rows > 0;
-    $has_ot_rate = $conn->query("SHOW COLUMNS FROM overtime_requests LIKE 'ot_rate'")->num_rows > 0;
-    $has_ot_pay = $conn->query("SHOW COLUMNS FROM overtime_requests LIKE 'ot_pay'")->num_rows > 0;
-    $has_remarks = $conn->query("SHOW COLUMNS FROM overtime_requests LIKE 'remarks'")->num_rows > 0;
-
-    if (!$employee_id || empty($ot_date) || empty($start_time) || empty($end_time)) {
-        $message = 'Please fill in all required fields.';
-        $message_type = 'error';
-    } elseif (strtotime($end_time) <= strtotime($start_time)) {
-        $message = 'End time must be after start time.';
-        $message_type = 'error';
-    } elseif ($ot_date < mmt_date()) {
-        $message = 'You cannot assign overtime to a past date.';
+    if (!validate_csrf_token()) {
+        $message = 'Invalid request.';
         $message_type = 'error';
     } else {
-        $start_ts = strtotime($start_time);
-        $end_ts = strtotime($end_time);
-        $total_hours = round(($end_ts - $start_ts) / 3600, 2);
+        $assignment_type = $_POST['assignment_type'] ?? 'employee';
+        $ot_date = $_POST['ot_date'] ?? '';
+        $start_time = $_POST['start_time'] ?? '';
+        $end_time = $_POST['end_time'] ?? '';
+        $reason = trim($_POST['reason'] ?? '');
 
-        // Get employee info
-        $emp = $conn->prepare("SELECT name, department_id, position_id FROM employee WHERE id = ?");
-        $emp->bind_param('i', $employee_id);
-        $emp->execute();
-        $emp_row = $emp->get_result()->fetch_assoc();
-        $emp_name = $emp_row['name'] ?? 'Employee';
-        $emp_dept_id = $emp_row['department_id'] ?? null;
-        $emp_pos_id = $emp_row['position_id'] ?? null;
-        $emp->close();
+        $data = [
+            'assignment_type' => $assignment_type,
+            'department_id' => $assignment_type === 'department' ? (int)($_POST['department_id'] ?? 0) : null,
+            'employee_id' => $assignment_type === 'employee' ? (int)($_POST['employee_id'] ?? 0) : null,
+            'assigned_by' => $admin_id,
+            'assigned_by_name' => $admin_name,
+            'assigned_by_position' => $admin_position,
+            'ot_date' => $ot_date,
+            'start_time' => $start_time,
+            'end_time' => $end_time,
+            'reason' => $reason,
+        ];
 
-        // Auto-detect OT type, rate, pay
-        $ot_type = detect_overtime_type($conn, $ot_date);
-        $ot_rate = get_overtime_rate_for_type($ot_type);
-        $ot_pay = calculate_overtime_pay_for_request($conn, $employee_id, $ot_type, $total_hours);
-
-        // Use the selected manager from the dropdown
-        $assigned_by_id   = intval($_POST['assigned_by_id'] ?? 0);
-        $assigned_by_name = $admin_name;
-        $assigned_by_dept = $admin_department;
-        $assigned_by_pos  = $admin_position;
-
-        if ($assigned_by_id > 0 && $has_assigned_by) {
-            $mgr = $conn->prepare("
-                SELECT e.name AS mgr_name, d.department_name, p.position_name AS mgr_position
-                FROM employee e
-                LEFT JOIN departments d ON e.department_id = d.id
-                LEFT JOIN positions p ON e.position_id = p.id
-                WHERE e.id = ? AND e.status = 'active'
-            ");
-            $mgr->bind_param('i', $assigned_by_id);
-            $mgr->execute();
-            $mgr_row = $mgr->get_result()->fetch_assoc();
-            $mgr->close();
-
-            if ($mgr_row) {
-                $assigned_by_name = $mgr_row['mgr_name'];
-                $assigned_by_dept = $mgr_row['department_name'] ?? $admin_department;
-                $assigned_by_pos  = $mgr_row['mgr_position'] ?? $admin_position;
-            }
-        }
-
-        // Build dynamic INSERT
-        $cols = ['employee_id', 'ot_date', 'start_time', 'end_time', 'total_hours', 'reason', 'status'];
-        $vals = [$employee_id, $ot_date, $start_time, $end_time, $total_hours, $reason, 'Approved'];
-        $types = 'isssds';
-
-        if ($has_source)       { $cols[] = 'source';       $vals[] = 'admin_assignment'; $types .= 's'; }
-        if ($has_request_type) { $cols[] = 'request_type'; $vals[] = 'admin_assignment'; $types .= 's'; }
-        if ($has_assigned_by) {
-            $cols[] = 'assigned_by_id';         $vals[] = $assigned_by_id;   $types .= 'i';
-            $cols[] = 'assigned_by_name';       $vals[] = $assigned_by_name; $types .= 's';
-            $cols[] = 'assigned_by_department'; $vals[] = $assigned_by_dept; $types .= 's';
-            $cols[] = 'assigned_by_position';   $vals[] = $assigned_by_pos;  $types .= 's';
-            $cols[] = 'assigned_at';            $vals[] = date('Y-m-d H:i:s'); $types .= 's';
-        }
-        if ($has_ot_type) { $cols[] = 'ot_type'; $vals[] = $ot_type; $types .= 's'; }
-        if ($has_ot_rate) { $cols[] = 'ot_rate'; $vals[] = $ot_rate; $types .= 'd'; }
-        if ($has_ot_pay)  { $cols[] = 'ot_pay';  $vals[] = $ot_pay;  $types .= 'd'; }
-        if ($emp_dept_id) { $cols[] = 'department_id'; $vals[] = $emp_dept_id; $types .= 'i'; }
-        if ($emp_pos_id)  { $cols[] = 'position_id';   $vals[] = $emp_pos_id;  $types .= 'i'; }
-        if ($has_remarks && !empty($reason)) { $cols[] = 'remarks'; $vals[] = $reason; $types .= 's'; }
-
-        $placeholders = implode(', ', array_fill(0, count($cols), '?'));
-        $stmt = $conn->prepare("INSERT INTO overtime_requests (" . implode(', ', $cols) . ") VALUES ($placeholders)");
-        $stmt->bind_param($types, ...$vals);
-
-        if ($stmt->execute()) {
-            $new_id = $stmt->insert_id;
-            $stmt->close();
-
-            log_overtime_action($conn, $new_id, 'created', $admin_id, 'admin');
-
-            create_notification($conn, $employee_id, 'ot_assigned', "Overtime has been assigned to you by $assigned_by_name ($assigned_by_pos, $assigned_by_dept). OT Date: $ot_date (" . number_format($total_hours, 1) . "h - " . str_replace('_', ' ', $ot_type) . ").", 'overtimerequest.php');
-            $message = "Overtime assigned to $emp_name successfully. (Auto-approved)";
-            $message_type = 'success';
-        } else {
-            $message = 'Error assigning overtime.';
+        // Validate required fields
+        if (empty($ot_date) || empty($start_time) || empty($end_time)) {
+            $message = 'Please fill in all required fields.';
             $message_type = 'error';
+        } elseif ($assignment_type === 'department' && empty($data['department_id'])) {
+            $message = 'Please select a department.';
+            $message_type = 'error';
+        } elseif ($assignment_type === 'employee' && empty($data['employee_id'])) {
+            $message = 'Please select an employee.';
+            $message_type = 'error';
+        } else {
+            // Detect OT type and validate time rules
+            $ot_type = detect_overtime_type($conn, $ot_date);
+            $time_rules = validate_overtime_time_rules($ot_type, $start_time, $end_time);
+
+            if (!$time_rules['valid']) {
+                $message = implode(' ', $time_rules['errors']);
+                $message_type = 'error';
+            } else {
+                $assignment_id = create_overtime_assignment($conn, $data);
+
+                if ($assignment_id) {
+                    // Get the assignment code and final status
+                    $code_stmt = $conn->prepare("SELECT assignment_code, status FROM overtime_assignments WHERE id = ?");
+                    $code_stmt->bind_param('i', $assignment_id);
+                    $code_stmt->execute();
+                    $code_row = $code_stmt->get_result()->fetch_assoc();
+                    $code_stmt->close();
+                    $code = $code_row['assignment_code'] ?? "OTA-$assignment_id";
+                    $final_status = $code_row['status'] ?? 'Assigned';
+
+                    $message = "Overtime assignment $code created successfully.";
+                    $message_type = 'success';
+
+                    log_activity($conn, $admin_id, 'overtime_assignment_created', "Created overtime assignment $code for " . ($assignment_type === 'department' ? 'department' : 'employee') . " on $ot_date");
+
+                    // Send notifications only if assignment is not auto-cancelled
+                    if ($final_status !== 'Cancelled' && $assignment_type === 'department' && !empty($data['department_id'])) {
+                        $dept_id = (int)$data['department_id'];
+                        $date_display = date('M d, Y', strtotime($ot_date));
+                        $time_display = date('h:i A', strtotime($start_time)) . ' - ' . date('h:i A', strtotime($end_time));
+                        $emp_link = '../employee/overtimerequest.php';
+                        $admin_link = "assignment_detail.php?id=$assignment_id";
+
+                        // Get department name
+                        $dept_stmt = $conn->prepare("SELECT department_name FROM departments WHERE id = ?");
+                        $dept_stmt->bind_param('i', $dept_id);
+                        $dept_stmt->execute();
+                        $dept_name = $dept_stmt->get_result()->fetch_assoc()['department_name'] ?? 'your department';
+                        $dept_stmt->close();
+
+                        // Get all active employees in the department
+                        $emp_stmt = $conn->prepare("SELECT id, name FROM employee WHERE department_id = ? AND status = 'active'");
+                        $emp_stmt->bind_param('i', $dept_id);
+                        $emp_stmt->execute();
+                        $dept_employees = $emp_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+                        $emp_stmt->close();
+
+                        // Find department manager (first active employee in the dept)
+                        $mgr_stmt = $conn->prepare("SELECT id, name FROM employee WHERE department_id = ? AND status = 'active' ORDER BY id ASC LIMIT 1");
+                        $mgr_stmt->bind_param('i', $dept_id);
+                        $mgr_stmt->execute();
+                        $manager = $mgr_stmt->get_result()->fetch_assoc();
+                        $mgr_stmt->close();
+
+                        // Notify each employee
+                        foreach ($dept_employees as $emp) {
+                            $msg = "You have been assigned overtime on $date_display ($time_display, {$total_hours}h) by $admin_name." . ($reason ? " Reason: $reason" : '');
+                            create_notification($conn, (int)$emp['id'], 'ot_assigned', $msg, $emp_link);
+                        }
+
+                        // Notify the department manager (if found and not already in the employee list notification)
+                        if ($manager) {
+                            $mgr_msg = "Overtime has been assigned to $dept_name on $date_display ($time_display, {$total_hours}h) by $admin_name." . ($reason ? " Reason: $reason" : '');
+                            create_notification($conn, (int)$manager['id'], 'ot_assigned', $mgr_msg, $admin_link);
+                        }
+
+                        // Notify admin (global notification)
+                        $admin_msg = "Overtime assignment $code created for $dept_name ($date_display, $time_display). " . count($dept_employees) . " employee(s) assigned.";
+                        create_notification($conn, null, 'ot_assigned', $admin_msg, $admin_link);
+                    }
+                } else {
+                    $message = 'Error creating overtime assignment. Please try again.';
+                    $message_type = 'error';
+                }
+            }
         }
     }
 }
@@ -185,16 +165,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['assign_ot'])) {
     <?php include "../includes/header.php"; ?>
 </head>
 
-<body x-data="{}" class="bg-slate-50 dark:bg-[#0B1120] text-slate-900 dark:text-white font-sans antialiased min-h-screen flex">
+<body x-data="assignOvertime()" class="bg-slate-50 dark:bg-[#0B1120] text-slate-900 dark:text-white font-sans antialiased min-h-screen flex">
     <?php include "../includes/sidebar.php"; ?>
     <div class="flex-1 flex flex-col min-w-0 main-wrapper">
         <?php $page_title = "Assign Overtime";
-        $page_subtitle = "Assign overtime work to employees.";
+        $page_subtitle = "Assign overtime to departments or individual employees.";
         include "../includes/topbar.php"; ?>
         <main class="flex-1 p-8 overflow-y-auto">
 
             <?php if ($message): ?>
-                <div class="mb-6 rounded-2xl px-6 py-4 shadow-sm border <?php echo $message_type == 'success' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 border-red-500/30 text-red-400'; ?>">
+                <div class="mb-6 rounded-2xl px-6 py-4 shadow-sm border <?php echo $message_type == 'success' ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400' : 'bg-red-500/20 border-red-500/30 text-red-400'; ?>">
                     <div class="flex items-center gap-3">
                         <i class="fa-solid <?php echo $message_type == 'success' ? 'fa-circle-check' : 'fa-circle-exclamation'; ?> text-lg"></i>
                         <p class="font-medium"><?php echo htmlspecialchars($message); ?></p>
@@ -202,79 +182,201 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['assign_ot'])) {
                 </div>
             <?php endif; ?>
 
-            <?php if (!$has_source): ?>
-                <div class="mb-6 rounded-2xl px-6 py-4 shadow-sm border bg-amber-500/20 border-amber-500/30 text-amber-400">
-                    <i class="fa-solid fa-triangle-exclamation mr-2"></i>
-                    <strong>Migration needed:</strong> Run <code class="bg-amber-500/20 px-1 rounded text-amber-400">config/migration_overtime_source.sql</code> to enable full assignment tracking. Assignments will work without it.
-                </div>
-            <?php endif; ?>
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Assignment Form -->
+                <div class="lg:col-span-2">
+                    <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-6">
+                        <h2 class="text-lg font-bold text-white mb-6"><i class="fa-solid fa-clock text-blue-400 mr-2"></i>New Overtime Assignment</h2>
 
-            <div class="max-w-2xl">
-                <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-6">
-                    <h2 class="text-lg font-bold text-white mb-6"><i class="fa-solid fa-clock text-blue-400 mr-2"></i>New Overtime Assignment</h2>
-                    <form method="POST" class="space-y-5 text-zinc-300">
+                        <form method="POST" id="assignForm" class="space-y-5 text-zinc-300">
+                            <?php echo csrf_field(); ?>
 
-                        <?php echo csrf_field(); ?>
-                        <div>
-                            <label class="text-xs font-semibold text-zinc-400 block mb-1.5">Employee</label>
-                            <select name="employee_id" required class="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white placeholder-zinc-500 shadow-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30">
-                                <option value="">-- Select Employee --</option>
-                                <?php foreach ($employees as $emp): ?>
-                                    <option value="<?php echo $emp['id']; ?>"><?php echo htmlspecialchars($emp['name'] . ' (' . $emp['employee_code'] . ') - ' . ($emp['department_name'] ?? 'N/A') . ' / ' . ($emp['position_name'] ?? 'N/A')); ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <?php if ($has_assigned_by): ?>
-                            <div class="rounded-xl border border-blue-400/20 bg-blue-500/10 p-4">
-                                <h3 class="text-xs font-bold uppercase tracking-wider text-blue-400 mb-2"><i class="fa-solid fa-user-check mr-1"></i>Assignment Info</h3>
-                                <div>
-                                    <label class="text-xs font-semibold text-zinc-400 block mb-1.5">Assigned By (Department Manager)</label>
-                                    <select name="assigned_by_id" id="assigned_by_select" required class="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white placeholder-zinc-500 shadow-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30">
-                                        <option value="">-- Select Manager --</option>
-                                        <?php
-                                        $current_dept = '';
-                                        foreach ($managers as $m):
-                                            if ($m['department_name'] !== $current_dept):
-                                                if ($current_dept !== '') echo '</optgroup>';
-                                                $current_dept = $m['department_name'];
-                                                echo '<optgroup label="' . htmlspecialchars($current_dept) . '">';
-                                            endif;
-                                        ?>
-                                            <option value="<?php echo $m['manager_id']; ?>" data-dept="<?php echo $m['department_id']; ?>" data-dept-name="<?php echo htmlspecialchars($m['department_name']); ?>" data-position="<?php echo htmlspecialchars($m['manager_position'] ?? '-'); ?>">
-                                                <?php echo htmlspecialchars($m['manager_name'] . ' - ' . ($m['manager_position'] ?? 'N/A')); ?>
-                                            </option>
-                                        <?php endforeach; ?>
-                                        <?php if ($current_dept !== '') echo '</optgroup>'; ?>
-                                    </select>
+                            <!-- Assignment Type Toggle -->
+                            <div>
+                                <label class="text-xs font-semibold text-zinc-400 block mb-2">Assignment Type</label>
+                                <div class="grid grid-cols-2 gap-3">
+                                    <button type="button" @click="assignmentType = 'department'" :class="assignmentType === 'department' ? 'bg-blue-600/20 border-blue-500 text-blue-400' : 'bg-white/[0.06] border-white/10 text-zinc-400 hover:border-blue-400/50'" class="rounded-xl border px-4 py-3 text-sm font-semibold transition flex items-center justify-center gap-2">
+                                        <i class="fa-solid fa-building"></i> Department
+                                    </button>
+                                    <button type="button" @click="assignmentType = 'employee'" :class="assignmentType === 'employee' ? 'bg-blue-600/20 border-blue-500 text-blue-400' : 'bg-white/[0.06] border-white/10 text-zinc-400 hover:border-blue-400/50'" class="rounded-xl border px-4 py-3 text-sm font-semibold transition flex items-center justify-center gap-2">
+                                        <i class="fa-solid fa-user"></i> Employee
+                                    </button>
                                 </div>
-                                <p class="text-xs text-zinc-500 mt-2"><i class="fa-solid fa-info-circle mr-1"></i>Select an employee first - the department manager will be auto-selected</p>
+                                <input type="hidden" name="assignment_type" :value="assignmentType">
                             </div>
-                        <?php endif; ?>
-                        <div>
-                            <label class="text-xs font-semibold text-zinc-400 block mb-1.5">OT Date</label>
-                            <input type="date" name="ot_date" required min="<?php echo mmt_date(); ?>" class="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white placeholder-zinc-500 shadow-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30">
-                        </div>
-                        <div class="grid grid-cols-2 gap-4">
+
+                            <!-- Department Selection -->
+                            <div x-show="assignmentType === 'department'" x-transition>
+                                <label class="text-xs font-semibold text-zinc-400 block mb-1.5">Select Department</label>
+                                <select name="department_id" x-model="selectedDeptId" class="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white placeholder-zinc-500 shadow-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30">
+                                    <option value="">-- Select Department --</option>
+                                    <?php foreach ($departments as $dept): ?>
+                                        <option value="<?php echo $dept['id']; ?>"><?php echo htmlspecialchars($dept['department_name']); ?> (<?php echo $dept_emp_count[$dept['id']] ?? 0; ?> employees)</option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <p class="text-xs text-zinc-500 mt-1.5" x-show="selectedDeptId">
+                                    <i class="fa-solid fa-users mr-1"></i>
+                                    <span x-text="deptEmpCount[selectedDeptId] + ' active employees will be assigned'"></span>
+                                </p>
+                            </div>
+
+                            <!-- Employee Selection -->
+                            <div x-show="assignmentType === 'employee'" x-transition>
+                                <label class="text-xs font-semibold text-zinc-400 block mb-1.5">Select Employee</label>
+                                <select name="employee_id" x-model="selectedEmpId" class="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white placeholder-zinc-500 shadow-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30">
+                                    <option value="">-- Select Employee --</option>
+                                    <?php
+                                    $current_dept = '';
+                                    foreach ($employees as $emp):
+                                        $did = $emp['department_id'] ?? 0;
+                                        if ($emp['department_name'] !== $current_dept):
+                                            if ($current_dept !== '') echo '</optgroup>';
+                                            $current_dept = $emp['department_name'] ?? 'Unassigned';
+                                            echo '<optgroup label="' . htmlspecialchars($current_dept) . '">';
+                                        endif;
+                                    ?>
+                                        <option value="<?php echo $emp['id']; ?>" data-dept="<?php echo $did; ?>">
+                                            <?php echo htmlspecialchars($emp['name'] . ' (' . $emp['employee_code'] . ') - ' . ($emp['position_name'] ?? 'N/A')); ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                    <?php if ($current_dept !== '') echo '</optgroup>'; ?>
+                                </select>
+                            </div>
+
+                            <!-- OT Date -->
                             <div>
-                                <label class="text-xs font-semibold text-zinc-400 block mb-1.5">Start Time</label>
-                                <input type="time" name="start_time" required class="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white placeholder-zinc-500 shadow-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30">
+                                <label class="text-xs font-semibold text-zinc-400 block mb-1.5">OT Date</label>
+                                <input type="date" name="ot_date" x-model="otDate" @change="validateAssignment()" min="<?php echo mmt_date(); ?>" class="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white placeholder-zinc-500 shadow-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30">
                             </div>
+
+                            <!-- Time Range -->
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="text-xs font-semibold text-zinc-400 block mb-1.5">Start Time</label>
+                                    <input type="time" name="start_time" x-model="startTime" @change="validateAssignment()" class="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white placeholder-zinc-500 shadow-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30">
+                                </div>
+                                <div>
+                                    <label class="text-xs font-semibold text-zinc-400 block mb-1.5">End Time</label>
+                                    <input type="time" name="end_time" x-model="endTime" @change="validateAssignment()" class="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white placeholder-zinc-500 shadow-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30">
+                                </div>
+                            </div>
+
+                            <!-- Reason -->
                             <div>
-                                <label class="text-xs font-semibold text-zinc-400 block mb-1.5">End Time</label>
-                                <input type="time" name="end_time" required class="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white placeholder-zinc-500 shadow-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30">
+                                <label class="text-xs font-semibold text-zinc-400 block mb-1.5">Reason / Instructions</label>
+                                <textarea name="reason" rows="3" class="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white placeholder-zinc-500 shadow-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 resize-none" placeholder="Describe the overtime task..."></textarea>
+                            </div>
+
+                            <button type="submit" name="assign_ot" :disabled="!isValid || validating" class="w-full rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold text-sm px-5 py-3 shadow-sm transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                                <i class="fa-solid fa-clock" x-show="!validating"></i>
+                                <i class="fa-solid fa-spinner fa-spin" x-show="validating"></i>
+                                <span x-text="validating ? 'Validating...' : 'Assign Overtime'"></span>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Validation Preview Panel -->
+                <div class="lg:col-span-1 space-y-4">
+                    <!-- OT Type Detection -->
+                    <div class="card-hover glass-strong rounded-2xl p-5">
+                        <h3 class="font-bold text-white mb-3 text-sm"><i class="fa-solid fa-wand-magic-sparkles text-purple-400 mr-2"></i>OT Type Detection</h3>
+                        <div class="space-y-2">
+                            <div class="flex justify-between text-sm">
+                                <span class="text-zinc-400">Type:</span>
+                                <span x-text="otTypeLabel || '-' " :class="otTypeClass" class="font-semibold"></span>
+                            </div>
+                            <div class="flex justify-between text-sm">
+                                <span class="text-zinc-400">Total Hours:</span>
+                                <span x-text="totalHours > 0 ? totalHours + 'h' : '-'" class="text-white font-semibold"></span>
+                            </div>
+                            <div class="flex justify-between text-sm" x-show="otType === 'working_day'">
+                                <span class="text-zinc-400">Allowed Window:</span>
+                                <span class="text-zinc-300 text-xs">5:00 PM - 9:00 PM</span>
+                            </div>
+                            <div class="flex justify-between text-sm" x-show="otType === 'weekend' || otType === 'holiday'">
+                                <span class="text-zinc-400">Allowed Window:</span>
+                                <span class="text-zinc-300 text-xs">9:00 AM - 5:00 PM</span>
                             </div>
                         </div>
-                        <div>
-                            <label class="text-xs font-semibold text-zinc-400 block mb-1.5">Reason / Instructions</label>
-                            <textarea name="reason" rows="3" class="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white placeholder-zinc-500 shadow-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 resize-none" placeholder="Describe the overtime task..."></textarea>
+                    </div>
+
+                    <!-- Validation Status -->
+                    <div class="card-hover glass-strong rounded-2xl p-5">
+                        <h3 class="font-bold text-white mb-3 text-sm"><i class="fa-solid fa-shield-check text-emerald-400 mr-2"></i>Validation Status</h3>
+                        <div x-show="validationErrors.length === 0 && !validating && (selectedDeptId || selectedEmpId) && otDate && startTime && endTime" class="text-center py-3">
+                            <div class="w-12 h-12 rounded-full bg-emerald-500/20 flex items-center justify-center mx-auto mb-2">
+                                <i class="fa-solid fa-check text-emerald-400 text-xl"></i>
+                            </div>
+                            <p class="text-emerald-400 text-sm font-semibold">All validations passed</p>
                         </div>
+                        <div x-show="validationErrors.length > 0" class="space-y-2">
+                            <template x-for="err in validationErrors" :key="err">
+                                <div class="flex items-start gap-2 text-xs">
+                                    <i class="fa-solid fa-circle-exclamation text-red-400 mt-0.5 shrink-0"></i>
+                                    <span class="text-red-400" x-text="err"></span>
+                                </div>
+                            </template>
+                        </div>
+                        <div x-show="validationErrors.length === 0 && !validating && !(selectedDeptId || selectedEmpId && otDate && startTime && endTime)" class="text-center py-3">
+                            <p class="text-zinc-500 text-xs">Select assignment type, date, and time to validate.</p>
+                        </div>
+                    </div>
 
+                    <!-- Employee Results (Department mode) -->
+                    <div class="card-hover glass-strong rounded-2xl p-5" x-show="assignmentType === 'department' && eligibleCount > 0">
+                        <h3 class="font-bold text-white mb-3 text-sm"><i class="fa-solid fa-users text-blue-400 mr-2"></i>Employee Validation</h3>
+                        <div class="space-y-2">
+                            <div class="flex justify-between text-sm">
+                                <span class="text-emerald-400 font-semibold">Eligible</span>
+                                <span class="text-emerald-400 font-bold" x-text="eligibleCount"></span>
+                            </div>
+                            <div class="flex justify-between text-sm" x-show="ineligibleCount > 0">
+                                <span class="text-red-400 font-semibold">Ineligible</span>
+                                <span class="text-red-400 font-bold" x-text="ineligibleCount"></span>
+                            </div>
+                        </div>
+                        <div x-show="ineligibleEmployees.length > 0" class="mt-3 space-y-1.5 max-h-48 overflow-y-auto">
+                            <template x-for="emp in ineligibleEmployees" :key="emp.id">
+                                <div class="bg-red-500/10 rounded-lg px-3 py-2 border border-red-500/20">
+                                    <div class="text-xs font-semibold text-red-400" x-text="emp.name + ' (' + emp.employee_code + ')'"></div>
+                                    <div class="text-[10px] text-red-400/70" x-text="emp.errors.join('; ')"></div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
 
+                    <!-- Monthly Limit Info (Employee mode) -->
+                    <div class="card-hover glass-strong rounded-2xl p-5" x-show="assignmentType === 'employee' && monthlyInfo">
+                        <h3 class="font-bold text-white mb-3 text-sm"><i class="fa-solid fa-gauge-high text-amber-400 mr-2"></i>Monthly OT Limit</h3>
+                        <div class="space-y-2">
+                            <div class="flex justify-between text-sm">
+                                <span class="text-zinc-400">Current Used:</span>
+                                <span class="text-white font-semibold" x-text="monthlyInfo.current_hours + 'h'"></span>
+                            </div>
+                            <div class="flex justify-between text-sm">
+                                <span class="text-zinc-400">New OT:</span>
+                                <span class="text-white font-semibold" x-text="totalHours + 'h'"></span>
+                            </div>
+                            <div class="flex justify-between text-sm">
+                                <span class="text-zinc-400">Total:</span>
+                                <span :class="monthlyInfo.within_limit ? 'text-emerald-400' : 'text-red-400'" class="font-bold" x-text="monthlyInfo.new_total + 'h / ' + monthlyInfo.max + 'h'"></span>
+                            </div>
+                            <div class="h-2 bg-white/[0.06] rounded-full overflow-hidden mt-1">
+                                <div class="h-full rounded-full transition-all" :class="monthlyInfo.new_total > monthlyInfo.max ? 'bg-red-500' : (monthlyInfo.new_total > monthlyInfo.max * 0.8 ? 'bg-amber-500' : 'bg-emerald-500')" :style="'width: ' + Math.min(100, (monthlyInfo.new_total / monthlyInfo.max) * 100) + '%'"></div>
+                            </div>
+                        </div>
+                    </div>
 
-                        <button type="submit" name="assign_ot" class="w-full rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold text-sm px-5 py-3 shadow-sm transition flex items-center justify-center gap-2">
-                            <i class="fa-solid fa-clock"></i> Assign Overtime
-                        </button>
-                    </form>
+                    <!-- Rate Info -->
+                    <div class="card-hover glass-strong rounded-2xl p-5">
+                        <h3 class="font-bold text-white mb-3 text-sm"><i class="fa-solid fa-percent text-cyan-400 mr-2"></i>OT Rate Reference</h3>
+                        <div class="space-y-2 text-xs">
+                            <div class="flex justify-between"><span class="text-blue-400">Working Day</span><span class="text-zinc-400">0.02</span></div>
+                            <div class="flex justify-between"><span class="text-amber-400">Weekend</span><span class="text-zinc-400">0.03</span></div>
+                            <div class="flex justify-between"><span class="text-rose-400">Holiday</span><span class="text-zinc-400">0.04</span></div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </main>
@@ -288,46 +390,109 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['assign_ot'])) {
         </footer>
     </div>
 
-    <?php if ($has_assigned_by): ?>
-        <script>
-            (function() {
-                var empDeptMap = <?php echo json_encode($emp_dept_map); ?>;
-                var deptManagersMap = <?php echo json_encode($dept_managers_map); ?>;
-                var managerSelect = document.getElementById('assigned_by_select');
-                var empSel = document.querySelector('select[name="employee_id"]');
+    <script>
+        function assignOvertime() {
+            return {
+                assignmentType: 'employee',
+                selectedDeptId: '',
+                selectedEmpId: '',
+                otDate: '',
+                startTime: '',
+                endTime: '',
+                otType: '',
+                otTypeLabel: '',
+                totalHours: 0,
+                isValid: false,
+                validating: false,
+                validationErrors: [],
+                eligibleCount: 0,
+                ineligibleCount: 0,
+                eligibleEmployees: [],
+                ineligibleEmployees: [],
+                monthlyInfo: null,
+                deptEmpCount: <?php echo json_encode($dept_emp_count); ?>,
 
-                function selectManagerForDept(deptId) {
-                    if (!deptId || !deptManagersMap[deptId]) return false;
-                    var managers = deptManagersMap[deptId];
-                    // Select the first manager for the department
-                    var targetVal = String(managers[0].id);
-                    for (var i = 0; i < managerSelect.options.length; i++) {
-                        if (managerSelect.options[i].value === targetVal) {
-                            managerSelect.selectedIndex = i;
-                            return true;
+                get otTypeClass() {
+                    if (this.otType === 'working_day') return 'text-blue-400';
+                    if (this.otType === 'weekend') return 'text-amber-400';
+                    if (this.otType === 'holiday') return 'text-rose-400';
+                    return 'text-zinc-400';
+                },
+
+                validateAssignment() {
+                    if (!this.otDate || !this.startTime || !this.endTime) {
+                        this.isValid = false;
+                        this.validationErrors = [];
+                        return;
+                    }
+
+                    const hasTarget = (this.assignmentType === 'department' && this.selectedDeptId) ||
+                                      (this.assignmentType === 'employee' && this.selectedEmpId);
+                    if (!hasTarget) {
+                        this.isValid = false;
+                        return;
+                    }
+
+                    this.validating = true;
+
+                    fetch('../ajax/validate_overtime_assignment.php', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            assignment_type: this.assignmentType,
+                            department_id: this.assignmentType === 'department' ? this.selectedDeptId : null,
+                            employee_id: this.assignmentType === 'employee' ? this.selectedEmpId : null,
+                            ot_date: this.otDate,
+                            start_time: this.startTime,
+                            end_time: this.endTime
+                        })
+                    })
+                    .then(r => r.json())
+                    .then(data => {
+                        this.validating = false;
+                        this.otType = data.ot_type || '';
+                        this.otTypeLabel = data.ot_type_label || '';
+                        this.totalHours = data.total_hours || 0;
+                        this.validationErrors = data.errors || [];
+                        this.isValid = data.valid || false;
+
+                        if (this.assignmentType === 'department') {
+                            this.eligibleCount = data.eligible_count || 0;
+                            this.ineligibleCount = data.ineligible_count || 0;
+                            this.eligibleEmployees = data.employees || [];
+                            this.ineligibleEmployees = data.ineligible_employees || [];
                         }
-                    }
-                    return false;
-                }
 
-                empSel.addEventListener('change', function() {
-                    var empId = this.value;
-                    if (!empId) {
-                        managerSelect.selectedIndex = 0;
-                        return;
-                    }
-                    var deptId = empDeptMap[empId];
-                    if (!deptId) {
-                        managerSelect.selectedIndex = 0;
-                        return;
-                    }
-                    if (!selectManagerForDept(deptId)) {
-                        managerSelect.selectedIndex = 0;
-                    }
-                });
-            })();
-        </script>
-    <?php endif; ?>
+                        if (this.assignmentType === 'employee' && data.monthly_info) {
+                            this.monthlyInfo = data.monthly_info;
+                        } else {
+                            this.monthlyInfo = null;
+                        }
+                    })
+                    .catch(err => {
+                        this.validating = false;
+                        this.validationErrors = ['Validation request failed. Please try again.'];
+                        this.isValid = false;
+                    });
+                },
+
+                // Watch for changes
+                init() {
+                    this.$watch('selectedDeptId', () => this.validateAssignment());
+                    this.$watch('selectedEmpId', () => this.validateAssignment());
+                    this.$watch('assignmentType', () => {
+                        this.validationErrors = [];
+                        this.isValid = false;
+                        this.eligibleCount = 0;
+                        this.ineligibleCount = 0;
+                        this.ineligibleEmployees = [];
+                        this.monthlyInfo = null;
+                        this.validateAssignment();
+                    });
+                }
+            }
+        }
+    </script>
 </body>
 
 </html>

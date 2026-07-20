@@ -36,6 +36,7 @@ $page_info_map = [
     'reports.php'            => ['Reports',                 'View attendance and payroll reports.'],
     'profile.php'            => ['My Profile',              'Manage your personal information.'],
     'settings.php'           => ['Settings',                'Configure system settings.'],
+    'monthly_attendance_report.php' => ['Monthly Attendance Report', 'Employee attendance with overtime overview.'],
     'company_policy.php'     => ['Company Policy',          'Review company rules and guidelines.'],
     'change_password.php'    => ['Change Password',         'Update your account password.'],
 ];
@@ -47,7 +48,8 @@ $unread_count = 0;
 $topbar_notifications = [];
 
 $is_admin = (strpos($_SERVER['SCRIPT_NAME'] ?? '', '/admin/') !== false);
-$topbar_emp_id = $is_admin ? null : ($_SESSION['employee_id'] ?? null);
+// Admins are employees too — use their employee ID for notifications
+$topbar_emp_id = $is_admin ? ($_SESSION['admin_id'] ?? null) : ($_SESSION['employee_id'] ?? null);
 
 if (isset($conn) && $conn) {
     require_once __DIR__ . '/../config/notifications.php';
@@ -87,6 +89,12 @@ if (isset($conn) && $conn) {
 }
 
 $short_name = explode(' ', $admin_name)[0];
+
+// ── Checkout Reminder Count (employee pages only) ──
+$checkout_reminder_count = 0;
+if (!$is_admin && $topbar_emp_id && isset($conn) && $conn) {
+    $checkout_reminder_count = get_unread_checkout_reminder_count($conn, $topbar_emp_id);
+}
 ?>
 <?php if ($is_admin): ?>
     <div aria-hidden="true" class="h-16 w-full flex-shrink-0"></div>
@@ -114,6 +122,11 @@ $short_name = explode(' ', $admin_name)[0];
                     <?php if ($unread_count > 0): ?>
                         <span class="absolute top-1.5 right-1.5 w-4 h-4 bg-rose-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center shadow-lg shadow-rose-500/30 animate-pulse-soft"><?php echo $unread_count; ?></span>
                     <?php endif; ?>
+                    <?php if ($checkout_reminder_count > 0): ?>
+                        <span id="checkout-topbar-badge" class="absolute top-1 right-1 w-2.5 h-2.5 bg-amber-500 rounded-full animate-pulse border border-white dark:border-[#0F172A]" style="display: block;"></span>
+                    <?php else: ?>
+                        <span id="checkout-topbar-badge" class="absolute top-1 right-1 w-2.5 h-2.5 bg-amber-500 rounded-full animate-pulse border border-white dark:border-[#0F172A]" style="display: none;"></span>
+                    <?php endif; ?>
                 </button>
                 <div x-show="open" @click.outside="open = false"
                     x-transition:enter="transition-all duration-200 ease-out"
@@ -130,6 +143,16 @@ $short_name = explode(' ', $admin_name)[0];
                         <?php endif; ?>
                     </div>
                     <div class="max-h-80 overflow-y-auto">
+                        <?php if (!$is_admin && $checkout_reminder_count > 0): ?>
+                        <div id="checkout-reminder-dropdown-item" class="px-4 py-3 border-b border-amber-100 dark:border-amber-500/20 bg-amber-50/50 dark:bg-amber-500/5">
+                            <div class="flex items-center gap-2 mb-1">
+                                <span class="w-2 h-2 bg-amber-500 rounded-full animate-pulse"></span>
+                                <p class="text-xs font-semibold text-amber-700 dark:text-amber-400">Checkout Reminder</p>
+                            </div>
+                            <p class="text-xs text-slate-600 dark:text-slate-400">You haven't checked out yet today.</p>
+                            <a href="attendance.php" class="inline-block mt-2 text-[11px] font-semibold text-amber-600 dark:text-amber-400 hover:underline">Check Out Now &rarr;</a>
+                        </div>
+                        <?php endif; ?>
                         <?php if (empty($topbar_notifications)): ?>
                             <div class="p-6 text-center">
                                 <div class="w-12 h-12 mx-auto mb-3 rounded-full bg-slate-100 dark:bg-white/[0.05] flex items-center justify-center">

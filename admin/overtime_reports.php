@@ -14,6 +14,7 @@ $employee_id = $_GET['employee_id'] ?? '';
 $status_filter = $_GET['status'] ?? '';
 $request_type_filter = $_GET['request_type'] ?? '';
 $export = $_GET['export'] ?? '';
+$week_offset = (int)($_GET['week'] ?? 0);
 
 $has_ot_type = $conn->query("SHOW COLUMNS FROM overtime_requests LIKE 'ot_type'")->num_rows > 0;
 
@@ -28,11 +29,33 @@ if ($department_id) {
     $emp_stmt->close();
 }
 
-$records = get_overtime_report_data($conn, $from_date, $to_date, $department_id ? (int)$department_id : null, $employee_id ? (int)$employee_id : null, $status_filter ?: null, $request_type_filter ?: null);
+$all_records = get_overtime_report_data($conn, $from_date, $to_date, $department_id ? (int)$department_id : null, $employee_id ? (int)$employee_id : null, $status_filter ?: null, $request_type_filter ?: null);
 
-// Calculate stats
+// Group records by ISO week
+$weeks = [];
+foreach ($all_records as $r) {
+    $dt = new DateTime($r['ot_date']);
+    $week_key = $dt->format('o-W');
+    $week_start = clone $dt;
+    $week_start->modify('monday this week');
+    $week_end = clone $week_start;
+    $week_end->modify('sunday this week');
+    if (!isset($weeks[$week_key])) {
+        $weeks[$week_key] = [
+            'label' => 'Week ' . $dt->format('W') . ' (' . $week_start->format('M d') . ' - ' . $week_end->format('M d, Y') . ')',
+            'start' => $week_start->format('Y-m-d'),
+            'end' => $week_end->format('Y-m-d'),
+            'records' => [],
+        ];
+    }
+    $weeks[$week_key]['records'][] = $r;
+}
+$week_keys = array_keys($weeks);
+$total_weeks = count($week_keys);
+
+// Calculate stats from ALL records (not just current week)
 $total_hours = 0; $approved_hours = 0; $pending_hours = 0; $total_pay = 0;
-foreach ($records as $r) {
+foreach ($all_records as $r) {
     $total_hours += (float)$r['total_hours'];
     if ($r['status'] === 'Approved') {
         $approved_hours += (float)$r['total_hours'];
@@ -41,11 +64,30 @@ foreach ($records as $r) {
     if ($r['status'] === 'Pending') $pending_hours += (float)$r['total_hours'];
 }
 
+// Normalize week_offset
+if ($week_offset < 0) $week_offset = 0;
+if ($week_offset >= $total_weeks) $week_offset = $total_weeks - 1;
+if ($total_weeks === 0) $week_offset = 0;
+
+$current_week_key = $week_keys[$week_offset] ?? null;
+$current_week = $current_week_key ? $weeks[$current_week_key] : null;
+$records = $current_week ? $current_week['records'] : [];
+
+function build_query_string($overrides) {
+    $params = $_GET;
+    foreach ($overrides as $k => $v) {
+        if ($v === '' || $v === null) unset($params[$k]);
+        else $params[$k] = $v;
+    }
+    unset($params['export']);
+    return http_build_query($params);
+}
+
 // Handle export
 if ($export && in_array($export, ['csv', 'excel'])) {
     $headers = ['Employee Name', 'Employee Code', 'Department', 'Position', 'OT Date', 'Start Time', 'End Time', 'Hours', 'Type', 'Request Type', 'OT Rate', 'OT Pay', 'Reason', 'Status', 'Submitted'];
     $data = [];
-    foreach ($records as $r) {
+    foreach ($all_records as $r) {
         $data[] = [
             'employee_name' => $r['employee_name'],
             'employee_code' => $r['employee_code'],
@@ -80,9 +122,9 @@ if ($export === 'pdf') {
     $html .= '<div class="summary-item"><div class="value">' . number_format($total_hours, 1) . 'h</div><div class="label">Total Hours</div></div>';
     $html .= '<div class="summary-item"><div class="value">' . number_format($approved_hours, 1) . 'h</div><div class="label">Approved</div></div>';
     $html .= '<div class="summary-item"><div class="value">$' . number_format($total_pay, 2) . '</div><div class="label">Total Pay</div></div>';
-    $html .= '<div class="summary-item"><div class="value">' . count($records) . '</div><div class="label">Requests</div></div></div>';
+    $html .= '<div class="summary-item"><div class="value">' . count($all_records) . '</div><div class="label">Requests</div></div></div>';
     $html .= '<table><thead><tr><th>Employee</th><th>Date</th><th>Hours</th><th>Type</th><th>Pay</th><th>Status</th></tr></thead><tbody>';
-    foreach ($records as $r) {
+    foreach ($all_records as $r) {
         $type = $r['ot_type'] ?? detect_overtime_type($conn, $r['ot_date']);
         $pay = isset($r['ot_pay']) && $r['ot_pay'] > 0 ? '$' . number_format($r['ot_pay'], 2) : '-';
         $html .= "<tr><td>{$r['employee_name']} ({$r['employee_code']})</td><td>{$r['ot_date']}</td><td>{$r['total_hours']}h</td><td>$type</td><td>$pay</td><td>{$r['status']}</td></tr>";
@@ -174,14 +216,62 @@ if ($export === 'pdf') {
                 </div>
                 <div class="glass-strong rounded-xl p-4 border border-white/[0.06]">
                     <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Requests</span>
-                    <p class="text-xl font-bold text-blue-400"><?php echo count($records); ?></p>
+                    <p class="text-xl font-bold text-blue-400"><?php echo count($all_records); ?></p>
                 </div>
             </section>
+
+            <!-- Week Pagination -->
+            <?php if ($total_weeks > 1): ?>
+            <div class="flex items-center justify-between glass-strong rounded-xl px-4 py-3 border border-white/[0.06]">
+                <div class="flex items-center gap-3">
+                    <?php if ($week_offset > 0): ?>
+                    <a href="?<?php echo build_query_string(['week' => $week_offset - 1]); ?>" class="rounded-lg bg-white/[0.06] hover:bg-white/[0.1] text-zinc-300 px-3 py-1.5 text-xs transition flex items-center gap-1">
+                        <i class="fa-solid fa-chevron-left"></i> Previous
+                    </a>
+                    <?php else: ?>
+                    <span class="rounded-lg bg-white/[0.03] text-zinc-600 px-3 py-1.5 text-xs cursor-not-allowed flex items-center gap-1">
+                        <i class="fa-solid fa-chevron-left"></i> Previous
+                    </span>
+                    <?php endif; ?>
+                </div>
+                <div class="text-center">
+                    <span class="text-sm font-semibold text-white"><?php echo $current_week ? htmlspecialchars($current_week['label']) : ''; ?></span>
+                    <span class="text-xs text-zinc-500 ml-2">(<?php echo count($records); ?> records)</span>
+                </div>
+                <div class="flex items-center gap-3">
+                    <?php if ($week_offset < $total_weeks - 1): ?>
+                    <a href="?<?php echo build_query_string(['week' => $week_offset + 1]); ?>" class="rounded-lg bg-white/[0.06] hover:bg-white/[0.1] text-zinc-300 px-3 py-1.5 text-xs transition flex items-center gap-1">
+                        Next <i class="fa-solid fa-chevron-right"></i>
+                    </a>
+                    <?php else: ?>
+                    <span class="rounded-lg bg-white/[0.03] text-zinc-600 px-3 py-1.5 text-xs cursor-not-allowed flex items-center gap-1">
+                        Next <i class="fa-solid fa-chevron-right"></i>
+                    </span>
+                    <?php endif; ?>
+                </div>
+            </div>
+            <?php endif; ?>
+
+            <!-- Week selector tabs -->
+            <?php if ($total_weeks > 1): ?>
+            <div class="flex flex-wrap gap-1.5">
+                <?php $wi = 0; foreach ($week_keys as $wk): ?>
+                <a href="?<?php echo build_query_string(['week' => $wi]); ?>" class="rounded-lg px-3 py-1.5 text-xs font-semibold transition <?php echo $wi === $week_offset ? 'bg-blue-600 text-white shadow-sm' : 'bg-white/[0.06] text-zinc-400 hover:bg-white/[0.1] hover:text-white'; ?>">
+                    <?php echo $weeks[$wk]['label']; ?>
+                </a>
+                <?php $wi++; endforeach; ?>
+            </div>
+            <?php endif; ?>
 
             <!-- Records Table -->
             <section class="card-hover glass-strong rounded-2xl overflow-hidden">
                 <div class="p-5 border-b border-white/[0.06] flex items-center justify-between">
-                    <h2 class="font-bold text-white"><i class="fa-solid fa-clock text-blue-400 mr-2"></i>Overtime Records (<?php echo count($records); ?>)</h2>
+                    <h2 class="font-bold text-white"><i class="fa-solid fa-clock text-blue-400 mr-2"></i>Overtime Records
+                        <?php if ($current_week): ?>
+                        <span class="text-sm font-normal text-zinc-400 ml-2"><?php echo htmlspecialchars($current_week['label']); ?></span>
+                        <?php endif; ?>
+                    </h2>
+                    <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold bg-indigo-500/20 text-indigo-400"><?php echo count($records); ?> records</span>
                 </div>
                 <div class="overflow-x-auto">
                     <table class="w-full text-left text-sm whitespace-nowrap">
@@ -205,7 +295,7 @@ if ($export === 'pdf') {
                             <?php if (empty($records)): ?>
                             <tr>
                                 <td colspan="12" class="px-5 py-12 text-center text-zinc-500">
-                                    <p class="text-lg mb-1">No records found for the selected filters.</p>
+                                    <p class="text-lg mb-1">No records found for this week.</p>
                                     <p class="text-xs text-zinc-600">Try adjusting the date range or filters.</p>
                                 </td>
                             </tr>

@@ -237,6 +237,11 @@ $month_name = date('F Y', strtotime($month_start));
                 </div>
             </section>
 
+            <!-- ═══ CHECKOUT REMINDER BANNER ═══ -->
+            <section class="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full">
+                <div id="checkout-reminder-banner" class="hidden" style="display: none;"></div>
+            </section>
+
             <!-- ═══ STATISTICS CARDS ═══ -->
             <section class="px-4 sm:px-6 lg:px-8 py-4 max-w-7xl mx-auto w-full">
                 <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
@@ -513,5 +518,7 @@ $month_name = date('F Y', strtotime($month_start));
         </main>
     </div>
     <?php include "../includes/employee_bottom_nav.php"; ?>
+    <div id="checkout-toast-container" class="fixed top-20 right-4 z-50 flex flex-col gap-2"></div>
+    <script src="checkout_reminder.js"></script>
 </body>
 </html>

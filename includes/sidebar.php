@@ -196,6 +196,7 @@ if ($sidebar_role === 'admin') {
             echo nav_section('Attendance', 'calendar-check', [
                 ['page' => 'attendance.php', 'href' => 'attendance.php', 'label' => 'Monthly Attendance'],
                 ['page' => 'dailyattendance.php', 'href' => 'dailyattendance.php', 'label' => 'Daily Attendance'],
+                ['page' => 'monthly_attendance_report.php', 'href' => 'monthly_attendance_report.php', 'label' => 'Attendance Report'],
                 ['page' => 'attendance_settings.php', 'href' => 'attendance_settings.php', 'label' => 'Settings'],
                 ['page' => 'attendance_corrections.php', 'href' => 'attendance_corrections.php', 'label' => 'Corrections'],
                 ['page' => 'attendance_management.php', 'href' => 'attendance_management.php', 'label' => 'Management'],
@@ -208,6 +209,7 @@ if ($sidebar_role === 'admin') {
                 // ['page' => 'overtime_dashboard.php', 'href' => 'overtime_dashboard.php', 'label' => 'Dashboard'],
                 ['page' => 'overtimeApproval.php', 'href' => 'overtimeApproval.php', 'label' => 'OT Approvals'],
                 ['page' => 'assign_overtime.php', 'href' => 'assign_overtime.php', 'label' => 'Assign OT'],
+                ['page' => 'assignment_list.php', 'href' => 'assignment_list.php', 'label' => 'Assignments'],
                 ['page' => 'overtimereport.php', 'href' => 'overtimereport.php', 'label' => 'OT Report'],
 
             ], $current_page, $pending_ot, 'orange'); ?>
@@ -255,6 +257,22 @@ if ($sidebar_role === 'admin') {
             ], $current_page, null, 'emerald'); ?>
             <?php echo nav_item('leaverequest.php', 'Leave Request', 'paper-plane', $current_page, null, null, 'amber'); ?>
             <?php echo nav_item('overtimerequest.php', 'Overtime Request', 'stopwatch', $current_page, null, null, 'orange'); ?>
+            <?php
+            // Show OT Approvals for approver-role employees
+            if (isset($conn) && $conn && isset($_SESSION['employee_id'])) {
+                $emp_role_stmt = $conn->prepare("SELECT role FROM employee WHERE id = ?");
+                $emp_role_stmt->bind_param('i', $_SESSION['employee_id']);
+                $emp_role_stmt->execute();
+                $emp_role_row = $emp_role_stmt->get_result()->fetch_assoc();
+                $emp_role_stmt->close();
+                $emp_role = strtolower(trim($emp_role_row['role'] ?? ''));
+                if (in_array($emp_role, ['admin', 'manager', 'supervisor', 'officer']) || $_SESSION['employee_id'] == 1) {
+                    $pending_ot_q = $conn->query("SELECT COUNT(*) as cnt FROM overtime_requests WHERE approver_id = " . (int)$_SESSION['employee_id'] . " AND status = 'Pending'");
+                    $pending_ot_count = $pending_ot_q ? (int)$pending_ot_q->fetch_assoc()['cnt'] : 0;
+                    echo nav_item('overtime_approval.php', 'OT Approvals', 'user-check', $current_page, null, $pending_ot_count, 'teal');
+                }
+            }
+            ?>
             <?php echo nav_section('Payroll', 'money-bill-wave', [
                 ['page' => 'payroll.php', 'href' => 'payroll.php', 'label' => 'My Payroll'],
             ], $current_page, null, 'sky'); ?>

@@ -38,7 +38,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['submit_ot'])) {
                 $ot_pay = calculate_overtime_pay_for_request($conn, $employee_id, $ot_type, $total_hours);
                 $cols = ['employee_id', 'ot_date', 'start_time', 'end_time', 'total_hours', 'reason', 'status'];
                 $vals = [$employee_id, $ot_date, $start_time, $end_time, $total_hours, $reason, 'Pending'];
-                $types = 'isssdss';
+                $types = 'isssds';
                 if ($has_source) { $cols[] = 'source'; $vals[] = 'employee_request'; $types .= 's'; }
                 if ($has_request_type) { $cols[] = 'request_type'; $vals[] = 'employee_request'; $types .= 's'; }
                 if ($has_ot_type) { $cols[] = 'ot_type'; $vals[] = $ot_type; $types .= 's'; $cols[] = 'ot_rate'; $vals[] = $ot_rate; $types .= 'd'; }
@@ -116,7 +116,7 @@ $emp_bs=$conn->query("SELECT basic_salary FROM employee WHERE id=$employee_id")-
 <link rel="icon" type="image/svg+xml" href="../favicon.svg">
 <?php include "../includes/header.php"; ?>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-<script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <style>
 .fp-calendar .day.OT-APPROVED{background:rgba(16,185,129,.25)!important;border-radius:50%}
 .fp-calendar .day.OT-PENDING{background:rgba(245,158,11,.25)!important;border-radius:50%}
@@ -127,20 +127,22 @@ $emp_bs=$conn->query("SELECT basic_salary FROM employee WHERE id=$employee_id")-
 .fp-calendar .day.disabled-date{color:#52525b!important;opacity:.4;pointer-events:none}
 </style>
 </head>
-<body class="bg-slate-50 dark:bg-[#0B1120] text-slate-900 dark:text-white font-sans antialiased emp-page-wrapper">
+<body x-data="otForm()" class="bg-slate-50 dark:bg-[#0B1120] text-slate-900 dark:text-white font-sans antialiased emp-page-wrapper">
 <?php $use_sidebar=true; include "../includes/sidebar.php"; ?>
 <div class="main-wrapper flex flex-col min-h-screen">
-<?php $page_title="Overtime Request"; $page_subtitle=format_mmt(mmt_date(),'l, F j, Y').' (MMT)'; include "../includes/topbar.php"; ?>
+<?php $page_title="Overtime Request"; $page_subtitle=format_mmt(mmt_date(),'l, F j, Y').' (MMT) &middot; <span class="text-purple-400 font-semibold">'.number_format($monthly_remaining['remaining_hours'],1).'h remaining</span>'; include "../includes/topbar.php"; ?>
 <main class="p-4 sm:p-6 lg:p-8 space-y-6 flex-1 page-content w-full">
 <?php if($is_inactive): ?><div class="px-4 py-3 rounded-lg border bg-red-500/10 border-red-500/20 text-red-400"><i class="fa-solid fa-ban mr-2"></i> Your account is inactive.</div><?php endif; ?>
 <?php if($message): ?><div class="px-4 py-3 rounded-lg border <?php echo $message_type=='success'?'bg-emerald-500/10 border-emerald-500/20 text-emerald-400':'bg-red-500/10 border-red-500/20 text-red-400'; ?>"><?php echo htmlspecialchars($message); ?></div><?php endif; ?>
 <?php if(isset($_SESSION['ot_success'])): ?><div class="px-4 py-3 rounded-lg border bg-emerald-500/10 border-emerald-500/20 text-emerald-400"><i class="fa-solid fa-circle-check mr-2"></i><?php echo htmlspecialchars($_SESSION['ot_success']); ?></div><?php unset($_SESSION['ot_success']); endif; ?>
+<!-- Stats -->
 <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
 <div class="glass-strong rounded-xl p-4 border border-white/[0.06]"><span class="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Monthly Cap</span><p class="text-lg font-bold text-white"><?php echo number_format($monthly_remaining['monthly_max'],0); ?>h</p></div>
 <div class="glass-strong rounded-xl p-4 border border-white/[0.06]"><span class="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Used</span><p class="text-lg font-bold text-amber-400"><?php echo number_format($monthly_remaining['used_hours'],1); ?>h</p></div>
 <div class="glass-strong rounded-xl p-4 border border-white/[0.06]"><span class="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Approved</span><p class="text-lg font-bold text-emerald-400"><?php echo number_format($monthly_remaining['approved_hours'],1); ?>h</p></div>
 <div class="glass-strong rounded-xl p-4 border border-white/[0.06]"><span class="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Remaining</span><p class="text-lg font-bold text-purple-400"><?php echo number_format($monthly_remaining['remaining_hours'],1); ?>h</p></div>
 </div>
+<!-- Quick Stats -->
 <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
 <div class="glass-strong rounded-xl p-3 border border-blue-500/20 bg-blue-500/5"><span class="text-[10px] font-bold uppercase tracking-wider text-blue-400">My Requests</span><p class="text-lg font-bold text-white"><?php echo $total_requests; ?></p></div>
 <div class="glass-strong rounded-xl p-3 border border-amber-500/20 bg-amber-500/5"><span class="text-[10px] font-bold uppercase tracking-wider text-amber-400">Pending</span><p class="text-lg font-bold text-white"><?php echo $pending_requests; ?></p></div>
@@ -148,6 +150,7 @@ $emp_bs=$conn->query("SELECT basic_salary FROM employee WHERE id=$employee_id")-
 <div class="glass-strong rounded-xl p-3 border border-rose-500/20 bg-rose-500/5"><span class="text-[10px] font-bold uppercase tracking-wider text-rose-400">Rejected</span><p class="text-lg font-bold text-white"><?php echo $rejected_requests; ?></p></div>
 <div class="glass-strong rounded-xl p-3 border border-purple-500/20 bg-purple-500/5"><span class="text-[10px] font-bold uppercase tracking-wider text-purple-400">Assignments</span><p class="text-lg font-bold text-white"><?php echo $total_assignments; ?><?php if($pending_assignments>0):?> <span class="text-xs text-amber-400">(<?php echo $pending_assignments; ?> new)</span><?php endif;?></p></div>
 </div>
+<!-- Calendar Legend -->
 <div class="glass-strong rounded-xl p-3 border border-white/[0.06]">
 <div class="flex flex-wrap items-center gap-3 text-[10px] font-semibold uppercase tracking-wider">
 <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-emerald-500/30 border border-emerald-500/50"></span> OT Approved</span>
@@ -158,30 +161,37 @@ $emp_bs=$conn->query("SELECT basic_salary FROM employee WHERE id=$employee_id")-
 <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-zinc-500/20 border border-zinc-500/40"></span> Disabled</span>
 </div></div>
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+<!-- Form -->
 <div class="space-y-4">
 <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-5">
 <h3 class="font-bold text-white mb-4"><i class="fa-solid fa-plus-circle text-blue-400 mr-2"></i>New Overtime Request</h3>
-<form method="POST" id="otForm" class="space-y-4 text-zinc-300">
+<form method="POST" class="space-y-4 text-zinc-300" @submit.prevent="submitForm">
 <?php echo csrf_field(); ?>
 <div>
 <label class="text-xs font-semibold text-zinc-400 block mb-1">OT Date</label>
-<input type="text" name="ot_date" id="ot_date_picker" required readonly class="w-full text-sm px-3 py-3 border border-white/10 rounded-lg bg-white/[0.06] text-white focus:outline-blue-500 cursor-pointer" placeholder="Click to select date...">
-<div id="date_info_box" class="hidden mt-2 space-y-1"></div>
-<div id="date_warn_box" class="hidden mt-2"></div>
+<input type="text" name="ot_date" id="ot_date_picker" required readonly x-model="otDate" class="w-full text-sm px-3 py-3 border border-white/10 rounded-lg bg-white/[0.06] text-white focus:outline-blue-500 cursor-pointer" placeholder="Click to select date...">
+<template x-if="dateInfo && dateInfo.disable_reason"><div class="mt-2 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex items-center gap-2"><i class="fa-solid fa-circle-exclamation"></i><span x-text="dateInfo.disable_reason"></span></div></template>
+<template x-if="dateInfo && !dateInfo.disabled"><div class="mt-2 space-y-1">
+<div class="flex items-center gap-2 text-xs" x-show="dateInfo.is_weekend"><span class="text-amber-400"><i class="fa-solid fa-calendar-weekend mr-1"></i>Weekend OT (09:00-17:00, max 8h)</span></div>
+<div class="flex items-center gap-2 text-xs" x-show="dateInfo.is_holiday"><span class="text-rose-400"><i class="fa-solid fa-calendar-day mr-1"></i>Holiday OT (09:00-17:00, max 8h) - <span x-text="dateInfo.holiday_name"></span></span></div>
+<div class="flex items-center gap-2 text-xs" x-show="!dateInfo.is_weekend && !dateInfo.is_holiday"><span class="text-blue-400"><i class="fa-solid fa-briefcase mr-1"></i>Working Day OT (17:00-21:00, max 4h)</span></div>
+</div></template>
 </div>
-<div id="time_section" class="hidden">
+<div x-show="otType" x-transition>
 <label class="text-xs font-semibold text-zinc-400 block mb-1">Time Range (MMT)</label>
-<div id="ot_type_badge" class="mb-2 hidden"></div>
 <div class="grid grid-cols-2 gap-3">
 <div><label class="text-[10px] text-zinc-500 block mb-1">Start Time</label>
-<input type="time" name="start_time" id="ot_start_time" required class="w-full text-sm px-3 py-3 border border-white/10 rounded-lg bg-white/[0.06] text-white focus:outline-blue-500 [color-scheme:dark]"></div>
+<select name="start_time" x-model="startTime" @change="calculatePreview" required class="w-full text-sm px-3 py-3 border border-white/10 rounded-lg bg-white/[0.06] text-white focus:outline-blue-500"><option value="">Select...</option><template x-for="t in allowedStartTimes" :key="t"><option :value="t" x-text="fmt12(t)"></option></template></select></div>
 <div><label class="text-[10px] text-zinc-500 block mb-1">End Time</label>
-<input type="time" name="end_time" id="ot_end_time" required class="w-full text-sm px-3 py-3 border border-white/10 rounded-lg bg-white/[0.06] text-white focus:outline-blue-500 [color-scheme:dark]"></div>
-</div>
-</div>
-<div id="preview_box" class="hidden rounded-xl p-4 border"></div>
-<div id="monthly_warn" class="hidden"></div>
-<div id="monthly_err" class="hidden"></div>
+<select name="end_time" x-model="endTime" @change="calculatePreview" required class="w-full text-sm px-3 py-3 border border-white/10 rounded-lg bg-white/[0.06] text-white focus:outline-blue-500"><option value="">Select...</option><template x-for="t in allowedEndTimes" :key="t"><option :value="t" x-text="fmt12(t)"></option></template></select></div>
+</div></div>
+<template x-if="preview.show"><div class="rounded-xl p-4 border" :class="preview.valid ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-red-500/10 border-red-500/20'">
+<div class="text-center space-y-1">
+<p class="text-sm font-medium" :class="preview.valid ? 'text-emerald-400' : 'text-red-400'" x-text="preview.message"></p>
+<template x-if="preview.valid"><div class="text-xs text-zinc-400">Hours: <span class="text-white font-semibold" x-text="preview.hours+'h'"></span> &middot; Rate: <span class="text-white font-semibold" x-text="preview.rate"></span> &middot; Pay: <span class="text-emerald-400 font-semibold" x-text="'$'+preview.pay"></span></div></template>
+</div></div></template>
+<template x-if="monthlyInfo && monthlyInfo.remaining_hours <= 4 && monthlyInfo.remaining_hours > 0"><div class="rounded-xl p-3 border bg-amber-500/10 border-amber-500/20 text-amber-400 text-xs flex items-center gap-2"><i class="fa-solid fa-triangle-exclamation"></i><span>Only <span x-text="monthlyInfo.remaining_hours.toFixed(1)"></span>h remaining this month.</span></div></template>
+<template x-if="monthlyInfo && monthlyInfo.remaining_hours <= 0"><div class="rounded-xl p-3 border bg-red-500/10 border-red-500/20 text-red-400 text-xs flex items-center gap-2"><i class="fa-solid fa-ban"></i><span>Monthly overtime limit exceeded.</span></div></template>
 <div><label class="text-xs font-semibold text-zinc-400 block mb-1">Reason</label>
 <textarea name="reason" rows="3" required class="w-full text-sm px-3 py-3 border border-white/10 rounded-lg bg-white/[0.06] text-white focus:outline-blue-500 resize-none" placeholder="Why is overtime needed..."></textarea></div>
 <?php if($has_approver_id): ?><div class="grid grid-cols-2 gap-3">
@@ -189,8 +199,9 @@ $emp_bs=$conn->query("SELECT basic_salary FROM employee WHERE id=$employee_id")-
 <div><label class="text-xs font-semibold text-zinc-400 block mb-1">Approver Type</label><select name="approver_type" required class="w-full text-sm px-3 py-3 border border-white/10 rounded-lg bg-white/[0.06] text-white focus:outline-blue-500"><option value="admin">Admin</option><option value="supervisor">Supervisor</option><option value="manager">Manager</option></select></div>
 </div><?php endif; ?>
 <?php if($is_inactive):?><button type="button" disabled class="w-full bg-zinc-600/50 text-zinc-400 font-semibold text-sm px-4 py-3 rounded-lg cursor-not-allowed"><i class="fa-solid fa-ban"></i> Account Inactive</button>
-<?php else:?><button type="submit" name="submit_ot" id="submitBtn" disabled class="w-full font-semibold text-sm px-4 py-3 rounded-lg transition flex items-center justify-center gap-2 bg-zinc-600/50 text-zinc-400 cursor-not-allowed"><i class="fa-solid fa-clock"></i> Submit OT Request</button><?php endif;?>
+<?php else:?><button type="submit" name="submit_ot" :disabled="!canSubmit" class="w-full font-semibold text-sm px-4 py-3 rounded-lg transition flex items-center justify-center gap-2" :class="canSubmit ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-zinc-600/50 text-zinc-400 cursor-not-allowed'"><i class="fa-solid fa-clock"></i> Submit OT Request</button><?php endif;?>
 </form></div>
+<!-- Assignments -->
 <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-5">
 <h3 class="font-bold text-white mb-4"><i class="fa-solid fa-user-shield text-purple-400 mr-2"></i>Overtime Assignments</h3>
 <?php if(empty($my_assignments)):?><div class="text-center py-8"><div class="w-16 h-16 rounded-2xl bg-purple-500/10 flex items-center justify-center mx-auto mb-3"><i class="fa-solid fa-inbox text-2xl text-zinc-500"></i></div><p class="text-zinc-400 text-sm">No assignments yet.</p></div>
@@ -200,13 +211,12 @@ $emp_bs=$conn->query("SELECT basic_salary FROM employee WHERE id=$employee_id")-
 <div class="grid grid-cols-2 gap-2 text-xs mb-2"><div><span class="text-zinc-500">Time:</span> <span class="text-white ml-1"><?php echo date('h:i A',strtotime($a['start_time'])).' - '.date('h:i A',strtotime($a['end_time'])); ?></span></div><div><span class="text-zinc-500">Hours:</span> <span class="text-white font-semibold ml-1"><?php echo $a['total_hours']; ?>h</span></div></div>
 <?php if(!empty($a['assigned_by_emp_name'])):?><div class="text-xs mb-2"><span class="text-zinc-500">Assigned by:</span> <span class="text-blue-400 ml-1"><?php echo htmlspecialchars($a['assigned_by_emp_name']); ?></span></div><?php endif;?>
 <?php if($a['status']==='Pending'):?><div class="flex gap-2 mt-3 pt-3 border-t border-white/[0.06]"><form method="POST" class="flex-1"><?php echo csrf_field();?><input type="hidden" name="request_id" value="<?php echo $a['id'];?>"><input type="hidden" name="response" value=""><button type="submit" name="respond_ot" value="1" onclick="this.form.response.value='accepted'" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-medium text-xs px-3 py-2 rounded-lg"><i class="fa-solid fa-check"></i> Accept</button></form><form method="POST" class="flex-1"><?php echo csrf_field();?><input type="hidden" name="request_id" value="<?php echo $a['id'];?>"><input type="hidden" name="response" value=""><button type="submit" name="respond_ot" value="1" onclick="this.form.response.value='rejected'" class="w-full border border-red-500/30 hover:bg-red-500/10 text-red-400 font-medium text-xs px-3 py-2 rounded-lg"><i class="fa-solid fa-times"></i> Decline</button></form></div><?php endif;?>
-</div><?php endforeach;?></div><?php endif;?>
-</div></div>
+<!-- Requests History -->
 <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-5">
 <h3 class="font-bold text-white mb-4"><i class="fa-solid fa-history text-sky-400 mr-2"></i>My Overtime Requests</h3>
 <?php if(empty($my_requests)):?><div class="text-center py-8"><div class="w-16 h-16 rounded-2xl bg-sky-500/10 flex items-center justify-center mx-auto mb-3"><i class="fa-solid fa-inbox text-2xl text-zinc-500"></i></div><p class="text-zinc-400 text-sm">No overtime requests yet.</p></div>
 <?php else:?><div class="space-y-3 max-h-[700px] overflow-y-auto pr-1"><?php foreach($my_requests as $row):?>
-<div class="rounded-xl border p-4 <?php echo $row['status']==='Pending'?'border-amber-500/30 bg-amber-500/5':($row['status']==='Approved'?'border-emerald-500/20 bg-emerald-500/5':($row['status']==='Rejected'?'border-red-500/20 border-red-500/5':'border-white/[0.06] bg-white/[0.02]')); ?>">
+<div class="rounded-xl border p-4 <?php echo $row['status']==='Pending'?'border-amber-500/30 bg-amber-500/5':($row['status']==='Approved'?'border-emerald-500/20 bg-emerald-500/5':($row['status']==='Rejected'?'border-red-500/20 bg-red-500/5':'border-white/[0.06] bg-white/[0.02]')); ?>">
 <div class="flex items-start justify-between mb-2"><div class="flex items-center gap-2">
 <span class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold <?php echo $row['status']=='Approved'?'bg-emerald-500/20 text-emerald-400':''; ?><?php echo $row['status']=='Rejected'?'bg-red-500/20 text-red-400':''; ?><?php echo $row['status']=='Pending'?'bg-amber-500/20 text-amber-400':''; ?><?php echo $row['status']=='Cancelled'?'bg-zinc-500/20 text-zinc-400':''; ?>"><?php echo $row['status']; ?></span>
 <span class="text-xs text-zinc-500"><?php echo format_mmt($row['ot_date'],'M d, Y'); ?></span></div>
@@ -225,159 +235,23 @@ $emp_bs=$conn->query("SELECT basic_salary FROM employee WHERE id=$employee_id")-
 </main>
 </div>
 <script>
-(function(){
-var BASIC_SALARY = <?php echo $basic_salary??0;?>;
-var MONTHLY_MAX = <?php echo $monthly_remaining['monthly_max']??60;?>;
-var MONTHLY_USED = <?php echo $monthly_remaining['used_hours']??0;?>;
-var MONTHLY_REMAINING = <?php echo $monthly_remaining['remaining_hours']??0;?>;
-var TODAY = '<?php echo mmt_date();?>';
-var RATE_MULT = {working_day:0.02, weekend:0.03, holiday:0.04};
-var WINDOWS = {working_day:{s:'17:00',e:'21:00',max:4}, weekend:{s:'09:00',e:'17:00',max:8}, holiday:{s:'09:00',e:'17:00',max:8}};
-var calendarData = {};
-var otType = '';
-var dateInfo = null;
-
-var elDate = document.getElementById('ot_date_picker');
-var elTimeSection = document.getElementById('time_section');
-var elTypeInfo = document.getElementById('ot_type_badge');
-var elDateInfo = document.getElementById('date_info_box');
-var elDateWarn = document.getElementById('date_warn_box');
-var elStart = document.getElementById('ot_start_time');
-var elEnd = document.getElementById('ot_end_time');
-var elPreview = document.getElementById('preview_box');
-var elMonthlyWarn = document.getElementById('monthly_warn');
-var elMonthlyErr = document.getElementById('monthly_err');
-var elSubmit = document.getElementById('submitBtn');
-var elForm = document.getElementById('otForm');
-
-function fmt12(t){
-  var p=t.split(':'),h=parseInt(p[0]),m=parseInt(p[1]);
-  return (h%12||12)+':'+(m<10?'0':'')+m+(h>=12?' PM':' AM');
+function otForm(){return{
+otDate:'',startTime:'',endTime:'',otType:'',dateInfo:null,calendarData:{},monthlyInfo:null,
+preview:{show:false,valid:false,hours:'0.0',rate:'0.02',pay:'0.00',message:''},
+rateMultipliers:{working_day:0.02,weekend:0.03,holiday:0.04},
+basicSalary:<?php echo $basic_salary??0;?>,
+get allowedStartTimes(){if(this.otType==='working_day')return this.genSlots('17:00','20:30',30);return this.genSlots('09:00','16:30',30);},
+get allowedEndTimes(){if(!this.startTime)return[];if(this.otType==='working_day')return this.genSlots('17:30','21:00',30);return this.genSlots('09:30','17:00',30);},
+get canSubmit(){return this.otDate&&this.startTime&&this.endTime&&this.preview.valid&&(!this.dateInfo||!this.dateInfo.disabled)&&this.monthlyInfo&&this.monthlyInfo.remaining_hours>0;},
+genSlots(s,e,m){const r=[];let[h,mi]=s.split(':').map(Number);const[eh,em]=e.split(':').map(Number);while(h<eh||(h===eh&&mi<=em)){r.push(String(h).padStart(2,'0')+':'+String(mi).padStart(2,'0'));mi+=m;if(mi>=60){h++;mi-=60;}}return r;},
+fmt12(t){const[h,m]=t.split(':').map(Number);return(h%12||12)+':'+String(m).padStart(2,'0')+(h>=12?' PM':' AM');},
+loadCalData(y,m){fetch('../ajax/ot_calendar_data.php?year='+y+'&month='+m).then(r=>r.json()).then(d=>{this.calendarData=d.dates||{};this.monthlyInfo=d.monthly||null;this.applyClasses();});},
+applyClasses(){const self=this;setTimeout(()=>{document.querySelectorAll('.flatpickr-day').forEach(day=>{const lbl=day.getAttribute('aria-label');if(!lbl)return;const iso=new Date(lbl).toISOString().split('T')[0];const info=self.calendarData[iso];if(!info)return;day.classList.remove('OT-APPROVED','OT-PENDING','OT-REJECTED','OT-LEAVE','OT-HOLIDAY','OT-ABSENT','disabled-date');if(info.disabled&&!info.is_past)day.classList.add('disabled-date');if(info.has_leave)day.classList.add('OT-LEAVE');else if(info.is_holiday)day.classList.add('OT-HOLIDAY');else if(info.ot_requests.length>0){const st=info.ot_requests.map(r=>r.status);if(st.includes('Approved'))day.classList.add('OT-APPROVED');else if(st.includes('Pending'))day.classList.add('OT-PENDING');else if(st.includes('Rejected'))day.classList.add('OT-REJECTED');}});},100);},
+onDateChange(){this.startTime='';this.endTime='';this.preview={show:false,valid:false,hours:'0.0',rate:'0',pay:'0.00',message:''};if(!this.otDate){this.otType='';this.dateInfo=null;return;}const info=this.calendarData[this.otDate];this.dateInfo=info||null;if(info&&info.disabled){this.otType='';return;}fetch('../ajax/detect_ot_type.php?date='+this.otDate).then(r=>r.json()).then(d=>{this.otType=d.type;}).catch(()=>{this.otType='';});},
+calculatePreview(){if(!this.otDate||!this.startTime||!this.endTime||!this.otType){this.preview.show=false;return;}const s=new Date('2000-01-01T'+this.startTime+':00');const e=new Date('2000-01-01T'+this.endTime+':00');if(e<=s){this.preview={show:true,valid:false,hours:'0.0',rate:'0',pay:'0.00',message:'End time must be after start time'};return;}const hrs=(e-s)/3600000;const rate=this.rateMultipliers[this.otType]||0.02;const hr=this.basicSalary>0?(this.basicSalary/(30*8)):0;const pay=hr*rate*hrs;const maxH=this.otType==='working_day'?4:8;const w={working_day:{s:'17:00',e:'21:00'},weekend:{s:'09:00',e:'17:00'},holiday:{s:'09:00',e:'17:00'}}[this.otType];const valid=hrs>0&&hrs<=maxH&&this.startTime>=w.s&&this.endTime<=w.e;let msg='Valid OT request';if(!valid){if(hrs>maxH)msg='Exceeds max '+maxH+'h';else if(this.startTime<w.s||this.endTime>w.e)msg='Outside allowed window ('+w.s+' - '+w.e+')';else msg='Check your time selection';}if(this.monthlyInfo&&(this.monthlyInfo.used_hours+hrs)>this.monthlyInfo.monthly_max){this.preview={show:true,valid:false,hours:hrs.toFixed(1),rate:rate.toFixed(2),pay:pay.toFixed(2),message:'Monthly OT limit exceeded. Would be '+(this.monthlyInfo.used_hours+hrs).toFixed(1)+'h / '+this.monthlyInfo.monthly_max+'h'};return;}this.preview={show:true,valid:valid,hours:hrs.toFixed(1),rate:rate.toFixed(2),pay:pay.toFixed(2),message:msg};},
+submitForm(e){if(!this.canSubmit){e.preventDefault();return;}e.target.submit();},
+init(){const self=this;flatpickr('#ot_date_picker',{dateFormat:'Y-m-d',minDate:'<?php echo mmt_date();?>',locale:{firstDayOfWeek:1},disableMobile:true,onMonthChange:function(s,d,fp){self.loadCalData(fp.currentYear,fp.currentMonth+1);},onYearChange:function(s,d,fp){self.loadCalData(fp.currentYear,fp.currentMonth+1);},onChange:function(s,d){self.otDate=d;self.onDateChange();},onReady:function(s,d,fp){self.loadCalData(fp.currentYear,fp.currentMonth+1);}});}
 }
-
-function loadCalData(y,m){
-  fetch('../ajax/ot_calendar_data.php?year='+y+'&month='+m,{credentials:'include'})
-  .then(function(r){return r.json()}).then(function(d){
-    calendarData=d.dates||{};
-    if(d.monthly){MONTHLY_MAX=d.monthly.monthly_max;MONTHLY_USED=d.monthly.used_hours;MONTHLY_REMAINING=d.monthly.remaining_hours;}
-    applyClasses();
-  }).catch(function(e){console.error('Calendar load failed:',e)});
-}
-
-function applyClasses(){
-  setTimeout(function(){
-    document.querySelectorAll('.flatpickr-day').forEach(function(day){
-      var ds=day.getAttribute('data-date')||'';
-      if(!ds){var lbl=day.getAttribute('aria-label');if(lbl){try{ds=new Date(lbl).toISOString().split('T')[0]}catch(e){}}}
-      if(!ds)return;
-      var info=calendarData[ds];if(!info)return;
-      day.classList.remove('OT-APPROVED','OT-PENDING','OT-REJECTED','OT-LEAVE','OT-HOLIDAY','OT-ABSENT','disabled-date');
-      if(info.disabled&&!info.is_past)day.classList.add('disabled-date');
-      else if(info.has_leave)day.classList.add('OT-LEAVE');
-      else if(info.is_holiday)day.classList.add('OT-HOLIDAY');
-      else if(info.ot_requests&&info.ot_requests.length>0){
-        var sts=info.ot_requests.map(function(r){return r.status});
-        if(sts.indexOf('Approved')>-1)day.classList.add('OT-APPROVED');
-        else if(sts.indexOf('Pending')>-1)day.classList.add('OT-PENDING');
-        else if(sts.indexOf('Rejected')>-1)day.classList.add('OT-REJECTED');
-      }
-    });
-  },150);
-}
-
-function onDateChange(){
-  elStart.value='';elEnd.value='';
-  elPreview.className='hidden';elPreview.innerHTML='';
-  otType='';dateInfo=null;
-  elTimeSection.classList.add('hidden');
-  elTypeInfo.classList.add('hidden');
-  elDateInfo.classList.add('hidden');
-  elDateWarn.classList.add('hidden');
-  updateSubmit();
-  if(!elDate.value)return;
-  var info=calendarData[elDate.value];
-  dateInfo=info||null;
-  if(info&&info.disabled){
-    elDateWarn.className='mt-2 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex items-center gap-2';
-    elDateWarn.innerHTML='<i class="fa-solid fa-circle-exclamation"></i><span>'+info.disable_reason+'</span>';
-    return;
-  }
-  if(info&&!info.disabled){
-    var html='';
-    if(info.is_weekend)html='<div class="flex items-center gap-2 text-xs"><span class="text-amber-400"><i class="fa-solid fa-calendar-weekend mr-1"></i>Weekend OT (09:00-17:00, max 8h)</span></div>';
-    else if(info.is_holiday)html='<div class="flex items-center gap-2 text-xs"><span class="text-rose-400"><i class="fa-solid fa-calendar-day mr-1"></i>Holiday OT (09:00-17:00, max 8h) - '+info.holiday_name+'</span></div>';
-    else html='<div class="flex items-center gap-2 text-xs"><span class="text-blue-400"><i class="fa-solid fa-briefcase mr-1"></i>Working Day OT (17:00-21:00, max 4h)</span></div>';
-    if(info.has_existing_ot)html+='<div class="mt-1 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs flex items-center gap-2"><i class="fa-solid fa-triangle-exclamation"></i><span>You already have OT on this date. Only non-overlapping time ranges are allowed.</span></div>';
-    elDateInfo.className='mt-2 space-y-1';
-    elDateInfo.innerHTML=html;
-  }
-  fetch('../ajax/detect_ot_type.php?date='+elDate.value,{credentials:'include'})
-  .then(function(r){return r.json()}).then(function(d){
-    otType=d.type;
-    elTimeSection.classList.remove('hidden');
-    elTypeInfo.classList.remove('hidden');
-    var labels={working_day:'<span class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold bg-blue-500/20 text-blue-400">Working Day OT</span>',weekend:'<span class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold bg-amber-500/20 text-amber-400">Weekend OT</span>',holiday:'<span class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold bg-rose-500/20 text-rose-400">Holiday OT</span>'};
-    elTypeInfo.innerHTML=(labels[otType]||'')+' <span class="text-[10px] text-zinc-500 ml-2">'+WINDOWS[otType].s+' - '+WINDOWS[otType].e+' (max '+WINDOWS[otType].max+'h)</span>';
-    elStart.min=WINDOWS[otType].s;
-    elStart.max=WINDOWS[otType].e;
-    elEnd.min=WINDOWS[otType].s;
-    elEnd.max=WINDOWS[otType].e;
-  }).catch(function(){otType='';elTimeSection.classList.add('hidden')});
-}
-
-function calculatePreview(){
-  if(!elDate.value||!elStart.value||!elEnd.value||!otType){elPreview.className='hidden';elPreview.innerHTML='';updateSubmit();return;}
-  var s=new Date('2000-01-01T'+elStart.value+':00'),e=new Date('2000-01-01T'+elEnd.value+':00');
-  if(e<=s){elPreview.className='rounded-xl p-4 border bg-red-500/10 border-red-500/20';elPreview.innerHTML='<div class="text-center"><p class="text-sm font-medium text-red-400">End time must be after start time</p></div>';updateSubmit();return;}
-  var hrs=(e-s)/3600000;
-  var w=WINDOWS[otType]||WINDOWS.working_day;
-  var valid=hrs>0&&hrs<=w.max&&elStart.value>=w.s&&elEnd.value<=w.e;
-  var rate=RATE_MULT[otType]||0.02;
-  var hr=BASIC_SALARY>0?(BASIC_SALARY/(22*8)):0;
-  var pay=hr*rate*hrs;
-  var msg='Valid OT request';
-  if(!valid){
-    if(hrs>w.max)msg='Exceeds max '+w.max+'h';
-    else if(elStart.value<w.s||elEnd.value>w.e)msg='Outside allowed window ('+w.s+' - '+w.e+')';
-    else msg='Check your time selection';
-  }
-  if(MONTHLY_USED+hrs>MONTHLY_MAX){
-    elPreview.className='rounded-xl p-4 border bg-red-500/10 border-red-500/20';
-    elPreview.innerHTML='<div class="text-center space-y-1"><p class="text-sm font-medium text-red-400">Monthly OT limit exceeded. Would be '+(MONTHLY_USED+hrs).toFixed(1)+'h / '+MONTHLY_MAX+'h</p></div>';
-    updateSubmit();return;
-  }
-  elPreview.className='rounded-xl p-4 border '+(valid?'bg-emerald-500/10 border-emerald-500/20':'bg-red-500/10 border-red-500/20');
-  elPreview.innerHTML='<div class="text-center space-y-1"><p class="text-sm font-medium '+(valid?'text-emerald-400':'text-red-400')+'">'+msg+'</p>'+(valid?'<div class="text-xs text-zinc-400">Hours: <span class="text-white font-semibold">'+hrs.toFixed(1)+'h</span> &middot; Rate: <span class="text-white font-semibold">'+rate+'</span> &middot; Pay: <span class="text-emerald-400 font-semibold">$'+pay.toFixed(2)+'</span></div>':'')+'</div>';
-  updateSubmit(valid);
-}
-
-function updateSubmit(valid){
-  var ready=elDate.value&&elStart.value&&elEnd.value&&otType;
-  if(valid===false)ready=false;
-  if(ready){
-    var s=new Date('2000-01-01T'+elStart.value+':00'),e=new Date('2000-01-01T'+elEnd.value+':00');
-    var hrs=(e-s)/3600000;var w=WINDOWS[otType]||WINDOWS.working_day;
-    ready=hrs>0&&hrs<=w.max&&elStart.value>=w.s&&elEnd.value<=w.e&&(!dateInfo||!dateInfo.disabled)&&MONTHLY_REMAINING>0;
-    if(ready&&MONTHLY_USED+hrs>MONTHLY_MAX)ready=false;
-  }
-  if(ready){elSubmit.disabled=false;elSubmit.className='w-full font-semibold text-sm px-4 py-3 rounded-lg transition flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white';}
-  else{elSubmit.disabled=true;elSubmit.className='w-full font-semibold text-sm px-4 py-3 rounded-lg transition flex items-center justify-center gap-2 bg-zinc-600/50 text-zinc-400 cursor-not-allowed';}
-}
-
-flatpickr('#ot_date_picker',{
-  dateFormat:'Y-m-d',
-  minDate:TODAY,
-  locale:{firstDayOfWeek:1},
-  disableMobile:true,
-  onChange:function(sel,ds){elDate.value=ds;onDateChange();},
-  onReady:function(sel,ds,fp){loadCalData(fp.currentYear,fp.currentMonth+1);},
-  onMonthChange:function(sel,ds,fp){loadCalData(fp.currentYear,fp.currentMonth+1);},
-  onYearChange:function(sel,ds,fp){loadCalData(fp.currentYear,fp.currentMonth+1);}
-});
-
-elStart.addEventListener('change',calculatePreview);
-elEnd.addEventListener('change',calculatePreview);
-})();
 </script>
 <?php include "../includes/employee_bottom_nav.php"; ?>
 </body></html>

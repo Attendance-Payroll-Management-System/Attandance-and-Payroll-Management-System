@@ -192,8 +192,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['check_out']) && !$is_i
                 $check_out_time_only = date('H:i:s', strtotime($current_datetime));
                 $is_early_checkout = strtotime($check_out_time_only) < strtotime($WORK_END);
 
-                $stmt = $conn->prepare("UPDATE attendance SET check_out = ?, check_out_ip = ?, check_out_source = 'web', total_working_hours = ?, check_out_note = ? WHERE id = ?");
-                $stmt->bind_param('ssdsi', $current_datetime, $ip, $total_hours, $note, $att['id']);
+                // Added the ip_address column and a 4th "?" placeholder
+                $stmt = $conn->prepare("UPDATE attendance SET check_out = ?, ip_address = ?, total_working_hours = ? WHERE id = ?");
+
+                // 'ssdi' matches: string (datetime), string (ip), double (hours), integer (id)
+                $stmt->bind_param('ssdi', $current_datetime, $ip, $total_hours, $att['id']);
                 if ($stmt->execute()) {
                     $stmt->close();
                     $old_status = $att['status'];
