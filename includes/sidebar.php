@@ -254,6 +254,7 @@ if ($sidebar_role === 'admin') {
                 ['page' => 'attendance.php', 'href' => 'attendance.php', 'label' => 'Check In/Out'],
                 ['page' => 'attendance_calendar.php', 'href' => 'attendance_calendar.php', 'label' => 'Calendar'],
                 ['page' => 'attendanceall.php', 'href' => 'attendanceall.php', 'label' => 'My Records'],
+                ['page' => 'attendance_overtime_overview.php', 'href' => 'attendance_overtime_overview.php', 'label' => 'Attendance & OT Overview'],
             ], $current_page, null, 'emerald'); ?>
             <?php echo nav_item('leaverequest.php', 'Leave Request', 'paper-plane', $current_page, null, null, 'amber'); ?>
             <?php echo nav_item('overtimerequest.php', 'Overtime Request', 'stopwatch', $current_page, null, null, 'orange'); ?>

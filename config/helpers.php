@@ -2485,7 +2485,8 @@ function create_overtime_assignment(mysqli $conn, array $data): ?int {
             $ot_pay = round($hourly_salary * $ot_rate * $total_hours, 2);
 
             // Insert assignment employee record
-            $oae_stmt->bind_param('iidds', $assignment_id, $eid, $ot_rate, $ot_pay, '');
+            $empty_notes = '';
+            $oae_stmt->bind_param('iidds', $assignment_id, $eid, $ot_rate, $ot_pay, $empty_notes);
             $oae_stmt->execute();
 
             // Insert overtime record
