@@ -148,24 +148,24 @@ foreach ($annual_data as $r) {
             <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
                 <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-5">
                     <span class="text-xs font-bold uppercase tracking-wider text-zinc-500">Total Annual Net</span>
-                    <p class="text-2xl font-bold text-white">$<?php echo number_format($total_net, 2); ?></p>
+                    <p class="text-2xl font-bold text-white"><?php echo $currency; ?> <?php echo number_format($total_net, 2); ?></p>
                     <span class="text-xs text-zinc-500"><?php echo count($annual_data); ?> employees</span>
                 </div>
                 <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-5">
                     <span class="text-xs font-bold uppercase tracking-wider text-zinc-500">Total Gross</span>
-                    <p class="text-2xl font-bold text-white">$<?php echo number_format($total_gross, 2); ?></p>
+                    <p class="text-2xl font-bold text-white"><?php echo $currency; ?> <?php echo number_format($total_gross, 2); ?></p>
                 </div>
                 <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-5">
                     <span class="text-xs font-bold uppercase tracking-wider text-zinc-500">Total Overtime</span>
-                    <p class="text-2xl font-bold text-amber-400">$<?php echo number_format($total_ot, 2); ?></p>
+                    <p class="text-2xl font-bold text-amber-400"><?php echo $currency; ?> <?php echo number_format($total_ot, 2); ?></p>
                 </div>
                 <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-5">
                     <span class="text-xs font-bold uppercase tracking-wider text-zinc-500">Total Bonuses</span>
-                    <p class="text-2xl font-bold text-emerald-400">$<?php echo number_format($total_bonus, 2); ?></p>
+                    <p class="text-2xl font-bold text-emerald-400"><?php echo $currency; ?> <?php echo number_format($total_bonus, 2); ?></p>
                 </div>
                 <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-5">
                     <span class="text-xs font-bold uppercase tracking-wider text-zinc-500">Total Deductions</span>
-                    <p class="text-2xl font-bold text-rose-400">$<?php echo number_format($total_ded, 2); ?></p>
+                    <p class="text-2xl font-bold text-rose-400"><?php echo $currency; ?> <?php echo number_format($total_ded, 2); ?></p>
                 </div>
             </section>
 
@@ -202,11 +202,11 @@ foreach ($annual_data as $r) {
                                     <td class="px-6 py-4 font-medium text-white"><?php echo htmlspecialchars($r['name']); ?></td>
                                     <td class="px-6 py-4 text-zinc-400 font-mono text-xs"><?php echo htmlspecialchars($r['employee_code']); ?></td>
                                     <td class="px-6 py-4 text-zinc-400"><?php echo htmlspecialchars($r['department_name'] ?? '-'); ?></td>
-                                    <td class="px-6 py-4 text-right font-mono">$<?php echo number_format($r['total_salary'], 2); ?></td>
-                                    <td class="px-6 py-4 text-right text-amber-400 font-mono">+$<?php echo number_format($r['total_ot'], 2); ?></td>
-                                    <td class="px-6 py-4 text-right text-emerald-400 font-mono">+$<?php echo number_format($r['total_bonus'], 2); ?></td>
-                                    <td class="px-6 py-4 text-right text-rose-400 font-mono">-$<?php echo number_format($r['total_deduction'], 2); ?></td>
-                                    <td class="px-6 py-4 text-right font-bold text-blue-400 font-mono">$<?php echo number_format($r['net_annual_salary'], 2); ?></td>
+                                    <td class="px-6 py-4 text-right font-mono"><?php echo $currency; ?> <?php echo number_format($r['total_salary'], 2); ?></td>
+                                    <td class="px-6 py-4 text-right text-amber-400 font-mono">+<?php echo $currency; ?> <?php echo number_format($r['total_ot'], 2); ?></td>
+                                    <td class="px-6 py-4 text-right text-emerald-400 font-mono">+<?php echo $currency; ?> <?php echo number_format($r['total_bonus'], 2); ?></td>
+                                    <td class="px-6 py-4 text-right text-rose-400 font-mono">-<?php echo $currency; ?> <?php echo number_format($r['total_deduction'], 2); ?></td>
+                                    <td class="px-6 py-4 text-right font-bold text-blue-400 font-mono"><?php echo $currency; ?> <?php echo number_format($r['net_annual_salary'], 2); ?></td>
                                 </tr>
                                 <?php endforeach; ?>
                             <?php endif; ?>

@@ -205,7 +205,7 @@ $recent_payrolls->close();
                         </div>
                         <div class="min-w-0 flex-1">
                             <span class="text-[11px] font-bold uppercase tracking-wider text-zinc-500">Monthly Payroll</span>
-                            <p class="text-xl font-extrabold text-emerald-400 mt-0.5 truncate">$<?php echo number_format($total_net, 2); ?></p>
+                            <p class="text-xl font-extrabold text-emerald-400 mt-0.5 truncate"><?php echo $currency; ?> <?php echo number_format($total_net, 2); ?></p>
                             <p class="text-[10px] text-zinc-500 mt-0.5">Total net pay</p>
                         </div>
                     </div>
@@ -219,7 +219,7 @@ $recent_payrolls->close();
                         </div>
                         <div class="min-w-0 flex-1">
                             <span class="text-[11px] font-bold uppercase tracking-wider text-zinc-500">Overtime Cost</span>
-                            <p class="text-xl font-extrabold text-amber-400 mt-0.5 truncate">$<?php echo number_format($total_ot, 2); ?></p>
+                            <p class="text-xl font-extrabold text-amber-400 mt-0.5 truncate"><?php echo $currency; ?> <?php echo number_format($total_ot, 2); ?></p>
                             <p class="text-[10px] text-zinc-500 mt-0.5">This month</p>
                         </div>
                     </div>
@@ -233,7 +233,7 @@ $recent_payrolls->close();
                         </div>
                         <div class="min-w-0 flex-1">
                             <span class="text-[11px] font-bold uppercase tracking-wider text-zinc-500">Total Bonuses</span>
-                            <p class="text-xl font-extrabold text-indigo-400 mt-0.5 truncate">$<?php echo number_format($total_bonus, 2); ?></p>
+                            <p class="text-xl font-extrabold text-indigo-400 mt-0.5 truncate"><?php echo $currency; ?> <?php echo number_format($total_bonus, 2); ?></p>
                             <p class="text-[10px] text-zinc-500 mt-0.5">Disbursed</p>
                         </div>
                     </div>
@@ -247,7 +247,7 @@ $recent_payrolls->close();
                         </div>
                         <div class="min-w-0 flex-1">
                             <span class="text-[11px] font-bold uppercase tracking-wider text-zinc-500">Total Deductions</span>
-                            <p class="text-xl font-extrabold text-rose-400 mt-0.5 truncate">$<?php echo number_format($total_ded, 2); ?></p>
+                            <p class="text-xl font-extrabold text-rose-400 mt-0.5 truncate"><?php echo $currency; ?> <?php echo number_format($total_ded, 2); ?></p>
                             <p class="text-[10px] text-zinc-500 mt-0.5">Withheld</p>
                         </div>
                     </div>
@@ -483,7 +483,7 @@ $recent_payrolls->close();
                                 </div>
                                 <span class="text-sm text-zinc-300 font-medium">OT Disbursed</span>
                             </div>
-                            <span class="text-sm font-bold text-amber-400 font-mono">$<?php echo number_format($total_ot, 2); ?></span>
+                            <span class="text-sm font-bold text-amber-400 font-mono"><?php echo $currency; ?> <?php echo number_format($total_ot, 2); ?></span>
                         </div>
 
                         <div class="quick-stat-item">
@@ -493,7 +493,7 @@ $recent_payrolls->close();
                                 </div>
                                 <span class="text-sm text-zinc-300 font-medium">Deductions</span>
                             </div>
-                            <span class="text-sm font-bold text-rose-400 font-mono">$<?php echo number_format($total_ded, 2); ?></span>
+                            <span class="text-sm font-bold text-rose-400 font-mono"><?php echo $currency; ?> <?php echo number_format($total_ded, 2); ?></span>
                         </div>
                     </div>
                 </div>
@@ -560,7 +560,7 @@ $recent_payrolls->close();
                                     <span class="text-xs text-zinc-300 font-medium"><?php echo date('F', mktime(0,0,0,$row['payroll_month'],1)); ?> <?php echo $row['payroll_year']; ?></span>
                                 </td>
                                 <td class="px-4 py-4 text-right">
-                                    <span class="net-highlight">$<?php echo number_format($row['net_salary'], 2); ?></span>
+                                    <span class="net-highlight"><?php echo $currency; ?> <?php echo number_format($row['net_salary'], 2); ?></span>
                                 </td>
                                 <td class="px-4 py-4 text-center">
                                     <span class="status-badge <?php echo get_payroll_status_badge($row['status'] ?? 'Generated'); ?>">

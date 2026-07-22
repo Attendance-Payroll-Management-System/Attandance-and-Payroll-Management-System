@@ -279,7 +279,7 @@ foreach ($requests as $r) {
                                 <td class="px-6 py-4"><?php echo $ot_type_display; ?></td>
                                 <td class="px-6 py-4 font-mono text-sm">
                                     <?php if ($has_ot_pay && isset($req['ot_pay']) && $req['ot_pay'] > 0): ?>
-                                        <span class="text-emerald-400 font-semibold">$<?php echo number_format($req['ot_pay'], 2); ?></span>
+                                        <span class="text-emerald-400 font-semibold"><?php echo $currency; ?> <?php echo number_format($req['ot_pay'], 2); ?></span>
                                     <?php else: ?>
                                         <span class="text-zinc-500">-</span>
                                     <?php endif; ?>

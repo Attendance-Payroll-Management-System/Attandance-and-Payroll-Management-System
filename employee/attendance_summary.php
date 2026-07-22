@@ -237,6 +237,7 @@ foreach ($records as $r) {
                                     <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold <?php echo get_attendance_status_badge_class($r['status']); ?>">
                                         <?php echo get_attendance_status_label($r['status']); ?>
                                     </span>
+                                    <?php echo get_auto_checkout_badge($r['is_auto_checkout'] ?? 0); ?>
                                 </td>
                             </tr>
                             <?php endforeach; endif; ?>

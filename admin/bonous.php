@@ -204,7 +204,7 @@ $total_amount = array_sum(array_column($records, 'amount'));
                     <section class="card-hover glass-strong rounded-2xl overflow-hidden">
                         <div class="p-6 border-b border-white/[0.06] flex items-center justify-between">
                             <h2 class="font-bold text-white text-lg"><i class="fa-solid fa-gift text-blue-400 mr-2"></i>Bonus Records</h2>
-                            <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold bg-indigo-500/20 text-indigo-400">$<?php echo number_format($total_amount, 2); ?> total</span>
+                            <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold bg-indigo-500/20 text-indigo-400"><?php echo $currency; ?> <?php echo number_format($total_amount, 2); ?> total</span>
                         </div>
                         <div class="overflow-x-auto">
                             <table class="w-full text-left text-sm whitespace-nowrap">
@@ -230,7 +230,7 @@ $total_amount = array_sum(array_column($records, 'amount'));
                                                 <div class="text-xs text-zinc-500 max-w-[200px] truncate" title="<?php echo htmlspecialchars($r['description']); ?>"><?php echo htmlspecialchars($r['description']); ?></div>
                                                 <?php endif; ?>
                                             </td>
-                                            <td class="px-6 py-4 text-right font-mono font-semibold text-emerald-400">+$<?php echo number_format($r['amount'], 2); ?></td>
+                                            <td class="px-6 py-4 text-right font-mono font-semibold text-emerald-400">+<?php echo $currency; ?> <?php echo number_format($r['amount'], 2); ?></td>
                                             <td class="px-6 py-4"><?php echo date('M d, Y', strtotime($r['bonus_date'])); ?></td>
                                             <td class="px-6 py-4 text-right space-x-3">
                                                 <button type="button" @click="$dispatch('open-edit', { id: <?php echo $r['id']; ?>, title: '<?php echo htmlspecialchars(addslashes($r['title'] ?? ''), ENT_QUOTES); ?>', amount: <?php echo $r['amount']; ?>, description: '<?php echo htmlspecialchars(addslashes($r['description'] ?? ''), ENT_QUOTES); ?>', date: '<?php echo $r['bonus_date']; ?>' })" class="text-blue-400 hover:text-blue-300 text-xs font-medium"><i class="fa-solid fa-pen"></i></button>

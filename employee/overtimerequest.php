@@ -5,6 +5,7 @@ require_once "../config/helpers.php";
 require_once "../config/notifications.php";
 if (!isset($_SESSION['logged_in'])) { header('Location: login.php'); exit; }
 set_mmt_timezone();
+$currency = get_currency($conn);
 $employee_id = $_SESSION['employee_id'];
 $employee_name = $_SESSION['employee_name'];
 $message = '';
@@ -215,7 +216,7 @@ $emp_bs=$conn->query("SELECT basic_salary FROM employee WHERE id=$employee_id")-
 <div><span class="text-zinc-500">Time:</span> <span class="text-white ml-1"><?php echo date('h:i A',strtotime($row['start_time'])).' - '.date('h:i A',strtotime($row['end_time'])); ?></span></div>
 <div><span class="text-zinc-500">Hours:</span> <span class="text-white font-semibold ml-1"><?php echo $row['total_hours']; ?>h</span></div>
 <div><span class="text-zinc-500">Type:</span> <?php if($has_ot_type&&$row['ot_type']):?><?php echo get_overtime_type_badge($row['ot_type']);?><?php else:?><span class="text-zinc-500 ml-1">-</span><?php endif;?></div>
-<div><span class="text-zinc-500">Pay:</span> <?php if($has_ot_pay&&isset($row['ot_pay'])&&$row['ot_pay']>0):?><span class="text-emerald-400 font-semibold ml-1">$<?php echo number_format($row['ot_pay'],2);?></span><?php else:?><span class="text-zinc-500 ml-1">-</span><?php endif;?></div>
+<div><span class="text-zinc-500">Pay:</span> <?php if($has_ot_pay&&isset($row['ot_pay'])&&$row['ot_pay']>0):?><span class="text-emerald-400 font-semibold ml-1"><?php echo $currency; ?> <?php echo number_format($row['ot_pay'],2);?></span><?php else:?><span class="text-zinc-500 ml-1">-</span><?php endif;?></div>
 </div>
 <?php if($has_approver_id&&!empty($row['approver_name'])):?><div class="text-xs"><span class="text-zinc-500">Approver:</span> <span class="text-blue-400 ml-1"><?php echo htmlspecialchars($row['approver_name']);?></span></div><?php endif;?>
 <?php if($row['approved_at']):?><div class="text-xs text-zinc-500 mt-1"><i class="fa-solid fa-clock mr-1"></i><?php echo date('M d, Y h:i A',strtotime($row['approved_at']));?></div><?php endif;?>

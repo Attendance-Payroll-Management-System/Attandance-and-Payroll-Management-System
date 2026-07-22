@@ -393,7 +393,7 @@ if ($admin['position_id']) {
                             </div>
                             <div class="flex justify-between py-2 border-b border-slate-200 dark:border-white/[0.06]">
                                 <span class="text-sm text-slate-500 dark:text-zinc-400">Basic Salary</span>
-                                <span class="text-sm font-medium text-emerald-400">$<?php echo number_format($admin['basic_salary'] ?? 0, 2); ?></span>
+                                <span class="text-sm font-medium text-emerald-400"><?php echo $currency; ?> <?php echo number_format($admin['basic_salary'] ?? 0, 2); ?></span>
                             </div>
                             <div class="flex justify-between py-2 border-b border-slate-200 dark:border-white/[0.06]">
                                 <span class="text-sm text-slate-500 dark:text-zinc-400">Phone</span>

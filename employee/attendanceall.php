@@ -654,6 +654,7 @@ $cal_query->close();
                                             <span class="inline-flex rounded-full px-3 py-1 text-[11px] font-semibold <?= get_attendance_status_badge_class($log['status']) ?>">
                                                 <?= get_attendance_status_label($log['status']) ?>
                                             </span>
+                                            <?= get_auto_checkout_badge($log['is_auto_checkout'] ?? 0) ?>
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>

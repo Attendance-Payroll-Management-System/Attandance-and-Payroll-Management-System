@@ -5,7 +5,7 @@ require_once "../config/helpers.php";
 if (!isset($_SESSION['logged_in'])) { header('Location: login.php'); exit; }
 
 $employee_id = $_SESSION['employee_id'];
-$message = '';
+$message = '';\n$currency = get_currency($conn);
 $message_type = '';
 
 $emp = $conn->prepare("
@@ -152,11 +152,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                             </div>
                             <div class="flex justify-between">
                                 <dt class="text-zinc-500">Basic Salary</dt>
-                                <dd class="font-mono text-emerald-400 font-semibold">$<?php echo number_format($employee['basic_salary'] ?? 0, 2); ?></dd>
+                                <dd class="font-mono text-emerald-400 font-semibold"><?php echo $currency; ?> <?php echo number_format($employee['basic_salary'] ?? 0, 2); ?></dd>
                             </div>
                             <div class="flex justify-between">
                                 <dt class="text-zinc-500">Allowance</dt>
-                                <dd class="font-mono text-amber-400 font-semibold">$<?php echo number_format($employee['allowance'] ?? 0, 2); ?></dd>
+                                <dd class="font-mono text-amber-400 font-semibold"><?php echo $currency; ?> <?php echo number_format($employee['allowance'] ?? 0, 2); ?></dd>
                             </div>
                         </dl>
                     </div>

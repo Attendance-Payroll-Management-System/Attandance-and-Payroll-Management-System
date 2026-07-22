@@ -468,6 +468,7 @@ $employees = $conn->query("SELECT id, name, employee_code FROM employee WHERE st
                                     <span class="inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold <?php echo get_attendance_status_badge_class($r['status']); ?>">
                                         <?php echo get_attendance_status_label($r['status']); ?>
                                     </span>
+                                    <?php echo get_auto_checkout_badge($r['is_auto_checkout'] ?? 0); ?>
                                 </td>
                             </tr>
                             <?php endforeach; ?>

@@ -202,7 +202,7 @@ $total_amount = array_sum(array_column($records, 'amount'));
                     <section class="card-hover glass-strong rounded-2xl overflow-hidden">
                         <div class="p-6 border-b border-white/[0.06] flex items-center justify-between">
                             <h2 class="font-bold text-white text-lg"><i class="fa-solid fa-chart-line text-blue-400 mr-2"></i>Deduction Records</h2>
-                            <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold bg-indigo-500/20 text-indigo-400">$<?php echo number_format($total_amount, 2); ?> total</span>
+                            <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold bg-indigo-500/20 text-indigo-400"><?php echo $currency; ?> <?php echo number_format($total_amount, 2); ?> total</span>
                         </div>
                         <div class="overflow-x-auto">
                             <table class="w-full text-left text-sm whitespace-nowrap">
@@ -227,14 +227,14 @@ $total_amount = array_sum(array_column($records, 'amount'));
                                                 <?php if (!empty($r['description'])): ?>
                                                 <div class="text-xs text-zinc-500 max-w-[200px] truncate" title="<?php echo htmlspecialchars($r['description']); ?>"><?php echo htmlspecialchars($r['description']); ?></div>
                                                 <?php endif; ?>
-                                                <?php if (!empty($r['remarks']) && $r['remarks'] === 'Auto Pension Fund Deduction for Unauthorized Absence'): ?>
+                                                <?php if (is_system_managed_deduction($r['remarks'])): ?>
                                                 <span class="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full bg-amber-500/15 text-[10px] font-semibold text-amber-400 border border-amber-500/20"><i class="fa-solid fa-robot text-[8px]"></i> Auto</span>
                                                 <?php endif; ?>
                                             </td>
-                                            <td class="px-6 py-4 text-right font-mono font-semibold text-rose-400">-$<?php echo number_format($r['amount'], 2); ?></td>
+                                            <td class="px-6 py-4 text-right font-mono font-semibold text-rose-400">-<?php echo $currency; ?> <?php echo number_format($r['amount'], 2); ?></td>
                                             <td class="px-6 py-4"><?php echo date('M d, Y', strtotime($r['deduction_date'])); ?></td>
                                             <td class="px-6 py-4 text-right space-x-3">
-                                                <?php if (empty($r['remarks']) || $r['remarks'] !== 'Auto Pension Fund Deduction for Unauthorized Absence'): ?>
+                                                <?php if (!is_system_managed_deduction($r['remarks'])): ?>
                                                 <button type="button" @click="$dispatch('open-edit', { id: <?php echo $r['id']; ?>, title: '<?php echo htmlspecialchars(addslashes($r['title'] ?? ''), ENT_QUOTES); ?>', amount: <?php echo $r['amount']; ?>, description: '<?php echo htmlspecialchars(addslashes($r['description'] ?? ''), ENT_QUOTES); ?>', date: '<?php echo $r['deduction_date']; ?>' })" class="text-blue-400 hover:text-blue-300 text-xs font-medium"><i class="fa-solid fa-pen"></i></button>
                                                 <form method="POST" onsubmit="return confirm('Delete this deduction?');" class="inline">
                                                 <?php echo csrf_field(); ?>

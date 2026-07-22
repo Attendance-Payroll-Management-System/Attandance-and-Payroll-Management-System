@@ -315,7 +315,7 @@ body {
                 <tr><td>Half-Day Deduction</td><td class="amount">-$' . ($half_ded_fmt !== '0.00' ? $half_ded_fmt : '0.00') . '</td></tr>
                 <tr><td>Late Deduction</td><td class="amount">-$' . $late_ded_fmt . '</td></tr>
                 <tr><td>Unpaid Leave Ded.</td><td class="amount">-$' . $unpaid_leave_ded_fmt . '</td></tr>' . ($awol_ded !== '0.00' ? '
-                <tr><td>Pension Fund Deduction (2%)</td><td class="amount">-$' . $awol_ded . '</td></tr>' : '') . '
+                <tr><td>Unpaid Absence Deduction</td><td class="amount">-$' . $awol_ded . '</td></tr>' : '') . '
                 <tr><td>Other Deductions</td><td class="amount">-$' . $deduction . '</td></tr>
                 <tr><td>Tax</td><td class="amount">-$' . $tax . '</td></tr>
                 <tr class="total-row"><td>TOTAL DEDUCTIONS</td><td class="amount">-$' . $total_deductions . '</td></tr>

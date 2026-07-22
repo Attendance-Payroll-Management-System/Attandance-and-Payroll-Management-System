@@ -10,6 +10,7 @@ if (!isset($_SESSION['logged_in'])) {
 }
 
 set_mmt_timezone();
+$currency = get_currency($conn);
 
 $employee_id = $_SESSION['employee_id'];
 $employee_name = $_SESSION['employee_name'];
@@ -250,7 +251,7 @@ $pending_hours = array_sum(array_column($pending_requests, 'total_hours'));
                                 <td class="px-6 py-4 font-mono text-sm"><?php echo date('h:i A', strtotime($req['start_time'])); ?> - <?php echo date('h:i A', strtotime($req['end_time'])); ?></td>
                                 <td class="px-6 py-4 font-bold text-white"><?php echo $req['total_hours']; ?>h</td>
                                 <td class="px-6 py-4"><?php echo $ot_type_display; ?></td>
-                                <td class="px-6 py-4 font-mono text-sm"><?php if ($has_ot_pay && isset($req['ot_pay']) && $req['ot_pay'] > 0): ?><span class="text-emerald-400 font-semibold">$<?php echo number_format($req['ot_pay'], 2); ?></span><?php else: ?><span class="text-zinc-500">-</span><?php endif; ?></td>
+                                <td class="px-6 py-4 font-mono text-sm"><?php if ($has_ot_pay && isset($req['ot_pay']) && $req['ot_pay'] > 0): ?><span class="text-emerald-400 font-semibold"><?php echo $currency; ?> <?php echo number_format($req['ot_pay'], 2); ?></span><?php else: ?><span class="text-zinc-500">-</span><?php endif; ?></td>
                                 <td class="px-6 py-4 text-zinc-400 max-w-[180px] truncate text-sm" title="<?php echo htmlspecialchars($req['reason']); ?>"><?php echo htmlspecialchars($req['reason']); ?></td>
                                 <td class="px-6 py-4 text-right whitespace-nowrap">
                                     <form method="POST" class="inline-flex flex-col gap-2 items-end">
@@ -308,7 +309,7 @@ $pending_hours = array_sum(array_column($pending_requests, 'total_hours'));
                                 <td class="px-6 py-3 text-sm"><?php echo date('M d, Y', strtotime($h['ot_date'])); ?></td>
                                 <td class="px-6 py-3 font-semibold text-sm"><?php echo $h['total_hours']; ?>h</td>
                                 <td class="px-6 py-3"><?php if ($has_ot_type && $h['ot_type']): ?><?php echo get_overtime_type_badge($h['ot_type']); ?><?php else: ?><span class="text-xs text-zinc-500">-</span><?php endif; ?></td>
-                                <td class="px-6 py-3 font-mono text-sm"><?php if ($has_ot_pay && isset($h['ot_pay']) && $h['ot_pay'] > 0): ?><span class="text-emerald-400 font-semibold">$<?php echo number_format($h['ot_pay'], 2); ?></span><?php else: ?><span class="text-zinc-500">-</span><?php endif; ?></td>
+                                <td class="px-6 py-3 font-mono text-sm"><?php if ($has_ot_pay && isset($h['ot_pay']) && $h['ot_pay'] > 0): ?><span class="text-emerald-400 font-semibold"><?php echo $currency; ?> <?php echo number_format($h['ot_pay'], 2); ?></span><?php else: ?><span class="text-zinc-500">-</span><?php endif; ?></td>
                                 <td class="px-6 py-3"><span class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold <?php echo $h['status'] == 'Approved' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'; ?>"><?php echo $h['status']; ?></span></td>
                                 <td class="px-6 py-3 text-sm text-zinc-400 max-w-[200px] truncate" title="<?php echo htmlspecialchars($h['remarks'] ?? ''); ?>"><?php echo htmlspecialchars($h['remarks'] ?? '-'); ?></td>
                                 <td class="px-6 py-3 text-xs text-zinc-500"><?php echo $h['approved_at'] ? date('M d, h:i A', strtotime($h['approved_at'])) : '-'; ?></td>

@@ -176,6 +176,22 @@ if ($sidebar_role === 'admin') {
                 <p class="text-[10px] font-semibold text-slate-400 dark:text-slate-500 tracking-wider uppercase">Main Menu</p>
             </div>
             <?php echo nav_item('dashboard.php', 'Dashboard', 'gauge-high', $current_page, null, null, 'indigo'); ?>
+            
+            <?php
+            // Get unread notification count for sidebar badge
+            $sidebar_notif_count = 0;
+            if (isset($conn) && $conn) {
+                require_once __DIR__ . '/../config/notifications.php';
+                $sidebar_is_admin = (strpos($_SERVER['SCRIPT_NAME'] ?? '', '/admin/') !== false);
+                $sidebar_emp_id = $sidebar_is_admin ? ($_SESSION['admin_id'] ?? null) : ($_SESSION['employee_id'] ?? null);
+                if ($sidebar_emp_id) {
+                    $sidebar_notif_count = get_unread_count($conn, $sidebar_emp_id);
+                } else {
+                    $sidebar_notif_count = get_unread_count($conn);
+                }
+            }
+            echo nav_item('notifications.php', 'Notifications', 'bell', $current_page, $sidebar_notif_count > 0 ? $sidebar_notif_count : null, null, 'sky');
+            ?>
 
             <div class="nav-text px-3 pt-4 pb-1.5">
                 <p class="text-[10px] font-semibold text-slate-400 dark:text-slate-500 tracking-wider uppercase">Management</p>
@@ -250,6 +266,16 @@ if ($sidebar_role === 'admin') {
                 <p class="text-[10px] font-semibold text-slate-400 dark:text-slate-500 tracking-wider uppercase">Main Menu</p>
             </div>
             <?php echo nav_item('dashboard.php', 'Dashboard', 'house-chimney', $current_page, null, null, 'indigo'); ?>
+            
+            <?php
+            // Get unread notification count for employee sidebar badge
+            $emp_notif_count = 0;
+            if (isset($conn) && $conn && isset($_SESSION['employee_id'])) {
+                require_once __DIR__ . '/../config/notifications.php';
+                $emp_notif_count = get_unread_count($conn, $_SESSION['employee_id']);
+            }
+            echo nav_item('notifications.php', 'Notifications', 'bell', $current_page, $emp_notif_count > 0 ? $emp_notif_count : null, null, 'sky');
+            ?>
             <?php echo nav_section('Attendance', 'calendar-check', [
                 ['page' => 'attendance.php', 'href' => 'attendance.php', 'label' => 'Check In/Out'],
                 ['page' => 'attendance_calendar.php', 'href' => 'attendance_calendar.php', 'label' => 'Calendar'],

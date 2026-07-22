@@ -252,6 +252,9 @@ $status_colors = [
                                 <div class="day-status" style="color: <?php echo $status_colors['public_holiday']['text']; ?>">Holiday</div>
                             <?php elseif ($record && $record['status']): ?>
                                 <div class="day-status" style="color: <?php echo $colors['text']; ?>"><?php echo get_attendance_status_label($record['status']); ?></div>
+                                <?php if (!empty($record['is_auto_checkout'])): ?>
+                                <div class="day-status" style="color: #A78BFA; font-size: 7px; margin-top: -2px;">Auto</div>
+                                <?php endif; ?>
                                 <?php if ($record['total_working_hours']): ?>
                                 <div class="day-hours" style="color: <?php echo $colors['text']; ?>"><?php echo number_format($record['total_working_hours'], 1); ?>h</div>
                                 <?php endif; ?>
@@ -317,6 +320,9 @@ $status_colors = [
                                 <span class="px-3 py-1.5 rounded-full text-xs font-bold" style="background: <?php echo $colors['bg']; ?>; color: <?php echo $colors['text']; ?>; border: 1px solid <?php echo $colors['border']; ?>;">
                                     <?php echo $colors['label']; ?>
                                 </span>
+                                <?php if (!empty($record['is_auto_checkout'])): ?>
+                                <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold bg-violet-500/15 text-violet-400 border border-violet-500/20 ml-2"><i class="fa-solid fa-clock-rotate-left text-[8px]"></i>Auto Checked Out</span>
+                                <?php endif; ?>
                             </div>
 
                             <?php if ($record && $record['check_in']): ?>

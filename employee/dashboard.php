@@ -6,6 +6,7 @@ if (!isset($_SESSION['logged_in'])) { header('Location: login.php'); exit; }
 $employee_id = $_SESSION['employee_id'];
 $employee_name = $_SESSION['employee_name'];
 set_mmt_timezone();
+$currency = get_currency($conn);
 $today = mmt_date();
 $month_start = date('Y-m-01');
 $month_end = date('Y-m-t');
@@ -362,7 +363,7 @@ $month_name = date('F Y', strtotime($month_start));
                             <div class="relative flex items-center justify-between">
                                 <div>
                                     <p class="text-xs text-white/70 font-medium">Net Pay (Latest)</p>
-                                    <p class="text-xl font-bold mt-0.5">$<?php echo number_format($payroll_data['net_salary'], 2); ?></p>
+                                    <p class="text-xl font-bold mt-0.5"><?php echo $currency; ?> <?php echo number_format($payroll_data['net_salary'], 2); ?></p>
                                 </div>
                                 <a href="payroll.php" class="bg-white/20 hover:bg-white/30 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors">View Slip <i class="fa-solid fa-arrow-right ml-1"></i></a>
                             </div>

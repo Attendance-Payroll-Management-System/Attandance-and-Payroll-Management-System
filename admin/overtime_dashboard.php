@@ -82,7 +82,7 @@ if ($next_month > 12) { $next_month = 1; $next_year++; }
                         <span class="text-xs font-bold uppercase tracking-wider text-zinc-500">Total OT Earnings</span>
                         <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500/20 to-green-500/10 flex items-center justify-center"><i class="fa-solid fa-dollar-sign text-emerald-400 text-sm"></i></div>
                     </div>
-                    <p class="text-2xl font-bold text-emerald-400">$<?php echo number_format($stats['total_earnings'] ?? 0, 2); ?></p>
+                    <p class="text-2xl font-bold text-emerald-400"><?php echo $currency; ?> <?php echo number_format($stats['total_earnings'] ?? 0, 2); ?></p>
                     <p class="text-[10px] text-zinc-500 mt-1">approved OT pay</p>
                 </div>
             </section>
@@ -167,7 +167,7 @@ if ($next_month > 12) { $next_month = 1; $next_year++; }
                             <div class="h-2 bg-white/[0.06] rounded-full overflow-hidden">
                                 <div class="h-full bg-blue-500 rounded-full transition-all" style="width: <?php echo $total_rt_hours > 0 ? ($emp_req['hours'] / $total_rt_hours * 100) : 0; ?>%"></div>
                             </div>
-                            <p class="text-[10px] text-zinc-500 mt-0.5">$<?php echo number_format($emp_req['pay'], 2); ?> earnings</p>
+                            <p class="text-[10px] text-zinc-500 mt-0.5"><?php echo $currency; ?> <?php echo number_format($emp_req['pay'], 2); ?> earnings</p>
                         </div>
                         <div>
                             <div class="flex justify-between text-xs mb-1">
@@ -177,7 +177,7 @@ if ($next_month > 12) { $next_month = 1; $next_year++; }
                             <div class="h-2 bg-white/[0.06] rounded-full overflow-hidden">
                                 <div class="h-full bg-purple-500 rounded-full transition-all" style="width: <?php echo $total_rt_hours > 0 ? ($adm_req['hours'] / $total_rt_hours * 100) : 0; ?>%"></div>
                             </div>
-                            <p class="text-[10px] text-zinc-500 mt-0.5">$<?php echo number_format($adm_req['pay'], 2); ?> earnings</p>
+                            <p class="text-[10px] text-zinc-500 mt-0.5"><?php echo $currency; ?> <?php echo number_format($adm_req['pay'], 2); ?> earnings</p>
                         </div>
                     </div>
                 </div>

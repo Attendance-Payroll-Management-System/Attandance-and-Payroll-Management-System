@@ -212,7 +212,7 @@ if ($export === 'pdf') {
                 </div>
                 <div class="glass-strong rounded-xl p-4 border border-white/[0.06]">
                     <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Total Pay</span>
-                    <p class="text-xl font-bold text-purple-400">$<?php echo number_format($total_pay, 2); ?></p>
+                    <p class="text-xl font-bold text-purple-400"><?php echo $currency; ?> <?php echo number_format($total_pay, 2); ?></p>
                 </div>
                 <div class="glass-strong rounded-xl p-4 border border-white/[0.06]">
                     <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Requests</span>

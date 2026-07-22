@@ -17,7 +17,7 @@ if ($payroll_id <= 0) {
 
 $stmt = $conn->prepare("
     SELECT p.*, e.name, e.employee_code
-    FROM payrolls p JOIN employee e ON p.employee_id = e.id
+    FROM payroll p JOIN employee e ON p.employee_id = e.id
     WHERE p.id = ? AND p.employee_id = ?
 ");
 $stmt->bind_param('ii', $payroll_id, $employee_id);
@@ -29,8 +29,13 @@ if (!$slip) {
     die('Salary slip not found');
 }
 
-$month_name = date('F', mktime(0, 0, 0, $slip['payroll_month'], 1));
-$year = $slip['payroll_year'];
+// Map fields for PDF generator compatibility
+$slip['ot_amount'] = $slip['overtime_amount'] ?? 0;
+$slip['bonus_amount'] = $slip['bonus'] ?? 0;
+$slip['deduction_amount'] = ($slip['leave_deduction'] ?? 0) + ($slip['half_day_deduction'] ?? 0) + ($slip['late_deduction'] ?? 0) + ($slip['absent_deduction'] ?? 0) + ($slip['other_deduction'] ?? 0);
+
+$month_name = date('F', mktime(0, 0, 0, $slip['pay_month'], 1));
+$year = $slip['pay_year'];
 
 $pdfContent = generate_salary_slip_pdf($slip, $month_name, $year);
 $filename = "Salary_Slip_{$slip['employee_code']}_{$month_name}_{$year}.pdf";

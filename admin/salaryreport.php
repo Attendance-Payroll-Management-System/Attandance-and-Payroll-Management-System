@@ -171,7 +171,7 @@ foreach ($records as $r) {
                         </div>
                         <div class="min-w-0 flex-1">
                             <span class="text-[11px] font-bold uppercase tracking-wider text-zinc-500">Total Net</span>
-                            <p class="text-xl font-extrabold text-emerald-400 mt-0.5 truncate">$<?php echo number_format($total_net, 2); ?></p>
+                            <p class="text-xl font-extrabold text-emerald-400 mt-0.5 truncate"><?php echo $currency; ?> <?php echo number_format($total_net, 2); ?></p>
                         </div>
                     </div>
                 </div>
@@ -184,7 +184,7 @@ foreach ($records as $r) {
                         </div>
                         <div class="min-w-0 flex-1">
                             <span class="text-[11px] font-bold uppercase tracking-wider text-zinc-500">Total Gross</span>
-                            <p class="text-xl font-extrabold text-blue-400 mt-0.5 truncate">$<?php echo number_format($total_gross, 2); ?></p>
+                            <p class="text-xl font-extrabold text-blue-400 mt-0.5 truncate"><?php echo $currency; ?> <?php echo number_format($total_gross, 2); ?></p>
                         </div>
                     </div>
                 </div>
@@ -197,7 +197,7 @@ foreach ($records as $r) {
                         </div>
                         <div class="min-w-0 flex-1">
                             <span class="text-[11px] font-bold uppercase tracking-wider text-zinc-500">Total OT</span>
-                            <p class="text-xl font-extrabold text-amber-400 mt-0.5 truncate">$<?php echo number_format($total_ot, 2); ?></p>
+                            <p class="text-xl font-extrabold text-amber-400 mt-0.5 truncate"><?php echo $currency; ?> <?php echo number_format($total_ot, 2); ?></p>
                         </div>
                     </div>
                 </div>
@@ -210,7 +210,7 @@ foreach ($records as $r) {
                         </div>
                         <div class="min-w-0 flex-1">
                             <span class="text-[11px] font-bold uppercase tracking-wider text-zinc-500">Total Bonus</span>
-                            <p class="text-xl font-extrabold text-cyan-400 mt-0.5 truncate">$<?php echo number_format($total_bonus, 2); ?></p>
+                            <p class="text-xl font-extrabold text-cyan-400 mt-0.5 truncate"><?php echo $currency; ?> <?php echo number_format($total_bonus, 2); ?></p>
                         </div>
                     </div>
                 </div>
@@ -223,7 +223,7 @@ foreach ($records as $r) {
                         </div>
                         <div class="min-w-0 flex-1">
                             <span class="text-[11px] font-bold uppercase tracking-wider text-zinc-500">Total Ded.</span>
-                            <p class="text-xl font-extrabold text-rose-400 mt-0.5 truncate">$<?php echo number_format($total_ded, 2); ?></p>
+                            <p class="text-xl font-extrabold text-rose-400 mt-0.5 truncate"><?php echo $currency; ?> <?php echo number_format($total_ded, 2); ?></p>
                         </div>
                     </div>
                 </div>
@@ -296,11 +296,11 @@ foreach ($records as $r) {
                                             <span class="text-zinc-600">—</span>
                                         <?php endif; ?>
                                     </td>
-                                    <td class="px-6 py-4 text-right font-mono text-white font-medium">$<?php echo number_format($r['basic_salary'], 2); ?></td>
+                                    <td class="px-6 py-4 text-right font-mono text-white font-medium"><?php echo $currency; ?> <?php echo number_format($r['basic_salary'], 2); ?></td>
                                     <td class="px-6 py-4 text-right">
                                         <?php if ($r['ot_amount'] > 0): ?>
                                             <span class="inline-flex items-center gap-1 font-mono text-amber-400 font-medium">
-                                                <i class="fa-solid fa-plus text-[9px]"></i>$<?php echo number_format($r['ot_amount'], 2); ?>
+                                                <i class="fa-solid fa-plus text-[9px]"></i><?php echo $currency; ?> <?php echo number_format($r['ot_amount'], 2); ?>
                                             </span>
                                         <?php else: ?>
                                             <span class="font-mono text-zinc-600">—</span>
@@ -309,7 +309,7 @@ foreach ($records as $r) {
                                     <td class="px-6 py-4 text-right">
                                         <?php if ($r['bonus_amount'] > 0): ?>
                                             <span class="inline-flex items-center gap-1 font-mono text-emerald-400 font-medium">
-                                                <i class="fa-solid fa-plus text-[9px]"></i>$<?php echo number_format($r['bonus_amount'], 2); ?>
+                                                <i class="fa-solid fa-plus text-[9px]"></i><?php echo $currency; ?> <?php echo number_format($r['bonus_amount'], 2); ?>
                                             </span>
                                         <?php else: ?>
                                             <span class="font-mono text-zinc-600">—</span>
@@ -318,15 +318,15 @@ foreach ($records as $r) {
                                     <td class="px-6 py-4 text-right">
                                         <?php if ($r['deduction_amount'] > 0): ?>
                                             <span class="inline-flex items-center gap-1 font-mono text-rose-400 font-medium">
-                                                <i class="fa-solid fa-minus text-[9px]"></i>$<?php echo number_format($r['deduction_amount'], 2); ?>
+                                                <i class="fa-solid fa-minus text-[9px]"></i><?php echo $currency; ?> <?php echo number_format($r['deduction_amount'], 2); ?>
                                             </span>
                                         <?php else: ?>
                                             <span class="font-mono text-zinc-600">—</span>
                                         <?php endif; ?>
                                     </td>
-                                    <td class="px-6 py-4 text-right font-mono text-white font-bold">$<?php echo number_format($r['gross_salary'], 2); ?></td>
+                                    <td class="px-6 py-4 text-right font-mono text-white font-bold"><?php echo $currency; ?> <?php echo number_format($r['gross_salary'], 2); ?></td>
                                     <td class="px-6 py-4 text-right">
-                                        <span class="net-highlight">$<?php echo number_format($r['net_salary'], 2); ?></span>
+                                        <span class="net-highlight"><?php echo $currency; ?> <?php echo number_format($r['net_salary'], 2); ?></span>
                                     </td>
                                 </tr>
                                 <?php endforeach; ?>

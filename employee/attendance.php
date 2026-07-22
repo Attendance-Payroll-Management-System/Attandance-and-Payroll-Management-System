@@ -122,7 +122,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['check_in']) && !$is_in
     } else {
         $ip = $_SERVER['REMOTE_ADDR'] ?? null;
         $is_late = is_late_checkin($current_time) ? 1 : 0;
-        $status = $is_late ? 'late' : 'present';
+
+        // Determine initial status based on check-in time
+        // Check-in between 12:00 PM and 5:00 PM → Half-Day
+        if (strtotime($current_time) >= strtotime('12:00:00') && strtotime($current_time) < strtotime($WORK_END)) {
+            $status = 'half_day';
+        } else {
+            $status = $is_late ? 'late' : 'present';
+        }
 
         $existing_att = has_checked_in_today($conn, $employee_id, $today);
 
@@ -206,11 +213,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['check_out']) && !$is_i
                     $time_display = date('h:i:s A');
                     $status_display = get_attendance_status_label($new_status);
 
-                    // Early checkout warnings
-                    if ($is_early_checkout && $total_hours < 4) {
-                        $message = "Check-out recorded at $time_display ($total_hours hours). WARNING: Early checkout - marked as Absent. Status: $status_display.";
-                    } elseif ($is_early_checkout && $total_hours >= 4 && $total_hours < 8) {
-                        $message = "Check-out recorded at $time_display ($total_hours hours). NOTE: Early checkout - marked as Half Day. Status: $status_display.";
+                    // Status-based messages
+                    if ($new_status === 'half_day') {
+                        if ($is_early_checkout) {
+                            $message = "Check-out recorded at $time_display ($total_hours hours). Early checkout - marked as Half Day. Status: $status_display.";
+                        } else {
+                            $message = "Check-out recorded at $time_display ($total_hours hours). Insufficient hours - marked as Half Day. Status: $status_display.";
+                        }
+                    } elseif ($new_status === 'late') {
+                        $message = "Check-out recorded at $time_display ($total_hours hours). Below required hours - marked as Late. Status: $status_display.";
                     } else {
                         $message = "Check-out recorded at $time_display ($total_hours hours worked). Status: $status_display.";
                     }
@@ -497,6 +508,7 @@ $corr_stmt->close();
                                 <div class="flex-1 text-center bg-emerald-500/10 text-emerald-400 text-sm px-4 py-3 rounded-xl border border-emerald-500/20">
                                     <i class="fa-solid fa-check-circle mr-1"></i> <?php echo get_attendance_status_label($today_att['status']); ?>
                                     (<?php echo number_format($today_att['total_working_hours'] ?? 0, 1); ?>h)
+                                    <?php echo get_auto_checkout_badge($today_att['is_auto_checkout'] ?? 0); ?>
                                 </div>
                             <?php endif; ?>
                         </div>
@@ -601,6 +613,7 @@ $corr_stmt->close();
                                             <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold <?php echo get_attendance_status_badge_class($row['status']); ?>">
                                                 <?php echo get_attendance_status_label($row['status']); ?>
                                             </span>
+                                            <?php echo get_auto_checkout_badge($row['is_auto_checkout'] ?? 0); ?>
                                         </td>
                                     </tr>
                                 <?php endwhile; ?>
@@ -629,6 +642,7 @@ $corr_stmt->close();
                     <span><span class="inline-block w-3 h-3 rounded-full bg-red-500/40 align-middle mr-1"></span> Absent</span>
                     <span><span class="inline-block w-3 h-3 rounded-full bg-pink-500/40 align-middle mr-1"></span> Holiday</span>
                     <span><span class="inline-block w-3 h-3 rounded-full bg-purple-500/40 align-middle mr-1"></span> Weekend</span>
+                    <span><span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold bg-violet-500/15 text-violet-400 border border-violet-500/20"><i class="fa-solid fa-clock-rotate-left text-[8px]"></i>Auto</span></span>
                 </div>
             </div>
 

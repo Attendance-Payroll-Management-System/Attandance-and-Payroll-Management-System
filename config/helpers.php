@@ -350,6 +350,21 @@ function calculate_overtime_amount_for_payroll(mysqli $conn, int $employee_id, s
     return round($total_ot_amount, 2);
 }
 
+// ─── Currency Helpers ─────────────────────────────────────────
+
+function get_currency(mysqli $conn): string {
+    return get_system_setting($conn, 'payroll_currency', 'K');
+}
+
+function format_currency(mysqli $conn, float $amount): string {
+    $currency = get_currency($conn);
+    return $currency . ' ' . number_format($amount, 0);
+}
+
+function format_currency_symbol(string $currency, float $amount): string {
+    return $currency . ' ' . number_format($amount, 0);
+}
+
 // ─── Session Message Helpers ────────────────────────────────────
 function set_message(string $message, string $type = 'error'): void {
     $_SESSION['message'] = $message;
@@ -443,56 +458,66 @@ function is_after_work_end(string $time): bool {
 function calculate_attendance_status(mysqli $conn, int $employee_id, string $date, ?string $check_in, ?string $check_out, ?float $total_hours): string {
     set_mmt_timezone();
 
-    // Rule 1: Weekend
+    // Prerequisite: Weekend
     if (is_weekend($date)) {
         return 'weekend';
     }
 
-    // Rule 2: Public Holiday
+    // Prerequisite: Public Holiday
     if (is_public_holiday($conn, $date)) {
         return 'public_holiday';
     }
 
-    // Rule 3: Approved Leave (distinguish paid vs unpaid)
+    // Prerequisite: Approved Leave (distinguish paid vs unpaid)
     if (has_approved_leave_on_date($conn, $employee_id, $date)) {
         return get_leave_status_for_date($conn, $employee_id, $date);
     }
 
-    // No check-in at all
+    // Priority 1: No Check-In and No Check-Out → Absent Without Leave (AWOL)
     if ($check_in === null) {
         return 'awol';
     }
 
-    // Hours-based status calculation
-    $half_day_min = (float)get_company_policy($conn, 'half_day_min_hours', 4);
-    $full_day_min = (float)get_company_policy($conn, 'full_day_min_hours', 8);
-    $is_late = is_late_checkin($check_in);
+    $check_in_time = $check_in ? date('H:i:s', strtotime($check_in)) : '';
 
-    if ($check_out !== null && $total_hours !== null) {
-        // Hours-based classification
-        if ($total_hours >= $full_day_min) {
-            return $is_late ? 'late' : 'present';
-        } elseif ($total_hours >= $half_day_min) {
+    // Priority 2: Check-In between 12:00 PM and 5:00 PM → Half-Day (regardless of total working hours)
+    if ($check_in_time && strtotime($check_in_time) >= strtotime('12:00:00') && strtotime($check_in_time) < strtotime('17:00:00')) {
+        return 'half_day';
+    }
+
+    // Priority 3: Check-Out between 12:00 PM and 5:00 PM → Half-Day
+    if ($check_out !== null) {
+        $check_out_time = date('H:i:s', strtotime($check_out));
+        if (strtotime($check_out_time) >= strtotime('12:00:00') && strtotime($check_out_time) < strtotime('17:00:00')) {
             return 'half_day';
-        } else {
-            return 'full_absent';
         }
+    }
+
+    // Hours-based status calculation (when check-out exists)
+    if ($check_out !== null && $total_hours !== null) {
+        // Priority 4: Total Working Hours less than 7 Hours → Half-Day
+        if ($total_hours < 7) {
+            return 'half_day';
+        }
+        // Priority 5: Total Working Hours between 7 Hours and less than 8 Hours → Late
+        if ($total_hours >= 7 && $total_hours < 8) {
+            return 'late';
+        }
+        // Priority 6: Total Working Hours 8 Hours or more → Present
+        return 'present';
     }
 
     // Has check-in but no check-out yet — use time-based estimation
     $current_time = mmt_time();
-    $hours_so_far = (strtotime($current_time) - strtotime($check_in)) / 3600;
+    $hours_so_far = max(0, (strtotime($current_time) - strtotime($check_in)) / 3600);
 
-    if ($hours_so_far >= $full_day_min) {
-        return $is_late ? 'late' : 'present';
-    } elseif ($hours_so_far >= $half_day_min) {
-        return 'half_day';
-    }
-
-    if ($is_late) {
+    if ($hours_so_far >= 8) {
+        return 'present';
+    } elseif ($hours_so_far >= 7) {
         return 'late';
     }
-    return 'present';
+
+    return 'half_day';
 }
 
 function get_leave_status_for_date(mysqli $conn, int $employee_id, string $date): string {
@@ -661,13 +686,151 @@ function auto_mark_daily_attendance(mysqli $conn, string $date): array {
     return $result;
 }
 
-// ─── Automatic Pension Fund Deduction for AWOL Attendance ─────
+// ─── Automatic Deductions for Attendance Violations ────────────
 
 define('AWOL_DEDUCTION_RATE', 0.02);
 define('AWOL_DEDUCTION_REMARKS', 'Auto Pension Fund Deduction for Unauthorized Absence');
+define('HALF_DAY_DEDUCTION_REMARKS', 'Auto Half-Day Deduction');
+define('UNPAID_ABSENCE_DEDUCTION_REMARKS', 'Auto Unpaid Absence Deduction');
+define('SYSTEM_MANAGED_REMARK_PREFIX', 'Auto ');
+
+// ─── Automatic Check-Out Helpers ──────────────────────────────
+
+define('AUTO_CHECKOUT_TIME', '17:30:00');
+define('AUTO_CHECKOUT_REMARKS', 'System auto checkout at end of work day');
+
+/**
+ * Get the approved overtime end time for an employee on a specific date.
+ * Returns the end_time string if an approved OT exists, null otherwise.
+ */
+function get_approved_overtime_end_time(mysqli $conn, int $employee_id, string $date): ?string {
+    $stmt = $conn->prepare(
+        "SELECT end_time FROM overtime_requests 
+         WHERE employee_id = ? AND ot_date = ? AND status = 'Approved'
+         ORDER BY end_time DESC LIMIT 1"
+    );
+    $stmt->bind_param('is', $employee_id, $date);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $row = $result->fetch_assoc();
+    $stmt->close();
+    return $row ? $row['end_time'] : null;
+}
+
+/**
+ * Get the configured auto-checkout time from settings.
+ */
+function get_auto_checkout_time(): string {
+    return AUTO_CHECKOUT_TIME;
+}
+
+/**
+ * Process automatic check-out for employees who checked in but forgot to check out.
+ * Skips employees with approved overtime requests (allows them to work until OT end time).
+ * Sets is_auto_checkout = 1 to flag auto-generated check-outs.
+ *
+ * @param mysqli $conn  Database connection
+ * @param string $date  The date to process (YYYY-MM-DD)
+ * @return array  Summary of processing results
+ */
+function process_auto_checkout(mysqli $conn, string $date): array {
+    set_mmt_timezone();
+
+    $result = [
+        'processed' => 0,
+        'auto_checkout' => 0,
+        'skipped_ot' => 0,
+        'skipped_no_checkout' => 0,
+        'errors' => [],
+    ];
+
+    // Check if auto-checkout feature is enabled
+    $enabled = get_company_policy($conn, 'auto_checkout_enabled', '1');
+    if ($enabled !== '1') {
+        return $result;
+    }
+
+    $auto_checkout_time = get_auto_checkout_time();
+
+    // Find all employees who checked in but haven't checked out on the given date
+    $stmt = $conn->prepare(
+        "SELECT a.id, a.employee_id, a.check_in, a.check_out, a.is_auto_checkout
+         FROM attendance a
+         WHERE a.attendance_date = ? 
+         AND a.check_in IS NOT NULL 
+         AND a.check_out IS NULL
+         AND a.is_auto_checkout = 0"
+    );
+    $stmt->bind_param('s', $date);
+    $stmt->execute();
+    $records = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+
+    foreach ($records as $record) {
+        $result['processed']++;
+        $att_id = (int)$record['id'];
+        $eid = (int)$record['employee_id'];
+
+        // Check if employee has an approved overtime request for this date
+        $ot_end_time = get_approved_overtime_end_time($conn, $eid, $date);
+
+        if ($ot_end_time !== null) {
+            // Employee has approved OT — skip auto checkout, allow attendance until OT end
+            $result['skipped_ot']++;
+            continue;
+        }
+
+        // No approved OT — auto check-out at configured time (17:30 MMT)
+        $check_in = $record['check_in'];
+        $check_in_ts = strtotime($check_in);
+        $auto_checkout_ts = strtotime("$date $auto_checkout_time");
+        $total_seconds = max(0, $auto_checkout_ts - $check_in_ts);
+        $total_hours = round($total_seconds / 3600, 2);
+
+        // Build the auto checkout datetime
+        $auto_checkout_datetime = "$date $auto_checkout_time";
+
+        // Update attendance record with auto checkout
+        $stmt = $conn->prepare(
+            "UPDATE attendance SET check_out = ?, total_working_hours = ?, is_auto_checkout = 1 WHERE id = ?"
+        );
+        $stmt->bind_param('sdi', $auto_checkout_datetime, $total_hours, $att_id);
+
+        if ($stmt->execute()) {
+            $stmt->close();
+
+            // Recalculate attendance status
+            $new_status = recalculate_attendance_after_checkout(
+                $conn, $att_id, $eid, $date, $check_in, $auto_checkout_datetime, $total_hours
+            );
+
+            // Log the auto checkout
+            log_activity(
+                $conn, $eid, 'auto_checkout',
+                "Automatic check-out at $auto_checkout_time for attendance on $date. Hours: $total_hours. Status: $new_status"
+            );
+
+            $result['auto_checkout']++;
+        } else {
+            $result['errors'][] = "Failed to auto-checkout employee ID $eid on $date";
+            $stmt->close();
+        }
+    }
+
+    return $result;
+}
+
+/**
+ * Render the "Auto Checked Out" badge HTML if the record was auto checked out.
+ */
+function get_auto_checkout_badge($is_auto_checkout): string {
+    if (!$is_auto_checkout) return '';
+    return '<span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold bg-violet-500/15 text-violet-400 border border-violet-500/20 ml-1.5"><i class="fa-solid fa-clock-rotate-left text-[8px]"></i>Auto Checked Out</span>';
+}
 
 function get_awol_deduction_type_id(mysqli $conn): ?int {
-    $result = $conn->query("SELECT id FROM deduction_types WHERE deduction_name = 'Pension Fund' LIMIT 1");
+    ensure_deduction_types_exist($conn);
+    $result = $conn->query("SELECT id FROM deduction_types WHERE deduction_name = 'Unpaid Absence' LIMIT 1");
     if ($result && $row = $result->fetch_assoc()) {
         return (int)$row['id'];
     }
@@ -675,9 +838,10 @@ function get_awol_deduction_type_id(mysqli $conn): ?int {
 }
 
 function has_awol_deduction(mysqli $conn, int $employee_id, string $date): bool {
-    $remarks = AWOL_DEDUCTION_REMARKS;
-    $stmt = $conn->prepare("SELECT id FROM deductions WHERE employee_id = ? AND deduction_date = ? AND remarks = ? LIMIT 1");
-    $stmt->bind_param('iss', $employee_id, $date, $remarks);
+    $remarks = UNPAID_ABSENCE_DEDUCTION_REMARKS;
+    $old_remarks = AWOL_DEDUCTION_REMARKS;
+    $stmt = $conn->prepare("SELECT id FROM deductions WHERE employee_id = ? AND deduction_date = ? AND remarks IN (?, ?) LIMIT 1");
+    $stmt->bind_param('isss', $employee_id, $date, $remarks, $old_remarks);
     $stmt->execute();
     $stmt->store_result();
     $exists = $stmt->num_rows > 0;
@@ -699,13 +863,17 @@ function create_awol_deduction(mysqli $conn, int $employee_id, int $attendance_i
     $basic_salary = (float)($emp['basic_salary'] ?? 0);
     if ($basic_salary <= 0) return false;
 
-    $deduction_amount = round($basic_salary * AWOL_DEDUCTION_RATE, 2);
+    // Calculate full day salary deduction
+    $working_days = get_working_days_in_month((int)date('Y', strtotime($date)), (int)date('m', strtotime($date)));
+    $daily_rate = calculate_daily_salary($basic_salary, $working_days);
+    $deduction_amount = $daily_rate; // One full day salary deduction
+
     $type_id = get_awol_deduction_type_id($conn);
 
-    $remarks = AWOL_DEDUCTION_REMARKS;
-    $rate = AWOL_DEDUCTION_RATE;
-    $stmt = $conn->prepare("INSERT INTO deductions (employee_id, title, deduction_type_id, attendance_id, amount, deduction_rate, description, deduction_date, remarks) VALUES (?, 'Pension Fund', ?, ?, ?, ?, 'Auto Pension Fund Deduction for Unauthorized Absence (2% of salary)', ?, ?)");
-    $stmt->bind_param('iiiddss', $employee_id, $type_id, $attendance_id, $deduction_amount, $rate, $date, $remarks);
+    $remarks = UNPAID_ABSENCE_DEDUCTION_REMARKS;
+    $description = "Auto Unpaid Absence Deduction - One Full Day Salary (\$" . number_format($deduction_amount, 2) . ")";
+    $stmt = $conn->prepare("INSERT INTO deductions (employee_id, title, deduction_type_id, attendance_id, amount, description, deduction_date, remarks) VALUES (?, 'Unpaid Absence', ?, ?, ?, ?, ?, ?)");
+    $stmt->bind_param('iiidsss', $employee_id, $type_id, $attendance_id, $deduction_amount, $description, $date, $remarks);
     $result = $stmt->execute();
     $stmt->close();
 
@@ -717,9 +885,10 @@ function create_awol_deduction(mysqli $conn, int $employee_id, int $attendance_i
 }
 
 function remove_awol_deduction(mysqli $conn, int $employee_id, string $date): bool {
-    $remarks = AWOL_DEDUCTION_REMARKS;
-    $stmt = $conn->prepare("DELETE FROM deductions WHERE employee_id = ? AND deduction_date = ? AND remarks = ?");
-    $stmt->bind_param('iss', $employee_id, $date, $remarks);
+    $remarks = UNPAID_ABSENCE_DEDUCTION_REMARKS;
+    $old_remarks = AWOL_DEDUCTION_REMARKS;
+    $stmt = $conn->prepare("DELETE FROM deductions WHERE employee_id = ? AND deduction_date = ? AND remarks IN (?, ?)");
+    $stmt->bind_param('isss', $employee_id, $date, $remarks, $old_remarks);
     $result = $stmt->execute();
     $affected = $stmt->affected_rows;
     $stmt->close();
@@ -728,12 +897,119 @@ function remove_awol_deduction(mysqli $conn, int $employee_id, string $date): bo
 
 function handle_awol_deduction_on_status_change(mysqli $conn, int $employee_id, string $new_status, int $attendance_id, string $date): void {
     $awol_statuses = ['awol', 'absent', 'full_absent'];
+    $half_day_statuses = ['half_day'];
 
     if (in_array($new_status, $awol_statuses)) {
         create_awol_deduction($conn, $employee_id, $attendance_id, $date);
+        remove_half_day_deduction($conn, $employee_id, $date);
+    } elseif (in_array($new_status, $half_day_statuses)) {
+        create_half_day_deduction($conn, $employee_id, $attendance_id, $date);
+        remove_awol_deduction($conn, $employee_id, $date);
     } else {
         remove_awol_deduction($conn, $employee_id, $date);
+        remove_half_day_deduction($conn, $employee_id, $date);
     }
+}
+
+// ─── Half-Day Deduction Helpers ───────────────────────────────
+
+function ensure_deduction_types_exist(mysqli $conn): void {
+    $types = ['Half-Day Deduction', 'Unpaid Absence'];
+    foreach ($types as $type_name) {
+        $check = $conn->query("SELECT id FROM deduction_types WHERE deduction_name = '$type_name' LIMIT 1");
+        if (!$check || $check->num_rows === 0) {
+            $conn->query("INSERT INTO deduction_types (deduction_name) VALUES ('$type_name')");
+        }
+    }
+}
+
+function is_system_managed_deduction(?string $remarks): bool {
+    return !empty($remarks) && str_starts_with($remarks, SYSTEM_MANAGED_REMARK_PREFIX);
+}
+
+function get_half_day_deduction_type_id(mysqli $conn): ?int {
+    ensure_deduction_types_exist($conn);
+    $result = $conn->query("SELECT id FROM deduction_types WHERE deduction_name = 'Half-Day Deduction' LIMIT 1");
+    if ($result && $row = $result->fetch_assoc()) {
+        return (int)$row['id'];
+    }
+    return null;
+}
+
+function has_half_day_deduction(mysqli $conn, int $employee_id, string $date): bool {
+    $remarks = HALF_DAY_DEDUCTION_REMARKS;
+    $stmt = $conn->prepare("SELECT id FROM deductions WHERE employee_id = ? AND deduction_date = ? AND remarks = ? LIMIT 1");
+    $stmt->bind_param('iss', $employee_id, $date, $remarks);
+    $stmt->execute();
+    $stmt->store_result();
+    $exists = $stmt->num_rows > 0;
+    $stmt->close();
+    return $exists;
+}
+
+function create_half_day_deduction(mysqli $conn, int $employee_id, int $attendance_id, string $date): bool {
+    if (has_half_day_deduction($conn, $employee_id, $date)) {
+        return false;
+    }
+
+    $emp_stmt = $conn->prepare("SELECT basic_salary, name, employee_code FROM employee WHERE id = ?");
+    $emp_stmt->bind_param('i', $employee_id);
+    $emp_stmt->execute();
+    $emp = $emp_stmt->get_result()->fetch_assoc();
+    $emp_stmt->close();
+
+    $basic_salary = (float)($emp['basic_salary'] ?? 0);
+    if ($basic_salary <= 0) return false;
+
+    // Calculate half day salary deduction
+    $working_days = get_working_days_in_month((int)date('Y', strtotime($date)), (int)date('m', strtotime($date)));
+    $daily_rate = calculate_daily_salary($basic_salary, $working_days);
+    $deduction_amount = round($daily_rate * 0.5, 2); // Half day salary deduction
+
+    $type_id = get_half_day_deduction_type_id($conn);
+
+    $remarks = HALF_DAY_DEDUCTION_REMARKS;
+    $description = "Auto Half-Day Deduction - Half Day Salary (\$" . number_format($deduction_amount, 2) . ")";
+    $stmt = $conn->prepare("INSERT INTO deductions (employee_id, title, deduction_type_id, attendance_id, amount, description, deduction_date, remarks) VALUES (?, 'Half-Day Deduction', ?, ?, ?, ?, ?, ?)");
+    $stmt->bind_param('iiidsss', $employee_id, $type_id, $attendance_id, $deduction_amount, $description, $date, $remarks);
+    $result = $stmt->execute();
+    $stmt->close();
+
+    if ($result) {
+        log_half_day_deduction($conn, $employee_id, $emp['name'] ?? '', $emp['employee_code'] ?? '', $date, $basic_salary, $deduction_amount);
+    }
+
+    return $result;
+}
+
+function remove_half_day_deduction(mysqli $conn, int $employee_id, string $date): bool {
+    $remarks = HALF_DAY_DEDUCTION_REMARKS;
+    $stmt = $conn->prepare("DELETE FROM deductions WHERE employee_id = ? AND deduction_date = ? AND remarks = ?");
+    $stmt->bind_param('iss', $employee_id, $date, $remarks);
+    $result = $stmt->execute();
+    $affected = $stmt->affected_rows;
+    $stmt->close();
+    return $affected > 0;
+}
+
+function log_half_day_deduction(mysqli $conn, int $employee_id, string $employee_name, string $employee_code, string $date, float $basic_salary, float $deduction_amount): void {
+    $res = $conn->query("SHOW TABLES LIKE 'activity_logs'");
+    if (!$res || $res->num_rows === 0) return;
+
+    $description = sprintf(
+        'Half-Day Deduction created for %s (%s) | Attendance Date: %s | Basic Salary: %s | Deduction Amount: %s (Half Day) | Timestamp: %s',
+        $employee_name,
+        $employee_code,
+        $date,
+        number_format($basic_salary, 2),
+        number_format($deduction_amount, 2),
+        mmt_datetime()
+    );
+
+    $stmt = $conn->prepare("INSERT INTO activity_logs (employee_id, action, description, ip_address, user_agent) VALUES (?, 'half_day_deduction_created', ?, 'system', 'auto_deduction')");
+    $stmt->bind_param('is', $employee_id, $description);
+    $stmt->execute();
+    $stmt->close();
 }
 
 function log_awol_deduction(mysqli $conn, int $employee_id, string $employee_name, string $employee_code, string $date, float $basic_salary, float $deduction_amount): void {
@@ -741,12 +1017,11 @@ function log_awol_deduction(mysqli $conn, int $employee_id, string $employee_nam
     if (!$res || $res->num_rows === 0) return;
 
     $description = sprintf(
-        'Pension Fund Deduction created for %s (%s) | Attendance Date: %s | Basic Salary: %s | Deduction Rate: %.2f%% | Deduction Amount: %s | Timestamp: %s',
+        'Unpaid Absence Deduction created for %s (%s) | Attendance Date: %s | Basic Salary: %s | Deduction Amount: %s (Full Day) | Timestamp: %s',
         $employee_name,
         $employee_code,
         $date,
         number_format($basic_salary, 2),
-        AWOL_DEDUCTION_RATE * 100,
         number_format($deduction_amount, 2),
         mmt_datetime()
     );
@@ -767,6 +1042,7 @@ function reconcile_awol_deductions(mysqli $conn, string $date): array {
         'errors' => [],
     ];
 
+    // Reconcile AWOL deductions
     $awol_stmt = $conn->prepare(
         "SELECT a.id as attendance_id, a.employee_id, a.status
          FROM attendance a
@@ -791,7 +1067,36 @@ function reconcile_awol_deductions(mysqli $conn, string $date): array {
         if ($created) {
             $result['created']++;
         } else {
-            $result['errors'][] = "Failed to create deduction for employee ID $eid on $date";
+            $result['errors'][] = "Failed to create AWOL deduction for employee ID $eid on $date";
+        }
+    }
+
+    // Reconcile Half-Day deductions
+    $half_day_stmt = $conn->prepare(
+        "SELECT a.id as attendance_id, a.employee_id, a.status
+         FROM attendance a
+         WHERE a.attendance_date = ? AND a.status = 'half_day'"
+    );
+    $half_day_stmt->bind_param('s', $date);
+    $half_day_stmt->execute();
+    $half_day_records = $half_day_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $half_day_stmt->close();
+
+    foreach ($half_day_records as $record) {
+        $result['checked']++;
+        $eid = (int)$record['employee_id'];
+        $att_id = (int)$record['attendance_id'];
+
+        if (has_half_day_deduction($conn, $eid, $date)) {
+            $result['skipped']++;
+            continue;
+        }
+
+        $created = create_half_day_deduction($conn, $eid, $att_id, $date);
+        if ($created) {
+            $result['created']++;
+        } else {
+            $result['errors'][] = "Failed to create Half-Day deduction for employee ID $eid on $date";
         }
     }
 
@@ -1297,7 +1602,7 @@ function generate_payroll_for_employee(mysqli $conn, int $employee_id, int $mont
     $upsert->execute();
     $payroll_id = $conn->insert_id;
     if ($payroll_id <= 0) {
-        $stmt = $conn->prepare("SELECT id FROM payrolls WHERE employee_id = ? AND payroll_month = ? AND payroll_year = ?");
+        $stmt = $conn->prepare("SELECT id FROM payroll WHERE employee_id = ? AND pay_month = ? AND pay_year = ?");
         $stmt->bind_param('iii', $employee_id, $month, $year);
         $stmt->execute();
         $payroll_id = (int)$stmt->get_result()->fetch_assoc()['id'];
@@ -1331,7 +1636,7 @@ function generate_payroll_for_employee(mysqli $conn, int $employee_id, int $mont
 }
 
 function update_payroll_status(mysqli $conn, int $payroll_id, string $new_status, ?int $admin_id = null, string $remarks = ''): bool {
-    $stmt = $conn->prepare("SELECT status FROM payrolls WHERE id = ?");
+    $stmt = $conn->prepare("SELECT payment_status FROM payroll WHERE id = ?");
     $stmt->bind_param('i', $payroll_id);
     $stmt->execute();
     $current = $stmt->get_result()->fetch_assoc();
@@ -1415,7 +1720,7 @@ function get_payroll_details_with_components(mysqli $conn, int $payroll_id): ?ar
     $stmt = $conn->prepare("
         SELECT p.*, e.name, e.employee_code, e.basic_salary as emp_salary, e.email,
                d.department_name, pos.position_name
-        FROM payrolls p
+        FROM payroll p
         JOIN employee e ON p.employee_id = e.id
         LEFT JOIN departments d ON e.department_id = d.id
         LEFT JOIN positions pos ON e.position_id = pos.id
@@ -1443,7 +1748,7 @@ function get_payroll_details_with_components(mysqli $conn, int $payroll_id): ?ar
 }
 
 function get_payroll_months_with_data(mysqli $conn): array {
-    $result = $conn->query("SELECT DISTINCT payroll_month, payroll_year FROM payrolls ORDER BY payroll_year DESC, payroll_month DESC");
+    $result = $conn->query("SELECT DISTINCT pay_month, pay_year FROM payroll ORDER BY pay_year DESC, pay_month DESC");
     return $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
 }
 
@@ -1459,8 +1764,8 @@ function get_dashboard_payroll_stats(mysqli $conn): array {
     $res = $conn->query("SELECT COUNT(*) as cnt FROM employee WHERE status = 'active'");
     $stats['total_employees'] = (int)$res->fetch_assoc()['cnt'];
 
-    // Current month payroll totals
-    $stmt = $conn->prepare("SELECT COUNT(*) as total_payrolls, COALESCE(SUM(net_salary),0) as total_net, COALESCE(SUM(ot_amount),0) as total_ot, COALESCE(SUM(bonus_amount),0) as total_bonus, COALESCE(SUM(deduction_amount),0) as total_ded FROM payrolls WHERE payroll_month = ? AND payroll_year = ?");
+    // Current month payroll totals (from `payroll` table)
+    $stmt = $conn->prepare("SELECT COUNT(*) as total_payrolls, COALESCE(SUM(net_salary),0) as total_net, COALESCE(SUM(overtime_amount),0) as total_ot, COALESCE(SUM(bonus),0) as total_bonus, COALESCE(SUM(total_deduction),0) as total_ded FROM payroll WHERE pay_month = ? AND pay_year = ?");
     $stmt->bind_param('ii', $current_month, $current_year);
     $stmt->execute();
     $row = $stmt->get_result()->fetch_assoc();
@@ -1471,14 +1776,13 @@ function get_dashboard_payroll_stats(mysqli $conn): array {
     $stats['total_bonus'] = (float)$row['total_bonus'];
     $stats['total_ded'] = (float)$row['total_ded'];
 
-    // Status counts (check column first for migration safety)
-    $has_status = $conn->query("SHOW COLUMNS FROM payrolls LIKE 'status'")->num_rows > 0;
+    // Status counts
     $status_counts = ['Draft' => 0, 'Generated' => 0, 'Reviewed' => 0, 'Approved' => 0, 'Paid' => 0, 'Cancelled' => 0];
-    if ($has_status) {
-        $res = $conn->query("SELECT status, COUNT(*) as cnt FROM payrolls WHERE payroll_month = $current_month AND payroll_year = $current_year GROUP BY status");
-        if ($res) while ($r = $res->fetch_assoc()) {
-            $status_counts[$r['status']] = (int)$r['cnt'];
-        }
+    $res = $conn->query("SELECT payment_status, COUNT(*) as cnt FROM payroll WHERE pay_month = $current_month AND pay_year = $current_year GROUP BY payment_status");
+    if ($res) while ($r = $res->fetch_assoc()) {
+        $s = $r['payment_status'];
+        if (isset($status_counts[$s])) $status_counts[$s] = (int)$r['cnt'];
+        elseif ($s === 'Pending') $status_counts['Generated'] += (int)$r['cnt'];
     }
     $stats['status_counts'] = $status_counts;
     $stats['total_pending'] = $status_counts['Generated'] + $status_counts['Draft'];
@@ -1491,7 +1795,7 @@ function get_dashboard_payroll_stats(mysqli $conn): array {
         $m = $current_month - $i;
         $y = $current_year;
         if ($m < 1) { $m += 12; $y--; }
-        $stmt = $conn->prepare("SELECT COALESCE(SUM(net_salary),0) as total FROM payrolls WHERE payroll_month = ? AND payroll_year = ?");
+        $stmt = $conn->prepare("SELECT COALESCE(SUM(net_salary),0) as total FROM payroll WHERE pay_month = ? AND pay_year = ?");
         $stmt->bind_param('ii', $m, $y);
         $stmt->execute();
         $trend[] = ['month' => date('M', mktime(0,0,0,$m,1)), 'year' => $y, 'total' => (float)$stmt->get_result()->fetch_assoc()['total']];
@@ -1503,7 +1807,7 @@ function get_dashboard_payroll_stats(mysqli $conn): array {
 }
 
 function get_payroll_report_data(mysqli $conn, string $start_date, string $end_date, ?int $department_id = null, ?int $employee_id = null, ?string $status = null): array {
-    $where = ["p.payroll_year >= ? AND p.payroll_year <= ?"];
+    $where = ["p.pay_year >= ? AND p.pay_year <= ?"];
     $params = [(int)date('Y', strtotime($start_date)), (int)date('Y', strtotime($end_date))];
     $types = 'ii';
 
@@ -1518,18 +1822,18 @@ function get_payroll_report_data(mysqli $conn, string $start_date, string $end_d
         $types .= 'i';
     }
     if ($status) {
-        $where[] = "p.status = ?";
+        $where[] = "p.payment_status = ?";
         $params[] = $status;
         $types .= 's';
     }
 
     $sql = "SELECT p.*, e.name, e.employee_code, d.department_name, pos.position_name
-            FROM payrolls p
+            FROM payroll p
             JOIN employee e ON p.employee_id = e.id
             LEFT JOIN departments d ON e.department_id = d.id
             LEFT JOIN positions pos ON e.position_id = pos.id
             WHERE " . implode(' AND ', $where) . "
-            ORDER BY p.payroll_year DESC, p.payroll_month DESC, e.name ASC";
+            ORDER BY p.pay_year DESC, p.pay_month DESC, e.name ASC";
 
     $stmt = $conn->prepare($sql);
     $stmt->bind_param($types, ...$params);
@@ -2750,4 +3054,375 @@ function should_send_new_reminder(mysqli $conn, int $employee_id, string $level)
     $cnt = (int)$stmt->get_result()->fetch_assoc()['cnt'];
     $stmt->close();
     return $cnt === 0;
+}
+
+// ─── New Payroll Module (payroll table) ──────────────────────
+
+/**
+ * Check if the new `payroll` table exists.
+ */
+function payroll_table_exists(mysqli $conn): bool {
+    $res = $conn->query("SHOW TABLES LIKE 'payroll'");
+    return $res && $res->num_rows > 0;
+}
+
+/**
+ * Calculate payroll for a single employee using the unified payroll formula.
+ * Salary Formula:
+ *   Daily Salary = Basic Salary / Working Days
+ *   Attendance Salary = (Present × Daily) + (Half Days × Daily × 0.5) + (Paid Leave × Daily)
+ *   Unpaid Leave Deduction = Unpaid Leave Days × Daily Salary
+ *   Gross Salary = Attendance Salary + OT Pay + Bonus
+ *   Net Salary = Gross Salary - Unpaid Leave Deduction - Total Deduction
+ */
+function calculate_new_payroll(mysqli $conn, int $employee_id, int $month, int $year): ?array {
+    $month_start = sprintf('%04d-%02d-01', $year, $month);
+    $month_end = date('Y-m-t', strtotime($month_start));
+    $working_days = get_working_days_in_month($year, $month);
+
+    $emp_stmt = $conn->prepare("SELECT basic_salary FROM employee WHERE id = ? AND status = 'active'");
+    $emp_stmt->bind_param('i', $employee_id);
+    $emp_stmt->execute();
+    $emp = $emp_stmt->get_result()->fetch_assoc();
+    $emp_stmt->close();
+    if (!$emp) return null;
+
+    $basic_salary = (float)($emp['basic_salary'] ?? 0);
+    $daily_rate = calculate_daily_salary($basic_salary, $working_days);
+    $hourly_rate = calculate_hourly_rate($basic_salary, $working_days);
+
+    // --- Attendance Summary ---
+    $att = get_monthly_attendance_summary($conn, $employee_id, $month_start, $month_end);
+    $present_days = (int)($att['present_days'] ?? 0);
+    $half_days = (int)($att['half_days'] ?? 0);
+    $late_days = (int)($att['late_days'] ?? 0);
+    $absent_days = (int)($att['absent_days'] ?? 0);
+    $paid_leave_days = (int)($att['paid_leave_days'] ?? 0);
+    $unpaid_leave_days = (int)($att['unpaid_leave_days'] ?? 0);
+    $leave_days = $paid_leave_days + $unpaid_leave_days;
+
+    // --- Attendance Salary (per user formula) ---
+    $attendance_salary = ($present_days * $daily_rate)
+                       + ($half_days * $daily_rate * 0.5)
+                       + ($paid_leave_days * $daily_rate);
+
+    // --- Unpaid Leave Deduction ---
+    $unpaid_leave_deduction = $unpaid_leave_days * $daily_rate;
+
+    // --- Late Penalty ---
+    // Check for late_deduction_percent (percentage of daily rate per late day)
+    $late_percent = (float)get_company_policy($conn, 'late_deduction_percent', 0);
+    $late_penalty_rate = (float)get_company_policy($conn, 'late_penalty_per_occurrence', 0);
+
+    if ($late_percent > 0) {
+        // Late deduction as percentage of daily rate per occurrence
+        $late_deduction = round($daily_rate * ($late_percent / 100) * $late_days, 2);
+    } elseif ($late_penalty_rate > 0) {
+        // Fixed penalty per late occurrence
+        $late_deduction = $late_penalty_rate * $late_days;
+    } else {
+        $late_deduction = 0;
+    }
+
+    // --- Leave Deduction (Unpaid Leave) ---
+    $leave_deduction = $unpaid_leave_deduction;
+
+    // --- Absent Deduction ---
+    $absent_deduction = $daily_rate * $absent_days;
+
+    // --- Half Day Deduction ---
+    $half_day_deduction = $daily_rate * 0.5 * $half_days;
+
+    // --- Other Deductions (from deductions table) ---
+    $ded_stmt = $conn->prepare("SELECT COALESCE(SUM(amount), 0) as total FROM deductions WHERE employee_id = ? AND deduction_date BETWEEN ? AND ?");
+    $ded_stmt->bind_param('iss', $employee_id, $month_start, $month_end);
+    $ded_stmt->execute();
+    $other_deduction = (float)$ded_stmt->get_result()->fetch_assoc()['total'];
+    $ded_stmt->close();
+
+    // --- Total Deductions ---
+    $total_deduction = $unpaid_leave_deduction + $late_deduction + $absent_deduction + $half_day_deduction + $other_deduction;
+
+    // --- Overtime ---
+    $overtime_hours = (float)($att['total_hours_worked'] ?? 0);
+    $overtime_amount = calculate_overtime_amount_for_payroll($conn, $employee_id, $month_start, $month_end, $hourly_rate);
+
+    // OT breakdown by type
+    $ot_breakdown = ['working_day' => 0.0, 'weekend' => 0.0, 'holiday' => 0.0];
+    $has_ot_type = $conn->query("SHOW COLUMNS FROM overtime_requests LIKE 'ot_type'")->num_rows > 0;
+    if ($has_ot_type) {
+        $ot_stmt = $conn->prepare("SELECT COALESCE(SUM(total_hours), 0) as hrs, ot_type FROM overtime_requests WHERE employee_id = ? AND ot_date BETWEEN ? AND ? AND status = 'Approved' GROUP BY ot_type");
+        $ot_stmt->bind_param('iss', $employee_id, $month_start, $month_end);
+        $ot_stmt->execute();
+        $ot_rows = $ot_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $ot_stmt->close();
+        foreach ($ot_rows as $r) {
+            $key = $r['ot_type'] ?? 'working_day';
+            if (isset($ot_breakdown[$key])) $ot_breakdown[$key] = (float)$r['hrs'];
+            else $ot_breakdown['working_day'] += (float)$r['hrs'];
+        }
+    }
+
+    // --- Bonus ---
+    $bonus_stmt = $conn->prepare("SELECT COALESCE(SUM(amount), 0) as total FROM bonuses WHERE employee_id = ? AND bonus_date BETWEEN ? AND ?");
+    $bonus_stmt->bind_param('iss', $employee_id, $month_start, $month_end);
+    $bonus_stmt->execute();
+    $bonus = (float)$bonus_stmt->get_result()->fetch_assoc()['total'];
+    $bonus_stmt->close();
+
+    // --- Allowance ---
+    $allow_stmt = $conn->prepare("SELECT COALESCE(epi.allowance, 0) as allowance FROM employee_personal_info epi WHERE epi.employee_id = ?");
+    $allow_stmt->bind_param('i', $employee_id);
+    $allow_stmt->execute();
+    $allowance = (float)($allow_stmt->get_result()->fetch_assoc()['allowance'] ?? 0);
+    $allow_stmt->close();
+
+    // --- Gross Salary = Attendance Salary + OT Pay + Bonus ---
+    $gross_salary = $attendance_salary + $overtime_amount + $bonus;
+
+    // --- Net Salary = Gross - Total Deduction ---
+    $net_salary = $gross_salary - $total_deduction;
+
+    return [
+        'employee_id'        => $employee_id,
+        'pay_month'          => $month,
+        'pay_year'           => $year,
+        'basic_salary'       => $basic_salary,
+        'attendance_salary'  => $attendance_salary,
+        'working_days'       => $working_days,
+        'present_days'       => $present_days,
+        'half_days'          => $half_days,
+        'paid_leave_days'    => $paid_leave_days,
+        'unpaid_leave_days'  => $unpaid_leave_days,
+        'leave_days'         => $leave_days,
+        'late_days'          => $late_days,
+        'absent_days'        => $absent_days,
+        'overtime_hours'     => $overtime_hours,
+        'ot_working_day_hours' => $ot_breakdown['working_day'],
+        'ot_weekend_hours'   => $ot_breakdown['weekend'],
+        'ot_holiday_hours'   => $ot_breakdown['holiday'],
+        'overtime_amount'    => $overtime_amount,
+        'unpaid_leave_deduction' => $unpaid_leave_deduction,
+        'leave_deduction'    => $unpaid_leave_deduction,
+        'half_day_deduction' => $half_day_deduction,
+        'late_deduction'     => $late_deduction,
+        'absent_deduction'   => $absent_deduction,
+        'bonus'              => $bonus,
+        'allowance'          => $allowance,
+        'other_deduction'    => $other_deduction,
+        'total_deduction'    => $total_deduction,
+        'gross_salary'       => $gross_salary,
+        'net_salary'         => $net_salary,
+    ];
+}
+
+/**
+ * Generate a unique payroll code like PAY-2026-07-001
+ */
+function generate_payroll_code(mysqli $conn, int $year, int $month): string {
+    $prefix = sprintf('PAY-%04d-%02d-', $year, $month);
+    $stmt = $conn->prepare("SELECT payroll_code FROM payroll WHERE payroll_code LIKE ? ORDER BY id DESC LIMIT 1");
+    $like = $prefix . '%';
+    $stmt->bind_param('s', $like);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    if ($row && $row['payroll_code']) {
+        $last_num = (int)substr($row['payroll_code'], -3);
+        $new_num = $last_num + 1;
+    } else {
+        $new_num = 1;
+    }
+    return $prefix . str_pad($new_num, 3, '0', STR_PAD_LEFT);
+}
+
+/**
+ * Generate (insert/update) a payroll record in the `payroll` table.
+ * Returns the payroll ID on success, null on failure.
+ */
+function generate_new_payroll(mysqli $conn, int $employee_id, int $month, int $year): ?int {
+    $data = calculate_new_payroll($conn, $employee_id, $month, $year);
+    if (!$data) return null;
+
+    $payroll_code = generate_payroll_code($conn, $year, $month);
+
+    $upsert = $conn->prepare("INSERT INTO payroll (
+        payroll_code, employee_id, pay_month, pay_year, basic_salary, attendance_salary,
+        working_days, present_days, half_days, paid_leave_days, unpaid_leave_days,
+        leave_days, late_days, absent_days,
+        overtime_hours, ot_working_day_hours, ot_weekend_hours, ot_holiday_hours, overtime_amount,
+        leave_deduction, unpaid_leave_deduction, half_day_deduction, late_deduction, absent_deduction,
+        bonus, allowance, other_deduction, total_deduction,
+        gross_salary, net_salary, payment_status, generated_date
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending', CURDATE())
+    ON DUPLICATE KEY UPDATE
+        payroll_code = VALUES(payroll_code),
+        basic_salary = VALUES(basic_salary),
+        attendance_salary = VALUES(attendance_salary),
+        working_days = VALUES(working_days),
+        present_days = VALUES(present_days),
+        half_days = VALUES(half_days),
+        paid_leave_days = VALUES(paid_leave_days),
+        unpaid_leave_days = VALUES(unpaid_leave_days),
+        leave_days = VALUES(leave_days),
+        late_days = VALUES(late_days),
+        absent_days = VALUES(absent_days),
+        overtime_hours = VALUES(overtime_hours),
+        ot_working_day_hours = VALUES(ot_working_day_hours),
+        ot_weekend_hours = VALUES(ot_weekend_hours),
+        ot_holiday_hours = VALUES(ot_holiday_hours),
+        overtime_amount = VALUES(overtime_amount),
+        leave_deduction = VALUES(leave_deduction),
+        unpaid_leave_deduction = VALUES(unpaid_leave_deduction),
+        half_day_deduction = VALUES(half_day_deduction),
+        late_deduction = VALUES(late_deduction),
+        absent_deduction = VALUES(absent_deduction),
+        bonus = VALUES(bonus),
+        allowance = VALUES(allowance),
+        other_deduction = VALUES(other_deduction),
+        total_deduction = VALUES(total_deduction),
+        gross_salary = VALUES(gross_salary),
+        net_salary = VALUES(net_salary),
+        payment_status = 'Pending',
+        generated_date = CURDATE(),
+        updated_at = CURRENT_TIMESTAMP");
+
+    $upsert->bind_param('siiiddiiiiiiiidddddddddddddddd',
+        $payroll_code, $data['employee_id'], $data['pay_month'], $data['pay_year'], $data['basic_salary'], $data['attendance_salary'],
+        $data['working_days'], $data['present_days'], $data['half_days'], $data['paid_leave_days'], $data['unpaid_leave_days'],
+        $data['leave_days'], $data['late_days'], $data['absent_days'],
+        $data['overtime_hours'], $data['ot_working_day_hours'], $data['ot_weekend_hours'], $data['ot_holiday_hours'], $data['overtime_amount'],
+        $data['leave_deduction'], $data['unpaid_leave_deduction'], $data['half_day_deduction'], $data['late_deduction'], $data['absent_deduction'],
+        $data['bonus'], $data['allowance'], $data['other_deduction'], $data['total_deduction'],
+        $data['gross_salary'], $data['net_salary']
+    );
+    $upsert->execute();
+    $payroll_id = $conn->insert_id;
+    $upsert->close();
+
+    if ($payroll_id <= 0) {
+        $stmt = $conn->prepare("SELECT id FROM payroll WHERE employee_id = ? AND pay_month = ? AND pay_year = ?");
+        $stmt->bind_param('iii', $data['employee_id'], $data['pay_month'], $data['pay_year']);
+        $stmt->execute();
+        $payroll_id = (int)$stmt->get_result()->fetch_assoc()['id'];
+        $stmt->close();
+    }
+
+    return $payroll_id > 0 ? $payroll_id : null;
+}
+
+/**
+ * Batch-generate payroll for all active employees for a given month/year.
+ * Returns [inserted_count, total_working_days].
+ */
+function generate_batch_new_payroll(mysqli $conn, int $month, int $year): array {
+    $emp_query = $conn->query("SELECT id FROM employee WHERE status = 'active'");
+    $inserted = 0;
+    $month_name = date('F', mktime(0, 0, 0, $month, 1));
+    
+    while ($emp = $emp_query->fetch_assoc()) {
+        $pid = generate_new_payroll($conn, (int)$emp['id'], $month, $year);
+        if ($pid) {
+            $inserted++;
+            // Create notification for employee
+            $payroll = get_new_payroll_detail($conn, $pid);
+            if ($payroll) {
+                create_payroll_notification($conn, (int)$emp['id'], 'generated', $month_name, $year, $payroll['net_salary']);
+            }
+        }
+    }
+    $emp_query->close();
+    return [$inserted, get_working_days_in_month($year, $month)];
+}
+
+/**
+ * Get a single payroll record from the new table, with employee info.
+ */
+function get_new_payroll_detail(mysqli $conn, int $payroll_id): ?array {
+    $stmt = $conn->prepare("
+        SELECT p.*, e.name, e.employee_code, e.email, e.basic_salary as emp_basic_salary,
+               d.department_name, pos.position_name
+        FROM payroll p
+        JOIN employee e ON p.employee_id = e.id
+        LEFT JOIN departments d ON e.department_id = d.id
+        LEFT JOIN positions pos ON e.position_id = pos.id
+        WHERE p.id = ?
+    ");
+    $stmt->bind_param('i', $payroll_id);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    return $row;
+}
+
+/**
+ * Update payment status for a payroll record.
+ */
+function update_new_payroll_status(mysqli $conn, int $payroll_id, string $status, ?string $remarks = null): bool {
+    $set_parts = ['payment_status = ?'];
+    $bind_types = 's';
+    $params = [$status];
+
+    if ($status === 'Paid') {
+        $set_parts[] = 'paid_date = CURDATE()';
+    }
+
+    if ($remarks !== null) {
+        $set_parts[] = 'remarks = ?';
+        $bind_types .= 's';
+        $params[] = $remarks;
+    }
+
+    $params[] = $payroll_id;
+    $bind_types .= 'i';
+    $set_sql = implode(', ', $set_parts);
+    $stmt = $conn->prepare("UPDATE payroll SET $set_sql WHERE id = ?");
+    $stmt->bind_param($bind_types, ...$params);
+    $result = $stmt->execute();
+    $affected = $stmt->affected_rows;
+    $stmt->close();
+
+    // Create notification for employee when payroll is paid
+    if ($result && $status === 'Paid' && $affected > 0) {
+        $payroll = get_new_payroll_detail($conn, $payroll_id);
+        if ($payroll) {
+            $month_name = date('F', mktime(0, 0, 0, $payroll['pay_month'], 1));
+            create_payroll_notification($conn, $payroll['employee_id'], 'paid', $month_name, $payroll['pay_year'], $payroll['net_salary']);
+        }
+    }
+
+    return $result;
+}
+
+/**
+ * Get payment status badge CSS classes for the payroll table.
+ */
+function get_new_payroll_status_badge(string $status): string {
+    return match ($status) {
+        'Draft'     => 'bg-zinc-500/15 text-zinc-400 border border-zinc-500/20',
+        'Generated' => 'bg-blue-500/15 text-blue-400 border border-blue-500/20',
+        'Reviewed'  => 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/20',
+        'Approved'  => 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20',
+        'Pending'   => 'bg-amber-500/15 text-amber-400 border border-amber-500/20',
+        'Paid'      => 'bg-purple-500/15 text-purple-400 border border-purple-500/20',
+        'Cancelled' => 'bg-rose-500/15 text-rose-400 border border-rose-500/20',
+        default     => 'bg-zinc-500/15 text-zinc-400 border border-zinc-500/20',
+    };
+}
+
+/**
+ * Get payment status icon for the payroll table.
+ */
+function get_new_payroll_status_icon(string $status): string {
+    return match ($status) {
+        'Draft'     => 'fa-pen-to-square',
+        'Generated' => 'fa-calculator',
+        'Reviewed'  => 'fa-magnifying-glass',
+        'Approved'  => 'fa-check-circle',
+        'Pending'   => 'fa-clock',
+        'Paid'      => 'fa-sack-dollar',
+        'Cancelled' => 'fa-ban',
+        default     => 'fa-circle',
+    };
 }

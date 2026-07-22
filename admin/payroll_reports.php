@@ -26,16 +26,16 @@ if (isset($_GET['export']) && $generated) {
     $export_headers = ['Employee', 'Code', 'Department', 'Period', 'Basic', 'OT', 'Bonus', 'Deduction', 'Gross', 'Net', 'Status'];
     $export_data = [];
     foreach ($report_data as $row) {
-        $period = date('M Y', mktime(0, 0, 0, $row['payroll_month'], 1, $row['payroll_year']));
+        $period = date('M Y', mktime(0, 0, 0, $row['pay_month'], 1, $row['pay_year']));
         $export_data[] = [
             'employee' => $row['name'] ?? '',
             'code' => $row['employee_code'] ?? '',
             'department' => $row['department_name'] ?? '',
             'period' => $period,
             'basic' => $row['basic_salary'] ?? 0,
-            'ot' => $row['ot_amount'] ?? 0,
-            'bonus' => $row['bonus_amount'] ?? 0,
-            'deduction' => $row['deduction_amount'] ?? 0,
+            'ot' => $row['overtime_amount'] ?? 0,
+            'bonus' => $row['bonus'] ?? 0,
+            'deduction' => $row['total_deduction'] ?? 0,
             'gross' => $row['gross_salary'] ?? 0,
             'net' => $row['net_salary'] ?? 0,
             'status' => $row['status'] ?? '',
@@ -57,23 +57,23 @@ $total_bonus = 0;
 $total_ded = 0;
 foreach ($report_data as $row) {
     $total_net += $row['net_salary'] ?? 0;
-    $total_ot += $row['ot_amount'] ?? 0;
-    $total_bonus += $row['bonus_amount'] ?? 0;
-    $total_ded += $row['deduction_amount'] ?? 0;
+    $total_ot += $row['overtime_amount'] ?? 0;
+    $total_bonus += $row['bonus'] ?? 0;
+    $total_ded += $row['total_deduction'] ?? 0;
 }
 $avg_net = $total_records > 0 ? $total_net / $total_records : 0;
 
 // Chart data: group by month
 $monthly_chart = [];
 foreach ($report_data as $row) {
-    $key = $row['payroll_year'] . '-' . str_pad($row['payroll_month'], 2, '0', STR_PAD_LEFT);
+    $key = $row['pay_year'] . '-' . str_pad($row['pay_month'], 2, '0', STR_PAD_LEFT);
     if (!isset($monthly_chart[$key])) {
-        $monthly_chart[$key] = ['label' => date('M Y', mktime(0, 0, 0, $row['payroll_month'], 1, $row['payroll_year'])), 'net' => 0, 'ot' => 0, 'bonus' => 0, 'ded' => 0];
+        $monthly_chart[$key] = ['label' => date('M Y', mktime(0, 0, 0, $row['pay_month'], 1, $row['pay_year'])), 'net' => 0, 'ot' => 0, 'bonus' => 0, 'ded' => 0];
     }
     $monthly_chart[$key]['net'] += $row['net_salary'] ?? 0;
-    $monthly_chart[$key]['ot'] += $row['ot_amount'] ?? 0;
-    $monthly_chart[$key]['bonus'] += $row['bonus_amount'] ?? 0;
-    $monthly_chart[$key]['ded'] += $row['deduction_amount'] ?? 0;
+    $monthly_chart[$key]['ot'] += $row['overtime_amount'] ?? 0;
+    $monthly_chart[$key]['bonus'] += $row['bonus'] ?? 0;
+    $monthly_chart[$key]['ded'] += $row['total_deduction'] ?? 0;
 }
 ksort($monthly_chart);
 
@@ -447,7 +447,7 @@ $employees = $conn->query("SELECT id, name, employee_code FROM employee WHERE st
                         </div>
                         <div class="min-w-0 flex-1">
                             <span class="text-[11px] font-bold uppercase tracking-wider text-zinc-500">Total Net</span>
-                            <p class="text-xl font-extrabold text-emerald-400 mt-0.5 truncate">$<?php echo number_format($total_net, 2); ?></p>
+                            <p class="text-xl font-extrabold text-emerald-400 mt-0.5 truncate"><?php echo $currency; ?> <?php echo number_format($total_net, 2); ?></p>
                         </div>
                     </div>
                 </div>
@@ -459,7 +459,7 @@ $employees = $conn->query("SELECT id, name, employee_code FROM employee WHERE st
                         </div>
                         <div class="min-w-0 flex-1">
                             <span class="text-[11px] font-bold uppercase tracking-wider text-zinc-500">Avg Net</span>
-                            <p class="text-xl font-extrabold text-violet-400 mt-0.5 truncate">$<?php echo number_format($avg_net, 2); ?></p>
+                            <p class="text-xl font-extrabold text-violet-400 mt-0.5 truncate"><?php echo $currency; ?> <?php echo number_format($avg_net, 2); ?></p>
                         </div>
                     </div>
                 </div>
@@ -471,7 +471,7 @@ $employees = $conn->query("SELECT id, name, employee_code FROM employee WHERE st
                         </div>
                         <div class="min-w-0 flex-1">
                             <span class="text-[11px] font-bold uppercase tracking-wider text-zinc-500">Total OT</span>
-                            <p class="text-xl font-extrabold text-amber-400 mt-0.5 truncate">$<?php echo number_format($total_ot, 2); ?></p>
+                            <p class="text-xl font-extrabold text-amber-400 mt-0.5 truncate"><?php echo $currency; ?> <?php echo number_format($total_ot, 2); ?></p>
                         </div>
                     </div>
                 </div>
@@ -483,7 +483,7 @@ $employees = $conn->query("SELECT id, name, employee_code FROM employee WHERE st
                         </div>
                         <div class="min-w-0 flex-1">
                             <span class="text-[11px] font-bold uppercase tracking-wider text-zinc-500">Total Bonus</span>
-                            <p class="text-xl font-extrabold text-indigo-400 mt-0.5 truncate">$<?php echo number_format($total_bonus, 2); ?></p>
+                            <p class="text-xl font-extrabold text-indigo-400 mt-0.5 truncate"><?php echo $currency; ?> <?php echo number_format($total_bonus, 2); ?></p>
                         </div>
                     </div>
                 </div>
@@ -495,7 +495,7 @@ $employees = $conn->query("SELECT id, name, employee_code FROM employee WHERE st
                         </div>
                         <div class="min-w-0 flex-1">
                             <span class="text-[11px] font-bold uppercase tracking-wider text-zinc-500">Total Ded</span>
-                            <p class="text-xl font-extrabold text-rose-400 mt-0.5 truncate">$<?php echo number_format($total_ded, 2); ?></p>
+                            <p class="text-xl font-extrabold text-rose-400 mt-0.5 truncate"><?php echo $currency; ?> <?php echo number_format($total_ded, 2); ?></p>
                         </div>
                     </div>
                 </div>
@@ -605,35 +605,35 @@ $employees = $conn->query("SELECT id, name, employee_code FROM employee WHERE st
                                     <span class="text-xs font-medium text-zinc-300"><?php echo htmlspecialchars($row['department_name'] ?? '—'); ?></span>
                                 </td>
                                 <td class="px-6 py-4">
-                                    <span class="text-xs font-medium text-zinc-300"><?php echo date('M Y', mktime(0, 0, 0, $row['payroll_month'], 1, $row['payroll_year'])); ?></span>
+                                    <span class="text-xs font-medium text-zinc-300"><?php echo date('M Y', mktime(0, 0, 0, $row['pay_month'], 1, $row['pay_year'])); ?></span>
                                 </td>
-                                <td class="px-6 py-4 text-right font-mono text-white font-medium">$<?php echo number_format($row['basic_salary'] ?? 0, 2); ?></td>
+                                <td class="px-6 py-4 text-right font-mono text-white font-medium"><?php echo $currency; ?> <?php echo number_format($row['basic_salary'] ?? 0, 2); ?></td>
                                 <td class="px-6 py-4 text-right">
-                                    <?php if (($row['ot_amount'] ?? 0) > 0): ?>
-                                        <span class="amount-positive font-mono font-medium">$<?php echo number_format($row['ot_amount'], 2); ?></span>
+                                    <?php if (($row['overtime_amount'] ?? 0) > 0): ?>
+                                        <span class="amount-positive font-mono font-medium"><?php echo $currency; ?> <?php echo number_format($row['overtime_amount'], 2); ?></span>
                                     <?php else: ?>
                                         <span class="font-mono text-zinc-600">—</span>
                                     <?php endif; ?>
                                 </td>
                                 <td class="px-6 py-4 text-right">
-                                    <?php if (($row['bonus_amount'] ?? 0) > 0): ?>
+                                    <?php if (($row['bonus'] ?? 0) > 0): ?>
                                         <span class="inline-flex items-center gap-1 font-mono text-emerald-400 font-medium">
-                                            <i class="fa-solid fa-plus text-[9px]"></i>$<?php echo number_format($row['bonus_amount'], 2); ?>
+                                            <i class="fa-solid fa-plus text-[9px]"></i><?php echo $currency; ?> <?php echo number_format($row['bonus'], 2); ?>
                                         </span>
                                     <?php else: ?>
                                         <span class="font-mono text-zinc-600">—</span>
                                     <?php endif; ?>
                                 </td>
                                 <td class="px-6 py-4 text-right">
-                                    <?php if (($row['deduction_amount'] ?? 0) > 0): ?>
-                                        <span class="amount-deduction font-mono font-medium">$<?php echo number_format($row['deduction_amount'], 2); ?></span>
+                                    <?php if (($row['total_deduction'] ?? 0) > 0): ?>
+                                        <span class="amount-deduction font-mono font-medium"><?php echo $currency; ?> <?php echo number_format($row['total_deduction'], 2); ?></span>
                                     <?php else: ?>
                                         <span class="font-mono text-zinc-600">—</span>
                                     <?php endif; ?>
                                 </td>
-                                <td class="px-6 py-4 text-right font-mono text-white font-medium">$<?php echo number_format($row['gross_salary'] ?? 0, 2); ?></td>
+                                <td class="px-6 py-4 text-right font-mono text-white font-medium"><?php echo $currency; ?> <?php echo number_format($row['gross_salary'] ?? 0, 2); ?></td>
                                 <td class="px-6 py-4 text-right">
-                                    <span class="net-highlight">$<?php echo number_format($row['net_salary'] ?? 0, 2); ?></span>
+                                    <span class="net-highlight"><?php echo $currency; ?> <?php echo number_format($row['net_salary'] ?? 0, 2); ?></span>
                                 </td>
                                 <td class="px-6 py-4 text-center">
                                     <span class="status-badge <?php echo get_payroll_status_badge($row['status'] ?? ''); ?>">
@@ -647,13 +647,13 @@ $employees = $conn->query("SELECT id, name, employee_code FROM employee WHERE st
                         <tfoot class="border-t-2 border-white/10">
                             <tr class="font-bold">
                                 <td colspan="5" class="px-6 py-4 text-zinc-400 text-xs uppercase tracking-wider">Totals (<?php echo $total_records; ?> records)</td>
-                                <td class="px-6 py-4 text-right font-mono text-white">$<?php echo number_format(array_sum(array_column($report_data, 'basic_salary')), 2); ?></td>
-                                <td class="px-6 py-4 text-right font-mono text-amber-400">$<?php echo number_format($total_ot, 2); ?></td>
-                                <td class="px-6 py-4 text-right font-mono text-emerald-400">$<?php echo number_format($total_bonus, 2); ?></td>
-                                <td class="px-6 py-4 text-right font-mono text-rose-400">$<?php echo number_format($total_ded, 2); ?></td>
-                                <td class="px-6 py-4 text-right font-mono text-white">$<?php echo number_format(array_sum(array_column($report_data, 'gross_salary')), 2); ?></td>
+                                <td class="px-6 py-4 text-right font-mono text-white"><?php echo $currency; ?> <?php echo number_format(array_sum(array_column($report_data, 'basic_salary')), 2); ?></td>
+                                <td class="px-6 py-4 text-right font-mono text-amber-400"><?php echo $currency; ?> <?php echo number_format($total_ot, 2); ?></td>
+                                <td class="px-6 py-4 text-right font-mono text-emerald-400"><?php echo $currency; ?> <?php echo number_format($total_bonus, 2); ?></td>
+                                <td class="px-6 py-4 text-right font-mono text-rose-400"><?php echo $currency; ?> <?php echo number_format($total_ded, 2); ?></td>
+                                <td class="px-6 py-4 text-right font-mono text-white"><?php echo $currency; ?> <?php echo number_format(array_sum(array_column($report_data, 'gross_salary')), 2); ?></td>
                                 <td class="px-6 py-4 text-right">
-                                    <span class="net-highlight">$<?php echo number_format($total_net, 2); ?></span>
+                                    <span class="net-highlight"><?php echo $currency; ?> <?php echo number_format($total_net, 2); ?></span>
                                 </td>
                                 <td class="px-6 py-4"></td>
                             </tr>

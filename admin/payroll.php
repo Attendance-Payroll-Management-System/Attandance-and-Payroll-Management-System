@@ -7,39 +7,66 @@ require_once '../config/helpers.php';
 
 set_mmt_timezone();
 
+// Ensure new payroll table exists
+if (!payroll_table_exists($conn)) {
+    // Auto-create if not exists
+    $sql = file_get_contents(__DIR__ . '/../config/migration_new_payroll_table.sql');
+    $conn->multi_query($sql);
+    while ($conn->next_result()) { $conn->store_result(); }
+}
+
 $selected_month = isset($_POST['pay_month']) ? (int)$_POST['pay_month'] : (int)mmt_date('m');
 $selected_year = isset($_POST['pay_year']) ? (int)$_POST['pay_year'] : (int)mmt_date('Y');
 $month_name = date('F', mktime(0, 0, 0, $selected_month, 1));
 $message = '';
 $message_type = '';
+$currency = get_currency($conn);
 
 $month_start = sprintf('%04d-%02d-01', $selected_year, $selected_month);
 $month_end = date('Y-m-t', strtotime($month_start));
 
 // Run batch payroll calculation
 if (isset($_POST['run_payroll'])) {
-    $admin_id = $_SESSION['admin_id'] ?? null;
-    $emp_query = $conn->query("SELECT id FROM employee WHERE status = 'active'");
-    $inserted = 0;
+    [$inserted, $working_days] = generate_batch_new_payroll($conn, $selected_month, $selected_year);
+    $message = "Payroll calculated for $inserted employees. (Working days: $working_days)";
+    $message_type = "success";
+}
 
-    while ($emp = $emp_query->fetch_assoc()) {
-        $eid = $emp['id'];
-        $payroll_id = generate_payroll_for_employee($conn, $eid, $selected_month, $selected_year, 'Generated', $admin_id);
-        if ($payroll_id) {
-            $inserted++;
+// Handle single payroll recalculation
+if (isset($_POST['recalc_payroll']) && isset($_POST['recalc_id'])) {
+    $recalc_id = (int)$_POST['recalc_id'];
+    $detail = get_new_payroll_detail($conn, $recalc_id);
+    if ($detail) {
+        $new_pid = generate_new_payroll($conn, $detail['employee_id'], $detail['pay_month'], $detail['pay_year']);
+        if ($new_pid) {
+            $message = "Payroll recalculated for " . htmlspecialchars($detail['name']) . ".";
+            $message_type = "success";
         }
     }
-    $emp_query->close();
-    $message = "Payroll calculated for $inserted employees. (Working days: " . get_working_days_in_month($selected_year, $selected_month) . ")";
-    $message_type = "success";
+}
+
+// Handle status update (mark as Paid / Cancelled)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_status'])) {
+    if (!validate_csrf_token()) {
+        $message = 'Invalid CSRF token.';
+        $message_type = 'error';
+    } else {
+        $pid = (int)$_POST['payroll_id'];
+        $new_status = $_POST['new_status'];
+        $remarks = trim($_POST['remarks'] ?? '');
+        if (update_new_payroll_status($conn, $pid, $new_status, $remarks ?: null)) {
+            $message = "Payroll status updated to $new_status.";
+            $message_type = "success";
+        }
+    }
 }
 
 // Get payroll records for selected month/year
 $payrolls = $conn->prepare("
     SELECT p.*, e.name, e.employee_code, e.basic_salary as emp_salary
-    FROM payrolls p
+    FROM payroll p
     JOIN employee e ON p.employee_id = e.id
-    WHERE p.payroll_month = ? AND p.payroll_year = ?
+    WHERE p.pay_month = ? AND p.pay_year = ?
     ORDER BY e.name ASC
 ");
 $payrolls->bind_param('ii', $selected_month, $selected_year);
@@ -53,17 +80,19 @@ $total_ot = 0;
 $total_bonus = 0;
 $total_ded = 0;
 $total_allowance = 0;
-$total_tax = 0;
 $total_leave_ded = 0;
+$total_late_ded = 0;
+$total_absent_ded = 0;
 $emp_count = count($payroll_data);
 foreach ($payroll_data as $p) {
     $total_net += $p['net_salary'];
-    $total_ot += $p['ot_amount'];
-    $total_bonus += $p['bonus_amount'];
-    $total_ded += $p['deduction_amount'];
-    $total_allowance += $p['allowance_amount'] ?? 0;
-    $total_tax += $p['tax_amount'] ?? 0;
-    $total_leave_ded += ($p['leave_deduction'] ?? 0) + ($p['late_deduction'] ?? 0) + ($p['unpaid_leave_deduction'] ?? 0);
+    $total_ot += $p['overtime_amount'];
+    $total_bonus += $p['bonus'];
+    $total_ded += $p['other_deduction'];
+    $total_allowance += $p['allowance'];
+    $total_leave_ded += $p['leave_deduction'];
+    $total_late_ded += $p['late_deduction'];
+    $total_absent_ded += $p['absent_deduction'];
 }
 ?>
 <!DOCTYPE html>
@@ -156,11 +185,6 @@ foreach ($payroll_data as $p) {
             text-transform: uppercase;
             letter-spacing: 0.05em;
         }
-        .status-calculated {
-            background: rgba(16,185,129,0.12);
-            color: #10B981;
-            border: 1px solid rgba(16,185,129,0.2);
-        }
         .run-payroll-btn {
             display: inline-flex;
             align-items: center;
@@ -233,7 +257,7 @@ foreach ($payroll_data as $p) {
             color: #F43F5E;
         }
         .amount-deduction::before {
-            content: '−';
+            content: '\2212';
             font-size: 0.75rem;
             font-weight: 700;
         }
@@ -256,7 +280,7 @@ foreach ($payroll_data as $p) {
     <div class="flex-1 flex flex-col min-w-0 main-wrapper">
         <?php
             $page_title = "Payroll Processing";
-            $page_subtitle = "Integrated with Attendance, Leave, and Overtime data. Uses MMT timezone.";
+            $page_subtitle = "Calculate salaries from attendance, leave, overtime, and bonus data.";
             ob_start();
         ?>
         <form method="POST" class="flex flex-wrap items-center gap-3 glass-strong rounded-xl p-3">
@@ -314,7 +338,7 @@ foreach ($payroll_data as $p) {
                         </div>
                         <div class="min-w-0 flex-1">
                             <span class="text-[11px] font-bold uppercase tracking-wider text-zinc-500">Total Net Payout</span>
-                            <p class="text-xl font-extrabold text-emerald-400 mt-0.5 truncate">$<?php echo number_format($total_net, 2); ?></p>
+                            <p class="text-xl font-extrabold text-emerald-400 mt-0.5 truncate"><?php echo $currency; ?> <?php echo number_format($total_net, 2); ?></p>
                             <p class="text-[10px] text-zinc-500 mt-0.5"><?php echo $emp_count; ?> employees</p>
                         </div>
                     </div>
@@ -328,7 +352,7 @@ foreach ($payroll_data as $p) {
                         </div>
                         <div class="min-w-0 flex-1">
                             <span class="text-[11px] font-bold uppercase tracking-wider text-zinc-500">Overtime Disbursed</span>
-                            <p class="text-xl font-extrabold text-amber-400 mt-0.5 truncate">$<?php echo number_format($total_ot, 2); ?></p>
+                            <p class="text-xl font-extrabold text-amber-400 mt-0.5 truncate"><?php echo $currency; ?> <?php echo number_format($total_ot, 2); ?></p>
                             <p class="text-[10px] text-zinc-500 mt-0.5"><?php echo $month_name; ?> <?php echo $selected_year; ?></p>
                         </div>
                     </div>
@@ -342,22 +366,42 @@ foreach ($payroll_data as $p) {
                         </div>
                         <div class="min-w-0 flex-1">
                             <span class="text-[11px] font-bold uppercase tracking-wider text-zinc-500">Bonuses Applied</span>
-                            <p class="text-xl font-extrabold text-indigo-400 mt-0.5 truncate">$<?php echo number_format($total_bonus, 2); ?></p>
+                            <p class="text-xl font-extrabold text-indigo-400 mt-0.5 truncate"><?php echo $currency; ?> <?php echo number_format($total_bonus, 2); ?></p>
                         </div>
                     </div>
                 </div>
 
-                <!-- Deductions Withheld -->
+                <!-- Total Deductions -->
                 <div class="payroll-stat ded animate-fade-in-up stagger-4">
                     <div class="flex items-center gap-3">
                         <div class="stat-icon-box bg-gradient-to-br from-rose-500/20 to-pink-500/10">
                             <i class="fa-solid fa-chart-line text-rose-500"></i>
                         </div>
                         <div class="min-w-0 flex-1">
-                            <span class="text-[11px] font-bold uppercase tracking-wider text-zinc-500">Deductions Withheld</span>
-                            <p class="text-xl font-extrabold text-rose-400 mt-0.5 truncate">$<?php echo number_format($total_ded, 2); ?></p>
+                            <span class="text-[11px] font-bold uppercase tracking-wider text-zinc-500">Deductions</span>
+                            <p class="text-xl font-extrabold text-rose-400 mt-0.5 truncate"><?php echo $currency; ?> <?php echo number_format($total_leave_ded + $total_late_ded + $total_absent_ded + $total_ded, 2); ?></p>
                         </div>
                     </div>
+                </div>
+            </section>
+
+            <!-- Deduction Breakdown -->
+            <section class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                <div class="glass-strong rounded-xl p-4 text-center">
+                    <p class="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Leave Deduction</p>
+                    <p class="text-lg font-bold text-rose-400 mt-1"><?php echo $currency; ?> <?php echo number_format($total_leave_ded, 2); ?></p>
+                </div>
+                <div class="glass-strong rounded-xl p-4 text-center">
+                    <p class="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Late Deduction</p>
+                    <p class="text-lg font-bold text-amber-400 mt-1"><?php echo $currency; ?> <?php echo number_format($total_late_ded, 2); ?></p>
+                </div>
+                <div class="glass-strong rounded-xl p-4 text-center">
+                    <p class="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Absent Deduction</p>
+                    <p class="text-lg font-bold text-red-400 mt-1"><?php echo $currency; ?> <?php echo number_format($total_absent_ded, 2); ?></p>
+                </div>
+                <div class="glass-strong rounded-xl p-4 text-center">
+                    <p class="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Other Deductions</p>
+                    <p class="text-lg font-bold text-pink-400 mt-1"><?php echo $currency; ?> <?php echo number_format($total_ded, 2); ?></p>
                 </div>
             </section>
 
@@ -369,7 +413,7 @@ foreach ($payroll_data as $p) {
                             <i class="fa-solid fa-file-invoice-dollar text-blue-500"></i>
                         </div>
                         <div>
-                            <h2 class="font-bold text-white text-lg">Salary Sheets</h2>
+                            <h2 class="font-bold text-white text-lg">Salary Sheet</h2>
                             <p class="text-xs text-zinc-500 mt-0.5"><?php echo $month_name . ' ' . $selected_year; ?></p>
                         </div>
                     </div>
@@ -383,46 +427,36 @@ foreach ($payroll_data as $p) {
                         <thead class="text-white text-xs font-bold uppercase tracking-wider">
                             <tr>
                                 <th class="px-6 py-4">Employee</th>
-                                <th class="px-4 py-4 text-center" title="Present Days"><i class="fa-solid fa-calendar-check text-emerald-400"></i></th>
-                                <th class="px-4 py-4 text-center" title="Half Days"><i class="fa-solid fa-clock text-teal-400"></i></th>
-                                <th class="px-4 py-4 text-center" title="Late Days"><i class="fa-solid fa-hourglass-half text-amber-400"></i></th>
-                                <th class="px-4 py-4 text-center" title="Absent Days"><i class="fa-solid fa-calendar-xmark text-red-400"></i></th>
-                                <th class="px-4 py-4 text-center" title="Leave Days"><i class="fa-solid fa-plane-departure text-blue-400"></i></th>
-                                <th class="px-4 py-4 text-center" title="OT Hours"><i class="fa-solid fa-stopwatch text-purple-400"></i></th>
-                                <th class="px-6 py-4 text-right">Basic</th>
-                                <th class="px-6 py-4 text-right">Allow.</th>
-                                <th class="px-6 py-4 text-right">OT</th>
-                                <th class="px-6 py-4 text-right">Bonus</th>
-                                <th class="px-6 py-4 text-right">Ded.</th>
-                                <th class="px-6 py-4 text-right">Tax</th>
-                                <th class="px-6 py-4 text-right font-bold">Net</th>
-                                <th class="px-6 py-4 text-center">Status</th>
+                                <th class="px-3 py-4 text-center" title="Present"><i class="fa-solid fa-calendar-check text-emerald-400"></i></th>
+                                <th class="px-3 py-4 text-center" title="Leave"><i class="fa-solid fa-plane-departure text-blue-400"></i></th>
+                                <th class="px-3 py-4 text-center" title="Late"><i class="fa-solid fa-hourglass-half text-amber-400"></i></th>
+                                <th class="px-3 py-4 text-center" title="Absent"><i class="fa-solid fa-calendar-xmark text-red-400"></i></th>
+                                <th class="px-3 py-4 text-center" title="OT Hours"><i class="fa-solid fa-stopwatch text-purple-400"></i></th>
+                                <th class="px-4 py-4 text-right">Basic</th>
+                                <th class="px-4 py-4 text-right">Allow.</th>
+                                <th class="px-4 py-4 text-right">OT</th>
+                                <th class="px-4 py-4 text-right">Bonus</th>
+                                <th class="px-4 py-4 text-right">Leave Ded.</th>
+                                <th class="px-4 py-4 text-right">Late Ded.</th>
+                                <th class="px-4 py-4 text-right">Absent Ded.</th>
+                                <th class="px-4 py-4 text-right">Other Ded.</th>
+                                <th class="px-5 py-4 text-right font-bold">Net</th>
+                                <th class="px-4 py-4 text-center">Status</th>
+                                <th class="px-4 py-4 text-center">Actions</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-white/[0.06]">
                             <?php if (empty($payroll_data)): ?>
                             <tr>
-                                <td colspan="15" class="px-6 py-16 text-center">
+                                <td colspan="17" class="px-6 py-16 text-center">
                                     <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500/10 to-indigo-500/10 flex items-center justify-center mx-auto mb-4">
                                         <i class="fa-solid fa-file-invoice-dollar text-2xl text-zinc-500"></i>
                                     </div>
                                     <p class="text-zinc-400 font-medium">No payroll data for <?php echo $month_name . ' ' . $selected_year; ?></p>
-                                    <p class="text-zinc-500 text-sm mt-2">Click <strong class="text-emerald-400">"Run Payroll"</strong> to calculate salaries with attendance & leave integration.</p>
+                                    <p class="text-zinc-500 text-sm mt-2">Click <strong class="text-emerald-400">"Run Payroll"</strong> to calculate salaries from attendance, leave, and overtime data.</p>
                                 </td>
                             </tr>
                             <?php else: ?>
-                                <?php
-                                // Fetch deduction details for each employee
-                                $ded_details = [];
-                                foreach ($payroll_data as $p) {
-                                    $emp_id = $p['employee_id'];
-                                    $ded_stmt = $conn->prepare("SELECT d.title, d.amount, d.deduction_date, dt.deduction_name FROM deductions d LEFT JOIN deduction_types dt ON d.deduction_type_id = dt.id WHERE d.employee_id = ? AND d.deduction_date BETWEEN ? AND ?");
-                                    $ded_stmt->bind_param('iss', $emp_id, $month_start, $month_end);
-                                    $ded_stmt->execute();
-                                    $ded_details[$emp_id] = $ded_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-                                    $ded_stmt->close();
-                                }
-                                ?>
                                 <?php foreach ($payroll_data as $idx => $p): ?>
                                 <tr class="table-row animate-fade-in-up" style="animation-delay: <?php echo 0.05 + ($idx * 0.03); ?>s;">
                                     <td class="px-6 py-4">
@@ -436,72 +470,85 @@ foreach ($payroll_data as $p) {
                                             </div>
                                         </div>
                                     </td>
-                                    <td class="px-4 py-4 text-center"><span class="text-xs font-bold text-emerald-400"><?php echo $p['present_days'] ?? 0; ?></span></td>
-                                    <td class="px-4 py-4 text-center"><span class="text-xs font-bold text-teal-400"><?php echo $p['half_days'] ?? 0; ?></span></td>
-                                    <td class="px-4 py-4 text-center"><span class="text-xs font-bold text-amber-400"><?php echo $p['late_days'] ?? 0; ?></span></td>
-                                    <td class="px-4 py-4 text-center"><span class="text-xs font-bold text-red-400"><?php echo $p['absent_days'] ?? 0; ?></span></td>
-                                    <td class="px-4 py-4 text-center"><span class="text-xs font-bold text-blue-400"><?php echo ($p['paid_leave_days'] ?? 0) + ($p['unpaid_leave_days'] ?? 0); ?></span></td>
-                                    <td class="px-4 py-4 text-center"><span class="text-xs font-bold text-purple-400"><?php echo number_format($p['overtime_hours'] ?? 0, 1); ?>h</span></td>
-                                    <td class="px-6 py-4 text-right font-mono text-white font-medium">$<?php echo number_format($p['basic_salary'], 2); ?></td>
-                                    <td class="px-6 py-4 text-right">
-                                        <?php if (($p['allowance_amount'] ?? 0) > 0): ?>
-                                            <span class="amount-positive font-mono font-medium">$<?php echo number_format($p['allowance_amount'], 2); ?></span>
+                                    <td class="px-3 py-4 text-center"><span class="text-xs font-bold text-emerald-400"><?php echo $p['present_days']; ?></span></td>
+                                    <td class="px-3 py-4 text-center"><span class="text-xs font-bold text-blue-400"><?php echo $p['leave_days']; ?></span></td>
+                                    <td class="px-3 py-4 text-center"><span class="text-xs font-bold text-amber-400"><?php echo $p['late_days']; ?></span></td>
+                                    <td class="px-3 py-4 text-center"><span class="text-xs font-bold text-red-400"><?php echo $p['absent_days']; ?></span></td>
+                                    <td class="px-3 py-4 text-center"><span class="text-xs font-bold text-purple-400"><?php echo number_format($p['overtime_hours'], 1); ?>h</span></td>
+                                    <td class="px-4 py-4 text-right font-mono text-white font-medium"><?php echo $currency; ?> <?php echo number_format($p['basic_salary'], 2); ?></td>
+                                    <td class="px-4 py-4 text-right">
+                                        <?php if ($p['allowance'] > 0): ?>
+                                            <span class="amount-positive font-mono font-medium"><?php echo $currency; ?> <?php echo number_format($p['allowance'], 2); ?></span>
                                         <?php else: ?>
-                                            <span class="font-mono text-zinc-600">—</span>
+                                            <span class="font-mono text-zinc-600">&mdash;</span>
                                         <?php endif; ?>
                                     </td>
-                                    <td class="px-6 py-4 text-right">
-                                        <?php if ($p['ot_amount'] > 0): ?>
-                                            <span class="amount-positive font-mono font-medium">$<?php echo number_format($p['ot_amount'], 2); ?></span>
+                                    <td class="px-4 py-4 text-right">
+                                        <?php if ($p['overtime_amount'] > 0): ?>
+                                            <span class="amount-positive font-mono font-medium"><?php echo $currency; ?> <?php echo number_format($p['overtime_amount'], 2); ?></span>
                                         <?php else: ?>
-                                            <span class="font-mono text-zinc-600">—</span>
+                                            <span class="font-mono text-zinc-600">&mdash;</span>
                                         <?php endif; ?>
                                     </td>
-                                    <td class="px-6 py-4 text-right">
-                                        <?php if ($p['bonus_amount'] > 0): ?>
+                                    <td class="px-4 py-4 text-right">
+                                        <?php if ($p['bonus'] > 0): ?>
                                             <span class="inline-flex items-center gap-1 font-mono text-emerald-400 font-medium">
-                                                <i class="fa-solid fa-plus text-[9px]"></i>$<?php echo number_format($p['bonus_amount'], 2); ?>
+                                                <i class="fa-solid fa-plus text-[9px]"></i><?php echo $currency; ?> <?php echo number_format($p['bonus'], 2); ?>
                                             </span>
                                         <?php else: ?>
-                                            <span class="font-mono text-zinc-600">—</span>
+                                            <span class="font-mono text-zinc-600">&mdash;</span>
                                         <?php endif; ?>
                                     </td>
-                                    <td class="px-6 py-4 text-right relative group">
-                                        <?php if ($p['deduction_amount'] > 0): ?>
-                                            <span class="amount-deduction font-mono font-medium cursor-help">$<?php echo number_format($p['deduction_amount'], 2); ?></span>
-                                            <?php if (!empty($ded_details[$p['employee_id']])): ?>
-                                            <div class="absolute right-0 top-full mt-2 w-64 bg-slate-800 border border-white/10 rounded-xl shadow-2xl p-3 z-50 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
-                                                <div class="text-xs font-bold text-zinc-400 mb-2 uppercase tracking-wider">Deduction Breakdown</div>
-                                                <?php foreach ($ded_details[$p['employee_id']] as $dd): ?>
-                                                <div class="flex items-center justify-between py-1.5 border-b border-white/5 last:border-0">
-                                                    <div>
-                                                        <div class="text-xs text-white font-medium"><?php echo htmlspecialchars($dd['title'] ?? $dd['deduction_name'] ?? '-'); ?></div>
-                                                        <div class="text-[10px] text-zinc-500"><?php echo date('M d', strtotime($dd['deduction_date'])); ?></div>
-                                                    </div>
-                                                    <span class="text-xs font-mono text-rose-400 font-semibold">-$<?php echo number_format($dd['amount'], 2); ?></span>
-                                                </div>
-                                                <?php endforeach; ?>
-                                            </div>
-                                            <?php endif; ?>
+                                    <td class="px-4 py-4 text-right">
+                                        <?php if ($p['leave_deduction'] > 0): ?>
+                                            <span class="amount-deduction font-mono font-medium"><?php echo $currency; ?> <?php echo number_format($p['leave_deduction'], 2); ?></span>
                                         <?php else: ?>
-                                            <span class="font-mono text-zinc-600">—</span>
+                                            <span class="font-mono text-zinc-600">&mdash;</span>
                                         <?php endif; ?>
                                     </td>
-                                    <td class="px-6 py-4 text-right">
-                                        <?php if (($p['tax_amount'] ?? 0) > 0): ?>
-                                            <span class="amount-deduction font-mono font-medium">$<?php echo number_format($p['tax_amount'], 2); ?></span>
+                                    <td class="px-4 py-4 text-right">
+                                        <?php if ($p['late_deduction'] > 0): ?>
+                                            <span class="amount-deduction font-mono font-medium"><?php echo $currency; ?> <?php echo number_format($p['late_deduction'], 2); ?></span>
                                         <?php else: ?>
-                                            <span class="font-mono text-zinc-600">—</span>
+                                            <span class="font-mono text-zinc-600">&mdash;</span>
                                         <?php endif; ?>
                                     </td>
-                                    <td class="px-6 py-4 text-right">
-                                        <span class="net-highlight">$<?php echo number_format($p['net_salary'], 2); ?></span>
+                                    <td class="px-4 py-4 text-right">
+                                        <?php if ($p['absent_deduction'] > 0): ?>
+                                            <span class="amount-deduction font-mono font-medium"><?php echo $currency; ?> <?php echo number_format($p['absent_deduction'], 2); ?></span>
+                                        <?php else: ?>
+                                            <span class="font-mono text-zinc-600">&mdash;</span>
+                                        <?php endif; ?>
                                     </td>
-                                    <td class="px-6 py-4 text-center">
-                                        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold border <?php echo get_payroll_status_badge($p['status'] ?? 'Generated'); ?>">
-                                            <i class="fa-solid <?php echo get_payroll_status_icon($p['status'] ?? 'Generated'); ?> text-[9px]"></i>
-                                            <?php echo $p['status'] ?? 'Generated'; ?>
+                                    <td class="px-4 py-4 text-right">
+                                        <?php if ($p['other_deduction'] > 0): ?>
+                                            <span class="amount-deduction font-mono font-medium"><?php echo $currency; ?> <?php echo number_format($p['other_deduction'], 2); ?></span>
+                                        <?php else: ?>
+                                            <span class="font-mono text-zinc-600">&mdash;</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td class="px-5 py-4 text-right">
+                                        <span class="net-highlight"><?php echo $currency; ?> <?php echo number_format($p['net_salary'], 2); ?></span>
+                                    </td>
+                                    <td class="px-4 py-4 text-center">
+                                        <span class="status-badge <?php echo get_new_payroll_status_badge($p['payment_status']); ?>">
+                                            <i class="fa-solid <?php echo get_new_payroll_status_icon($p['payment_status']); ?> text-[9px]"></i>
+                                            <?php echo $p['payment_status']; ?>
                                         </span>
+                                    </td>
+                                    <td class="px-4 py-4 text-center">
+                                        <div class="flex items-center justify-center gap-1">
+                                            <form method="POST" class="inline">
+                                                <?php echo csrf_field(); ?>
+                                                <input type="hidden" name="recalc_id" value="<?php echo $p['id']; ?>">
+                                                <button type="submit" name="recalc_payroll" value="1" class="w-7 h-7 rounded-lg bg-blue-500/15 text-blue-400 hover:bg-blue-500/25 flex items-center justify-center transition-colors" title="Recalculate">
+                                                    <i class="fa-solid fa-rotate text-[10px]"></i>
+                                                </button>
+                                            </form>
+                                            <a href="payroll_detail.php?id=<?php echo $p['id']; ?>" class="w-7 h-7 rounded-lg bg-indigo-500/15 text-indigo-400 hover:bg-indigo-500/25 flex items-center justify-center transition-colors" title="View Details">
+                                                <i class="fa-solid fa-eye text-[10px]"></i>
+                                            </a>
+                                        </div>
                                     </td>
                                 </tr>
                                 <?php endforeach; ?>

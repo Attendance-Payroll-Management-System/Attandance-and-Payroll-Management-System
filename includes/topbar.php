@@ -161,16 +161,118 @@ if (!$is_admin && $topbar_emp_id && isset($conn) && $conn) {
                                 <p class="text-xs text-slate-500 dark:text-slate-400 font-medium">No notifications yet</p>
                             </div>
                         <?php else: ?>
+                            <?php
+                            // Load notification helpers
+                            require_once __DIR__ . '/../config/notifications.php';
+                            
+                            // Get pending leaves and OT for action buttons (admin only)
+                            $pending_leave_map = [];
+                            $pending_ot_map = [];
+                            if ($is_admin && isset($conn) && $conn) {
+                                $pl_res = $conn->query("SELECT id, employee_id, leave_type, start_date, end_date FROM leave_requests WHERE status = 'Pending'");
+                                if ($pl_res) {
+                                    while ($pl = $pl_res->fetch_assoc()) {
+                                        $pending_leave_map[$pl['employee_id']] = $pl;
+                                    }
+                                }
+                                $ot_res = $conn->query("SELECT id, employee_id, ot_date, total_hours FROM overtime_requests WHERE status = 'Pending'");
+                                if ($ot_res) {
+                                    while ($ot = $ot_res->fetch_assoc()) {
+                                        $pending_ot_map[$ot['employee_id']] = $ot;
+                                    }
+                                }
+                            }
+                            ?>
                             <?php foreach ($topbar_notifications as $noti): ?>
-                                <a href="<?php echo $noti['link'] ?: '#'; ?>" class="block px-4 py-3 border-b border-slate-50 dark:border-white/[0.04] hover:bg-slate-50 dark:hover:bg-white/[0.02] transition-colors <?php echo !$noti['is_read'] ? 'bg-sky-50/50 dark:bg-sky-500/5' : ''; ?>">
-                                    <p class="text-xs text-slate-700 dark:text-slate-300 leading-relaxed"><?php echo htmlspecialchars($noti['message']); ?></p>
-                                    <p class="text-[10px] text-slate-400 dark:text-slate-500 mt-1"><?php echo date('M d, h:i A', strtotime($noti['created_at'])); ?></p>
-                                </a>
+                            <?php
+                                $icon = get_notification_icon($noti['type']);
+                                $icon_color = get_notification_color($noti['type']);
+                                $icon_bg = get_notification_bg_color($noti['type']);
+                                $is_unread = !$noti['is_read'];
+                                
+                                // Check for pending action
+                                $has_action = false;
+                                $action_type = '';
+                                $related_id = 0;
+                                
+                                if ($is_admin) {
+                                    if ($noti['type'] === 'leave_request' && isset($pending_leave_map[$noti['employee_id'] ?? 0])) {
+                                        $has_action = true;
+                                        $action_type = 'leave';
+                                        $related_id = $pending_leave_map[$noti['employee_id']]['id'];
+                                    } elseif ($noti['type'] === 'ot_request' && isset($pending_ot_map[$noti['employee_id'] ?? 0])) {
+                                        $has_action = true;
+                                        $action_type = 'ot';
+                                        $related_id = $pending_ot_map[$noti['employee_id']]['id'];
+                                    }
+                                }
+                            ?>
+                            <div class="px-4 py-3 border-b border-slate-50 dark:border-white/[0.04] hover:bg-slate-50 dark:hover:bg-white/[0.02] transition-colors <?php echo $is_unread ? 'bg-sky-50/50 dark:bg-sky-500/5' : ''; ?>">
+                                <div class="flex items-start gap-3">
+                                    <div class="w-8 h-8 rounded-lg <?php echo $icon_bg; ?> flex items-center justify-center flex-shrink-0 mt-0.5">
+                                        <i class="fa-solid <?php echo $icon; ?> <?php echo $icon_color; ?> text-xs"></i>
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <p class="text-xs text-slate-700 dark:text-slate-300 leading-relaxed"><?php echo htmlspecialchars($noti['message']); ?></p>
+                                        <p class="text-[10px] text-slate-400 dark:text-slate-500 mt-1"><?php echo date('M d, h:i A', strtotime($noti['created_at'])); ?></p>
+                                        
+                                        <?php if ($has_action): ?>
+                                        <div class="flex items-center gap-2 mt-2" x-data="{ showReject: false }">
+                                            <?php if ($action_type === 'leave'): ?>
+                                            <form method="POST" action="../admin/leaveApproval.php" class="inline">
+                                                <?php echo csrf_field(); ?>
+                                                <input type="hidden" name="action" value="approve">
+                                                <input type="hidden" name="request_id" value="<?php echo $related_id; ?>">
+                                                <button type="submit" class="px-2.5 py-1 rounded-md bg-emerald-500/15 text-emerald-500 hover:bg-emerald-500/25 text-[10px] font-semibold transition-colors">
+                                                    <i class="fa-solid fa-check mr-1"></i>Approve
+                                                </button>
+                                            </form>
+                                            <button type="button" @click="showReject = !showReject" class="px-2.5 py-1 rounded-md bg-rose-500/15 text-rose-500 hover:bg-rose-500/25 text-[10px] font-semibold transition-colors">
+                                                <i class="fa-solid fa-xmark mr-1"></i>Reject
+                                            </button>
+                                            <div x-show="showReject" x-transition class="absolute left-0 right-0 mt-1 p-2 bg-white dark:bg-[#1E293B] rounded-lg shadow-xl border border-slate-200 dark:border-white/10 z-50 mx-4">
+                                                <form method="POST" action="../admin/leaveApproval.php" class="flex gap-1">
+                                                    <?php echo csrf_field(); ?>
+                                                    <input type="hidden" name="action" value="reject">
+                                                    <input type="hidden" name="request_id" value="<?php echo $related_id; ?>">
+                                                    <input type="text" name="reason" placeholder="Reason..." class="flex-1 bg-slate-100 dark:bg-white/[0.06] text-xs rounded px-2 py-1 outline-none border-0">
+                                                    <button type="submit" class="px-2 py-1 bg-rose-500 text-white text-[10px] font-semibold rounded">Send</button>
+                                                </form>
+                                            </div>
+                                            <?php elseif ($action_type === 'ot'): ?>
+                                            <form method="POST" action="../admin/overtimeApproval.php" class="inline">
+                                                <?php echo csrf_field(); ?>
+                                                <input type="hidden" name="action" value="approve">
+                                                <input type="hidden" name="request_id" value="<?php echo $related_id; ?>">
+                                                <button type="submit" class="px-2.5 py-1 rounded-md bg-emerald-500/15 text-emerald-500 hover:bg-emerald-500/25 text-[10px] font-semibold transition-colors">
+                                                    <i class="fa-solid fa-check mr-1"></i>Approve
+                                                </button>
+                                            </form>
+                                            <button type="button" @click="showReject = !showReject" class="px-2.5 py-1 rounded-md bg-rose-500/15 text-rose-500 hover:bg-rose-500/25 text-[10px] font-semibold transition-colors">
+                                                <i class="fa-solid fa-xmark mr-1"></i>Reject
+                                            </button>
+                                            <div x-show="showReject" x-transition class="absolute left-0 right-0 mt-1 p-2 bg-white dark:bg-[#1E293B] rounded-lg shadow-xl border border-slate-200 dark:border-white/10 z-50 mx-4">
+                                                <form method="POST" action="../admin/overtimeApproval.php" class="flex gap-1">
+                                                    <?php echo csrf_field(); ?>
+                                                    <input type="hidden" name="action" value="reject">
+                                                    <input type="hidden" name="request_id" value="<?php echo $related_id; ?>">
+                                                    <input type="text" name="reason" placeholder="Reason..." class="flex-1 bg-slate-100 dark:bg-white/[0.06] text-xs rounded px-2 py-1 outline-none border-0">
+                                                    <button type="submit" class="px-2 py-1 bg-rose-500 text-white text-[10px] font-semibold rounded">Send</button>
+                                                </form>
+                                            </div>
+                                            <?php endif; ?>
+                                        </div>
+                                        <?php elseif ($noti['link']): ?>
+                                        <a href="<?php echo htmlspecialchars($noti['link']); ?>" class="inline-block mt-1 text-[10px] font-semibold text-sky-500 dark:text-sky-400 hover:underline">View &rarr;</a>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                            </div>
                             <?php endforeach; ?>
                         <?php endif; ?>
                     </div>
                     <div class="px-4 py-2.5 border-t border-slate-100 dark:border-white/[0.06] text-center">
-                        <a href="dashboard.php" class="text-xs font-medium text-sky-600 dark:text-sky-400 hover:text-sky-700 dark:hover:text-sky-300 transition-colors">View Dashboard</a>
+                        <a href="notifications.php" class="text-xs font-medium text-sky-600 dark:text-sky-400 hover:text-sky-700 dark:hover:text-sky-300 transition-colors">View All Notifications</a>
                     </div>
                 </div>
             </div>

@@ -187,17 +187,20 @@ if ($correction_table_exists) {
                         </h3>
 
                         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                            <div>
-                                <label class="block text-sm font-semibold text-zinc-300 mb-1.5">Half-Day Minimum Hours</label>
-                                <input type="number" step="0.5" name="half_day_min_hours" value="<?php echo $half_day_min; ?>"
-                                    class="w-full bg-white/[0.06] border border-white/10 text-white rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500/30 outline-none">
-                                <p class="text-xs text-zinc-500 mt-1">Minimum hours worked to count as half day</p>
+                            <div class="bg-white/[0.03] rounded-xl p-4">
+                                <label class="block text-sm font-semibold text-zinc-300 mb-1.5">Office Hours</label>
+                                <p class="text-lg font-bold text-white">9:00 AM - 5:00 PM</p>
+                                <p class="text-xs text-zinc-500 mt-1">Required: 8 hours/day</p>
                             </div>
-                            <div>
-                                <label class="block text-sm font-semibold text-zinc-300 mb-1.5">Full-Day Minimum Hours</label>
-                                <input type="number" step="0.5" name="full_day_min_hours" value="<?php echo $full_day_min; ?>"
-                                    class="w-full bg-white/[0.06] border border-white/10 text-white rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500/30 outline-none">
-                                <p class="text-xs text-zinc-500 mt-1">Minimum hours worked to count as full day</p>
+                            <div class="bg-white/[0.03] rounded-xl p-4">
+                                <label class="block text-sm font-semibold text-zinc-300 mb-1.5">Late Threshold</label>
+                                <p class="text-lg font-bold text-amber-400">7 hours</p>
+                                <p class="text-xs text-zinc-500 mt-1">7 to &lt; 8 hours = Late</p>
+                            </div>
+                            <div class="bg-white/[0.03] rounded-xl p-4">
+                                <label class="block text-sm font-semibold text-zinc-300 mb-1.5">Half-Day Cutoff</label>
+                                <p class="text-lg font-bold text-teal-400">12:00 PM</p>
+                                <p class="text-xs text-zinc-500 mt-1">Check-in/out after noon = Half-Day</p>
                             </div>
                             <div>
                                 <label class="block text-sm font-semibold text-zinc-300 mb-1.5">Grace Period (minutes)</label>
@@ -209,25 +212,49 @@ if ($correction_table_exists) {
 
                         <!-- Status Rules Info -->
                         <div class="mt-6 border-t border-white/[0.06] pt-6">
-                            <h4 class="font-semibold text-white mb-3">Status Determination Logic</h4>
-                            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
-                                <div class="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3">
-                                    <span class="font-bold text-emerald-400">Present</span>
-                                    <p class="text-zinc-400 mt-1">≥ <?php echo $full_day_min; ?>h worked, on-time check-in</p>
-                                </div>
-                                <div class="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3">
-                                    <span class="font-bold text-amber-400">Late</span>
-                                    <p class="text-zinc-400 mt-1">≥ <?php echo $full_day_min; ?>h worked, late check-in</p>
+                            <h4 class="font-semibold text-white mb-3">Status Determination Logic (Priority Order)</h4>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
+                                <div class="bg-red-500/10 border border-red-500/20 rounded-xl p-3">
+                                    <span class="font-bold text-red-400">1. AWOL</span>
+                                    <p class="text-zinc-400 mt-1">No Check-In and No Check-Out</p>
                                 </div>
                                 <div class="bg-teal-500/10 border border-teal-500/20 rounded-xl p-3">
-                                    <span class="font-bold text-teal-400">Half Day</span>
-                                    <p class="text-zinc-400 mt-1"><?php echo $half_day_min; ?>-<?php echo $full_day_min; ?>h worked</p>
+                                    <span class="font-bold text-teal-400">2. Half-Day (Late Check-In)</span>
+                                    <p class="text-zinc-400 mt-1">Check-In between 12:00 PM - 5:00 PM</p>
                                 </div>
-                                <div class="bg-red-500/10 border border-red-500/20 rounded-xl p-3">
-                                    <span class="font-bold text-red-400">Absent</span>
-                                    <p class="text-zinc-400 mt-1">&lt; <?php echo $half_day_min; ?>h or no check-in</p>
+                                <div class="bg-teal-500/10 border border-teal-500/20 rounded-xl p-3">
+                                    <span class="font-bold text-teal-400">3. Half-Day (Early Check-Out)</span>
+                                    <p class="text-zinc-400 mt-1">Check-Out between 12:00 PM - 5:00 PM</p>
+                                </div>
+                                <div class="bg-teal-500/10 border border-teal-500/20 rounded-xl p-3">
+                                    <span class="font-bold text-teal-400">4. Half-Day (Insufficient Hours)</span>
+                                    <p class="text-zinc-400 mt-1">Total working hours &lt; 7 hours</p>
+                                </div>
+                                <div class="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3">
+                                    <span class="font-bold text-amber-400">5. Late</span>
+                                    <p class="text-zinc-400 mt-1">7 to &lt; 8 hours worked</p>
+                                </div>
+                                <div class="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3">
+                                    <span class="font-bold text-emerald-400">6. Present</span>
+                                    <p class="text-zinc-400 mt-1">&ge; 8 hours worked</p>
                                 </div>
                             </div>
+                        </div>
+
+                        <!-- Deduction Rules Info -->
+                        <div class="mt-4 border-t border-white/[0.06] pt-6">
+                            <h4 class="font-semibold text-white mb-3">Automatic Deduction Rules</h4>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                                <div class="bg-rose-500/10 border border-rose-500/20 rounded-xl p-3">
+                                    <span class="font-bold text-rose-400">Half-Day Deduction</span>
+                                    <p class="text-zinc-400 mt-1">Auto-deducts half day salary when status = Half-Day</p>
+                                </div>
+                                <div class="bg-rose-500/10 border border-rose-500/20 rounded-xl p-3">
+                                    <span class="font-bold text-rose-400">Unpaid Absence Deduction</span>
+                                    <p class="text-zinc-400 mt-1">Auto-deducts one full day salary when status = AWOL</p>
+                                </div>
+                            </div>
+                            <p class="text-xs text-zinc-500 mt-2"><i class="fa-solid fa-lock mr-1"></i>System-managed deductions cannot be edited or deleted manually.</p>
                         </div>
                     </div>
                 </div>
@@ -300,15 +327,15 @@ if ($correction_table_exists) {
                     </div>
                     <div class="bg-white/[0.03] rounded-xl p-3">
                         <p class="text-xs text-zinc-500">Required Hours</p>
-                        <p class="text-sm font-semibold text-white mt-0.5"><?php echo $required_hours; ?>h/day</p>
+                        <p class="text-sm font-semibold text-white mt-0.5">8h/day</p>
                     </div>
                     <div class="bg-white/[0.03] rounded-xl p-3">
-                        <p class="text-xs text-zinc-500">Half-Day Threshold</p>
-                        <p class="text-sm font-semibold text-teal-400 mt-0.5">≥ <?php echo $half_day_min; ?>h</p>
+                        <p class="text-xs text-zinc-500">Late Threshold</p>
+                        <p class="text-sm font-semibold text-amber-400 mt-0.5">7h to &lt; 8h</p>
                     </div>
                     <div class="bg-white/[0.03] rounded-xl p-3">
-                        <p class="text-xs text-zinc-500">Full-Day Threshold</p>
-                        <p class="text-sm font-semibold text-emerald-400 mt-0.5">≥ <?php echo $full_day_min; ?>h</p>
+                        <p class="text-xs text-zinc-500">Half-Day Cutoff</p>
+                        <p class="text-sm font-semibold text-teal-400 mt-0.5">12:00 PM</p>
                     </div>
                     <div class="bg-white/[0.03] rounded-xl p-3">
                         <p class="text-xs text-zinc-500">Grace Period</p>

@@ -235,7 +235,7 @@ function get_assignment_status_icon(string $status): string {
                                         <td class="px-6 py-4 font-mono text-sm text-cyan-400"><?php echo $emp['ot_rate'] ?? '-'; ?></td>
                                         <td class="px-6 py-4 font-mono text-sm">
                                             <?php if ($emp['ot_pay'] > 0): ?>
-                                                <span class="text-emerald-400 font-semibold">$<?php echo number_format($emp['ot_pay'], 2); ?></span>
+                                                <span class="text-emerald-400 font-semibold"><?php echo $currency; ?> <?php echo number_format($emp['ot_pay'], 2); ?></span>
                                             <?php else: ?>
                                                 <span class="text-zinc-500">-</span>
                                             <?php endif; ?>

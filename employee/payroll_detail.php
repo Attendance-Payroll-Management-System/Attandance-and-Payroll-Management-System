@@ -7,6 +7,7 @@ if (!isset($_SESSION['logged_in'])) { header('Location: login.php'); exit; }
 
 $employee_id = (int)$_SESSION['employee_id'];
 $payroll_id = isset($_GET['pid']) ? (int)$_GET['pid'] : 0;
+$currency = get_currency($conn);
 
 if (!$payroll_id) {
     header('Location: payroll.php');
@@ -285,7 +286,7 @@ if ($payroll) {
                         </div>
                         <div class="info-item">
                             <span class="info-label">Basic Salary</span>
-                            <span class="info-value font-mono">$<?php echo number_format($payroll['basic_salary'], 2); ?></span>
+                            <span class="info-value font-mono"><?php echo $currency; ?> <?php echo number_format($payroll['basic_salary'], 2); ?></span>
                         </div>
                         <div class="info-item">
                             <span class="info-label">Working Days</span>
@@ -404,14 +405,14 @@ if ($payroll) {
                                     <td class="px-6 py-3"><?php echo get_overtime_type_badge($key); ?></td>
                                     <td class="px-6 py-3 text-center text-zinc-400"><?php echo $ot_bd[$key]['count']; ?></td>
                                     <td class="px-6 py-3 text-right font-mono text-white font-semibold"><?php echo number_format($ot_bd[$key]['hours'], 1); ?>h</td>
-                                    <td class="px-6 py-3 text-right font-mono text-emerald-400 font-semibold">$<?php echo number_format($ot_bd[$key]['amount'], 2); ?></td>
+                                    <td class="px-6 py-3 text-right font-mono text-emerald-400 font-semibold"><?php echo $currency; ?> <?php echo number_format($ot_bd[$key]['amount'], 2); ?></td>
                                 </tr>
                                 <?php endif; ?>
                                 <?php endforeach; ?>
                                 <tr class="bg-purple-500/10 border-t border-purple-500/20">
                                     <td class="px-6 py-3 text-purple-400 font-bold text-xs uppercase tracking-wider" colspan="2">OT Total</td>
                                     <td class="px-6 py-3 text-right font-mono text-white font-extrabold"><?php echo number_format($ot_bd['total_hours'], 1); ?>h</td>
-                                    <td class="px-6 py-3 text-right font-mono text-emerald-400 font-extrabold">$<?php echo number_format($ot_bd['total_amount'], 2); ?></td>
+                                    <td class="px-6 py-3 text-right font-mono text-emerald-400 font-extrabold"><?php echo $currency; ?> <?php echo number_format($ot_bd['total_amount'], 2); ?></td>
                                 </tr>
                             </tbody>
                         </table>
@@ -447,7 +448,7 @@ if ($payroll) {
                                 <?php foreach ($earnings as $idx => $e): ?>
                                 <tr class="<?php echo $idx % 2 === 0 ? 'bg-white/[0.02]' : ''; ?>">
                                     <td class="px-6 py-3 text-zinc-300 font-medium"><?php echo htmlspecialchars($e['component_name']); ?></td>
-                                    <td class="px-6 py-3 text-right font-mono text-emerald-400 font-semibold">$<?php echo number_format($e['amount'], 2); ?></td>
+                                    <td class="px-6 py-3 text-right font-mono text-emerald-400 font-semibold"><?php echo $currency; ?> <?php echo number_format($e['amount'], 2); ?></td>
                                 </tr>
                                 <?php endforeach; ?>
                                 <?php if (empty($earnings)): ?>
@@ -457,7 +458,7 @@ if ($payroll) {
                                 <?php endif; ?>
                                 <tr class="bg-emerald-500/10 border-t border-emerald-500/20">
                                     <td class="px-6 py-3 text-emerald-400 font-bold text-xs uppercase tracking-wider">Gross Total</td>
-                                    <td class="px-6 py-3 text-right font-mono text-emerald-400 font-extrabold">$<?php echo number_format($payroll['gross_salary'], 2); ?></td>
+                                    <td class="px-6 py-3 text-right font-mono text-emerald-400 font-extrabold"><?php echo $currency; ?> <?php echo number_format($payroll['gross_salary'], 2); ?></td>
                                 </tr>
                             </tbody>
                         </table>
@@ -489,7 +490,7 @@ if ($payroll) {
                                 <?php foreach ($deductions as $idx => $d): ?>
                                 <tr class="<?php echo $idx % 2 === 0 ? 'bg-white/[0.02]' : ''; ?>">
                                     <td class="px-6 py-3 text-zinc-300 font-medium"><?php echo htmlspecialchars($d['component_name']); ?></td>
-                                    <td class="px-6 py-3 text-right font-mono text-rose-400 font-semibold">$<?php echo number_format($d['amount'], 2); ?></td>
+                                    <td class="px-6 py-3 text-right font-mono text-rose-400 font-semibold"><?php echo $currency; ?> <?php echo number_format($d['amount'], 2); ?></td>
                                 </tr>
                                 <?php endforeach; ?>
                                 <?php if (empty($deductions)): ?>
@@ -499,7 +500,7 @@ if ($payroll) {
                                 <?php endif; ?>
                                 <tr class="bg-rose-500/10 border-t border-rose-500/20">
                                     <td class="px-6 py-3 text-rose-400 font-bold text-xs uppercase tracking-wider">Total Deductions</td>
-                                    <td class="px-6 py-3 text-right font-mono text-rose-400 font-extrabold">-$<?php echo number_format($payroll['deduction_amount'] + $payroll['tax_amount'], 2); ?></td>
+                                    <td class="px-6 py-3 text-right font-mono text-rose-400 font-extrabold">-<?php echo $currency; ?> <?php echo number_format($payroll['deduction_amount'] + $payroll['tax_amount'], 2); ?></td>
                                 </tr>
                             </tbody>
                         </table>
@@ -516,16 +517,16 @@ if ($payroll) {
                         </div>
                         <div>
                             <span class="text-[11px] font-bold uppercase tracking-wider text-emerald-400">Net Salary</span>
-                            <p class="text-3xl font-extrabold text-white font-mono mt-0.5">$<?php echo number_format($payroll['net_salary'], 2); ?></p>
+                            <p class="text-3xl font-extrabold text-white font-mono mt-0.5"><?php echo $currency; ?> <?php echo number_format($payroll['net_salary'], 2); ?></p>
                         </div>
                     </div>
                     <div class="text-right">
                         <p class="text-xs text-zinc-400 font-mono">
-                            <span class="text-emerald-400">$<?php echo number_format($payroll['gross_salary'], 2); ?></span>
+                            <span class="text-emerald-400"><?php echo $currency; ?> <?php echo number_format($payroll['gross_salary'], 2); ?></span>
                             <span class="text-zinc-500 mx-1">−</span>
-                            <span class="text-rose-400">$<?php echo number_format($payroll['deduction_amount'] + $payroll['tax_amount'], 2); ?></span>
+                            <span class="text-rose-400"><?php echo $currency; ?> <?php echo number_format($payroll['deduction_amount'] + $payroll['tax_amount'], 2); ?></span>
                             <span class="text-zinc-500 mx-1">=</span>
-                            <span class="text-white font-bold">$<?php echo number_format($payroll['net_salary'], 2); ?></span>
+                            <span class="text-white font-bold"><?php echo $currency; ?> <?php echo number_format($payroll['net_salary'], 2); ?></span>
                         </p>
                         <p class="text-[10px] text-zinc-500 mt-1">Gross − Deductions = Net</p>
                     </div>

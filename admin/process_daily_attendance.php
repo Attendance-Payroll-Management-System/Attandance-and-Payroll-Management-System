@@ -6,6 +6,7 @@
  * - Saturdays/Sundays -> weekend
  * - Public holidays -> public_holiday
  * - Working days without check-in and no approved leave -> AWOL
+ * - Auto check-out for employees who forgot (no approved OT, after 17:30 MMT)
  * 
  * Also reconciles missing Pension Fund deductions for AWOL records.
  * 
@@ -13,7 +14,7 @@
  * 1. Manually by admin via browser
  * 2. As a cron job (CLI)
  * 
- * Usage (CLI): php admin/process_daily_attendance.php [date] [--reconcile]
+ * Usage (CLI): php admin/process_daily_attendance.php [date] [--reconcile] [--auto-checkout]
  * Usage (Web): Navigate to this page in admin panel
  */
 
@@ -57,6 +58,14 @@ if (!$is_cli && isset($_POST['reconcile'])) {
     $reconcile_only = true;
 }
 
+$auto_checkout_only = false;
+if ($is_cli && in_array('--auto-checkout', $argv ?? [])) {
+    $auto_checkout_only = true;
+}
+if (!$is_cli && isset($_POST['auto_checkout'])) {
+    $auto_checkout_only = true;
+}
+
 $message = '';
 $message_type = '';
 
@@ -78,8 +87,26 @@ if ($reconcile_only) {
     $_SESSION['message_type'] = $message_type;
 }
 
+// Handle Auto Check-Out
+if ($auto_checkout_only) {
+    $auto_result = process_auto_checkout($conn, $process_date);
+    $message = "Auto Check-Out for $process_date: Processed {$auto_result['processed']} employees, Auto-checked-out {$auto_result['auto_checkout']}, Skipped (OT) {$auto_result['skipped_ot']}.";
+    $message_type = !empty($auto_result['errors']) ? 'error' : 'success';
+
+    if (!empty($auto_result['errors'])) {
+        $message .= " Errors: " . implode('; ', $auto_result['errors']);
+    }
+
+    if ($is_cli) {
+        echo $message . "\n";
+        exit(0);
+    }
+    $_SESSION['message'] = $message;
+    $_SESSION['message_type'] = $message_type;
+}
+
 // Handle Process Attendance
-if (!$reconcile_only && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['process_attendance'])) {
+if (!$reconcile_only && !$auto_checkout_only && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['process_attendance'])) {
     $result = auto_mark_daily_attendance($conn, $process_date);
 
     // Try to log the processing run (table may not exist)
@@ -92,10 +119,13 @@ if (!$reconcile_only && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['p
         $log->close();
     }
 
-    // Also reconcile deductions for any AWOL records
+    // Also reconcile deductions for any AWOL and Half-Day records
     $recon = reconcile_awol_deductions($conn, $process_date);
 
-    $message = "Processed {$result['processed']} employees: {$result['awol']} AWOL, {$result['weekend']} Weekend, {$result['holiday']} Holiday. Deductions: {$recon['created']} created, {$recon['skipped']} existing.";
+    // Auto check-out employees who forgot
+    $auto_result = process_auto_checkout($conn, $process_date);
+
+    $message = "Processed {$result['processed']} employees: {$result['awol']} AWOL, {$result['weekend']} Weekend, {$result['holiday']} Holiday. Deductions: {$recon['created']} created, {$recon['skipped']} existing. Auto check-outs: {$auto_result['auto_checkout']}.";
     $message_type = 'success';
 
     if ($is_cli) {
@@ -106,8 +136,8 @@ if (!$reconcile_only && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['p
     $_SESSION['message_type'] = $message_type;
 }
 
-// CLI mode: run both processing + reconcile
-if ($is_cli && !$reconcile_only) {
+// CLI mode: run processing + auto-checkout + reconcile
+if ($is_cli && !$reconcile_only && !$auto_checkout_only) {
     $result = auto_mark_daily_attendance($conn, $process_date);
 
     $log_check = $conn->query("SHOW TABLES LIKE 'attendance_processing_log'");
@@ -120,12 +150,17 @@ if ($is_cli && !$reconcile_only) {
 
     $recon = reconcile_awol_deductions($conn, $process_date);
 
+    // Auto check-out employees who forgot
+    $auto_result = process_auto_checkout($conn, $process_date);
+
     echo "Processed {$result['processed']} employees on $process_date.\n";
     echo "  AWOL: {$result['awol']}\n";
     echo "  Weekend: {$result['weekend']}\n";
     echo "  Public Holiday: {$result['holiday']}\n";
     echo "  Deductions created: {$recon['created']}\n";
     echo "  Deductions existing (skipped): {$recon['skipped']}\n";
+    echo "  Auto check-outs: {$auto_result['auto_checkout']}\n";
+    echo "  Skipped (OT active): {$auto_result['skipped_ot']}\n";
     exit(0);
 }
 
@@ -139,18 +174,19 @@ if ($log_table_check && $log_table_check->num_rows > 0) {
     }
 }
 
-// Get AWOL deduction summary for the selected date
+// Get AWOL and Half-Day deduction summary for the selected date
 $awol_summary = [];
 $awol_stmt = $conn->prepare(
     "SELECT a.id, a.employee_id, e.name, e.employee_code, a.status,
-            (SELECT d.id FROM deductions d WHERE d.employee_id = a.employee_id AND d.deduction_date = a.attendance_date AND d.remarks = ? LIMIT 1) as deduction_id
+            (SELECT d.id FROM deductions d WHERE d.employee_id = a.employee_id AND d.deduction_date = a.attendance_date AND d.remarks IN (?, ?) LIMIT 1) as deduction_id
      FROM attendance a
      JOIN employee e ON a.employee_id = e.id
-     WHERE a.attendance_date = ? AND a.status IN ('awol', 'absent', 'full_absent')
+     WHERE a.attendance_date = ? AND a.status IN ('awol', 'absent', 'full_absent', 'half_day')
      ORDER BY e.name"
 );
-$awol_remarks = AWOL_DEDUCTION_REMARKS;
-$awol_stmt->bind_param('ss', $awol_remarks, $process_date);
+$awol_remarks = UNPAID_ABSENCE_DEDUCTION_REMARKS;
+$half_day_remarks = HALF_DAY_DEDUCTION_REMARKS;
+$awol_stmt->bind_param('sss', $awol_remarks, $half_day_remarks, $process_date);
 $awol_stmt->execute();
 $awol_summary = $awol_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $awol_stmt->close();
@@ -202,6 +238,7 @@ if (!$is_cli):
                                     <li>Marks <strong>Weekend</strong> on Saturdays/Sundays</li>
                                     <li>Marks <strong>Public Holiday</strong> on holidays</li>
                                     <li>Marks <strong>AWOL</strong> on working days without check-in</li>
+                                    <li>Auto check-out employees at <strong>5:30 PM</strong> (no OT)</li>
                                     <li>Creates <strong>Pension Fund deductions (2%)</strong> for AWOL records</li>
                                 </ul>
                             </div>
@@ -235,12 +272,37 @@ if (!$is_cli):
                             </button>
                         </form>
                     </div>
+
+                    <!-- Auto Check-Out -->
+                    <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-6">
+                        <h2 class="text-lg font-bold text-white mb-4"><i class="fa-solid fa-clock text-violet-400 mr-2"></i>Auto Check-Out</h2>
+
+                        <form method="POST" class="space-y-4">
+                        <?php echo csrf_field(); ?>
+                            <input type="hidden" name="date" value="<?php echo htmlspecialchars($process_date); ?>">
+
+                            <div class="bg-violet-500/10 border border-violet-500/20 rounded-xl p-4 text-sm text-violet-400">
+                                <i class="fa-solid fa-circle-info mr-2"></i>
+                                <strong>What this does:</strong>
+                                <ul class="mt-2 space-y-1 text-zinc-400 ml-5 list-disc">
+                                    <li>Finds employees who <strong>checked in but forgot to check out</strong></li>
+                                    <li>Auto checks them out at <strong>5:30 PM MMT</strong> (no approved OT)</li>
+                                    <li>Skips employees with <strong>approved overtime</strong> requests</li>
+                                    <li>Flags records with <strong>is_auto_checkout = 1</strong></li>
+                                </ul>
+                            </div>
+
+                            <button type="submit" name="auto_checkout" value="1" class="w-full rounded-xl bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700 text-white font-semibold text-sm px-5 py-3 shadow-sm transition flex items-center justify-center gap-2">
+                                <i class="fa-solid fa-clock-rotate-left"></i> Run Auto Check-Out
+                            </button>
+                        </form>
+                    </div>
                 </div>
 
                 <!-- AWOL Summary for Selected Date -->
                 <?php if (!empty($awol_summary)): ?>
                 <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-6 mt-6">
-                    <h2 class="text-lg font-bold text-white mb-4"><i class="fa-solid fa-users-slash text-red-400 mr-2"></i>AWOL Records — <?php echo htmlspecialchars($process_date); ?></h2>
+                    <h2 class="text-lg font-bold text-white mb-4"><i class="fa-solid fa-users-slash text-red-400 mr-2"></i>Attendance Violations — <?php echo htmlspecialchars($process_date); ?></h2>
                     <div class="overflow-x-auto">
                         <table class="w-full text-left text-sm">
                             <thead class="text-zinc-500 text-xs uppercase tracking-wider border-b border-white/[0.06]">
@@ -308,9 +370,11 @@ if (!$is_cli):
                 <!-- Cron Setup Instructions -->
                 <div class="glass-strong rounded-2xl p-6 mt-6">
                     <h3 class="font-bold text-white text-sm mb-2"><i class="fa-solid fa-terminal text-emerald-400 mr-2"></i>Automated Cron Setup (Linux)</h3>
-                    <p class="text-xs text-zinc-400 mb-2">Add this to your crontab to run daily at 11:45 PM:</p>
+                    <p class="text-xs text-zinc-400 mb-2">Add this to your crontab to run daily at 11:45 PM (processes + auto-checkout + reconcile):</p>
                     <pre class="bg-black/40 text-emerald-300 text-xs p-3 rounded-lg overflow-x-auto">45 23 * * * /usr/bin/php /path/to/admin/process_daily_attendance.php</pre>
-                    <p class="text-xs text-zinc-500 mt-2">This will auto-mark attendance and create Pension Fund deductions for AWOL.</p>
+                    <p class="text-xs text-zinc-400 mt-2">For auto-checkout only at 5:35 PM MMT:</p>
+                    <pre class="bg-black/40 text-emerald-300 text-xs p-3 rounded-lg overflow-x-auto">35 17 * * * /usr/bin/php /path/to/admin/process_daily_attendance.php $(date +\%F) --auto-checkout</pre>
+                    <p class="text-xs text-zinc-500 mt-2">This will auto-mark attendance, auto-checkout employees, and create Pension Fund deductions for AWOL.</p>
                 </div>
             </div>
         </main>

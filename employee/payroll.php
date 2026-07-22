@@ -7,37 +7,35 @@ if (!isset($_SESSION['logged_in'])) { header('Location: login.php'); exit; }
 
 $employee_id = $_SESSION['employee_id'];
 $selected_year = isset($_GET['year']) ? (int)$_GET['year'] : (int)date('Y');
-$selected_month = isset($_GET['month']) ? (int)$_GET['month'] : 0;
+$currency = get_currency($conn);
 
-$payrolls = $conn->prepare("
-    SELECT p.* FROM payrolls p
-    WHERE p.employee_id = ? AND p.payroll_year = ?
-    ORDER BY p.payroll_month DESC
-");
-$payrolls->bind_param("ii", $employee_id, $selected_year);
-$payrolls->execute();
-$payroll_data = $payrolls->get_result()->fetch_all(MYSQLI_ASSOC);
-$payrolls->close();
+// Check if new payroll table exists, auto-create if not
+if (payroll_table_exists($conn)) {
+    $payrolls = $conn->prepare("
+        SELECT p.* FROM payroll p
+        WHERE p.employee_id = ? AND p.pay_year = ?
+        ORDER BY p.pay_month DESC
+    ");
+    $payrolls->bind_param("ii", $employee_id, $selected_year);
+    $payrolls->execute();
+    $payroll_data = $payrolls->get_result()->fetch_all(MYSQLI_ASSOC);
+    $payrolls->close();
+} else {
+    $payroll_data = [];
+}
 
-$annual = $conn->prepare("SELECT * FROM annual_payrolls WHERE employee_id = ? AND payroll_year = ?");
-$annual->bind_param("ii", $employee_id, $selected_year);
-$annual->execute();
-$annual_data = $annual->get_result()->fetch_assoc();
-$annual->close();
-
-$totals = ['basic' => 0, 'ot' => 0, 'bonus' => 0, 'ded' => 0, 'gross' => 0, 'net' => 0, 'allowance' => 0, 'tax' => 0, 'leave_ded' => 0, 'late_ded' => 0, 'unpaid_leave_ded' => 0];
+$totals = ['basic' => 0, 'ot' => 0, 'bonus' => 0, 'leave_ded' => 0, 'late_ded' => 0, 'absent_ded' => 0, 'other_ded' => 0, 'gross' => 0, 'net' => 0, 'allowance' => 0];
 foreach ($payroll_data as $p) {
     $totals['basic'] += $p['basic_salary'];
-    $totals['ot'] += $p['ot_amount'];
-    $totals['bonus'] += $p['bonus_amount'];
-    $totals['ded'] += $p['deduction_amount'];
+    $totals['ot'] += $p['overtime_amount'];
+    $totals['bonus'] += $p['bonus'];
+    $totals['leave_ded'] += $p['leave_deduction'];
+    $totals['late_ded'] += $p['late_deduction'];
+    $totals['absent_ded'] += $p['absent_deduction'];
+    $totals['other_ded'] += $p['other_deduction'];
     $totals['gross'] += $p['gross_salary'];
     $totals['net'] += $p['net_salary'];
-    $totals['allowance'] += $p['allowance_amount'] ?? 0;
-    $totals['tax'] += $p['tax_amount'] ?? 0;
-    $totals['leave_ded'] += $p['leave_deduction'] ?? 0;
-    $totals['late_ded'] += $p['late_deduction'] ?? 0;
-    $totals['unpaid_leave_ded'] += $p['unpaid_leave_deduction'] ?? 0;
+    $totals['allowance'] += $p['allowance'];
 }
 
 $latest_payroll = !empty($payroll_data) ? $payroll_data[0] : null;
@@ -48,26 +46,27 @@ $employee->execute();
 $emp_info = $employee->get_result()->fetch_assoc();
 $employee->close();
 
-// Notifications for employee
+// Notifications
 $notif_count = 0;
 $payroll_notifications = [];
-$notif_check = $conn->prepare("SELECT COUNT(*) as cnt FROM payroll_notifications WHERE (employee_id = ? OR employee_id IS NULL) AND is_read = 0");
-$notif_check->bind_param("i", $employee_id);
-$notif_check->execute();
-$notif_count = (int)$notif_check->get_result()->fetch_assoc()['cnt'];
-$notif_check->close();
+if ($conn->query("SHOW TABLES LIKE 'payroll_notifications'")->num_rows > 0) {
+    $notif_check = $conn->prepare("SELECT COUNT(*) as cnt FROM payroll_notifications WHERE (employee_id = ? OR employee_id IS NULL) AND is_read = 0");
+    $notif_check->bind_param("i", $employee_id);
+    $notif_check->execute();
+    $notif_count = (int)$notif_check->get_result()->fetch_assoc()['cnt'];
+    $notif_check->close();
 
-$notif_query = $conn->prepare("SELECT * FROM payroll_notifications WHERE (employee_id = ? OR employee_id IS NULL) AND is_read = 0 ORDER BY created_at DESC LIMIT 20");
-$notif_query->bind_param("i", $employee_id);
-$notif_query->execute();
-$payroll_notifications = $notif_query->get_result()->fetch_all(MYSQLI_ASSOC);
-$notif_query->close();
+    $notif_query = $conn->prepare("SELECT * FROM payroll_notifications WHERE (employee_id = ? OR employee_id IS NULL) AND is_read = 0 ORDER BY created_at DESC LIMIT 20");
+    $notif_query->bind_param("i", $employee_id);
+    $notif_query->execute();
+    $payroll_notifications = $notif_query->get_result()->fetch_all(MYSQLI_ASSOC);
+    $notif_query->close();
+}
 
-// Monthly breakdown for chart
+// Chart data
 $chart_data = [];
 foreach ($payroll_data as $p) {
-    $month_num = $p['payroll_month'];
-    $chart_data[$month_num] = $p['net_salary'];
+    $chart_data[$p['pay_month']] = $p['net_salary'];
 }
 $chart_labels = [];
 $chart_values = [];
@@ -167,32 +166,6 @@ for ($m = 1; $m <= 12; $m++) {
             text-align: center;
             backdrop-filter: blur(8px);
         }
-        .annual-card {
-            position: relative;
-            overflow: hidden;
-            background: var(--glass-strong-bg);
-            backdrop-filter: blur(20px);
-            border: 1px solid var(--glass-strong-border);
-            border-radius: 1.25rem;
-            padding: 1.5rem;
-            transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
-        }
-        .annual-card:hover {
-            transform: translateY(-4px);
-            box-shadow: var(--shadow-card-hover);
-        }
-        .annual-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 3px;
-            background: linear-gradient(90deg, #10B981, #06B6D4, #3B82F6);
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-        .annual-card:hover::before { opacity: 1; }
         .history-table {
             position: relative;
             overflow: hidden;
@@ -210,23 +183,6 @@ for ($m = 1; $m <= 12; $m++) {
         }
         .table-row:hover {
             background: linear-gradient(90deg, rgba(139,92,246,0.03), rgba(217,70,239,0.02), transparent) !important;
-        }
-        .download-pill {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 2.25rem;
-            height: 2.25rem;
-            border-radius: 0.625rem;
-            background: linear-gradient(135deg, rgba(245,158,11,0.15), rgba(249,115,22,0.1));
-            color: #F59E0B;
-            transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-            box-shadow: 0 2px 8px rgba(245,158,11,0.15);
-        }
-        .download-pill:hover {
-            background: linear-gradient(135deg, rgba(245,158,11,0.25), rgba(249,115,22,0.2));
-            transform: scale(1.1);
-            box-shadow: 0 4px 16px rgba(245,158,11,0.25);
         }
         .status-badge {
             display: inline-flex;
@@ -335,7 +291,7 @@ for ($m = 1; $m <= 12; $m++) {
                         </div>
                         <div class="min-w-0 flex-1">
                             <span class="text-[11px] font-bold uppercase tracking-wider text-zinc-500">Basic Salary</span>
-                            <p class="text-xl font-extrabold text-white mt-0.5 truncate">$<?php echo number_format($emp_info['basic_salary'] ?? 0, 2); ?></p>
+                            <p class="text-xl font-extrabold text-white mt-0.5 truncate"><?php echo $currency; ?> <?php echo number_format($emp_info['basic_salary'] ?? 0, 2); ?></p>
                         </div>
                     </div>
                 </div>
@@ -348,7 +304,7 @@ for ($m = 1; $m <= 12; $m++) {
                         </div>
                         <div class="min-w-0 flex-1">
                             <span class="text-[11px] font-bold uppercase tracking-wider text-zinc-500">Allowance</span>
-                            <p class="text-xl font-extrabold text-amber-400 mt-0.5 truncate">$<?php echo number_format($emp_info['allowance'] ?? 0, 2); ?></p>
+                            <p class="text-xl font-extrabold text-amber-400 mt-0.5 truncate"><?php echo $currency; ?> <?php echo number_format($emp_info['allowance'] ?? 0, 2); ?></p>
                         </div>
                     </div>
                 </div>
@@ -361,7 +317,7 @@ for ($m = 1; $m <= 12; $m++) {
                         </div>
                         <div class="min-w-0 flex-1">
                             <span class="text-[11px] font-bold uppercase tracking-wider text-zinc-500">Year to Date</span>
-                            <p class="text-xl font-extrabold text-emerald-400 mt-0.5 truncate">$<?php echo number_format($totals['net'], 2); ?></p>
+                            <p class="text-xl font-extrabold text-emerald-400 mt-0.5 truncate"><?php echo $currency; ?> <?php echo number_format($totals['net'], 2); ?></p>
                         </div>
                     </div>
                 </div>
@@ -374,7 +330,7 @@ for ($m = 1; $m <= 12; $m++) {
                         </div>
                         <div class="min-w-0 flex-1">
                             <span class="text-[11px] font-bold uppercase tracking-wider text-zinc-500">YTD Gross</span>
-                            <p class="text-xl font-extrabold text-indigo-400 mt-0.5 truncate">$<?php echo number_format($totals['gross'], 2); ?></p>
+                            <p class="text-xl font-extrabold text-indigo-400 mt-0.5 truncate"><?php echo $currency; ?> <?php echo number_format($totals['gross'], 2); ?></p>
                         </div>
                     </div>
                 </div>
@@ -408,91 +364,49 @@ for ($m = 1; $m <= 12; $m++) {
                         </div>
                         <div>
                             <h3 class="text-lg font-bold text-white">Latest Payslip</h3>
-                            <span class="text-sm text-white/70"><?php echo date('F', mktime(0,0,0,$latest_payroll['payroll_month'],1)); ?> <?php echo $latest_payroll['payroll_year']; ?></span>
+                            <span class="text-sm text-white/70"><?php echo date('F', mktime(0,0,0,$latest_payroll['pay_month'],1)); ?> <?php echo $latest_payroll['pay_year']; ?></span>
                         </div>
                     </div>
                     <div class="flex items-center gap-2">
-                        <span class="status-badge <?php echo get_payroll_status_badge($latest_payroll['status'] ?? 'Generated'); ?> bg-white/15 text-white border-white/20">
-                            <i class="fa-solid <?php echo get_payroll_status_icon($latest_payroll['status'] ?? 'Generated'); ?> text-[10px]"></i>
-                            <?php echo $latest_payroll['status'] ?? 'Generated'; ?>
+                        <span class="status-badge <?php echo get_new_payroll_status_badge($latest_payroll['payment_status']); ?> bg-white/15 text-white border-white/20">
+                            <i class="fa-solid <?php echo get_new_payroll_status_icon($latest_payroll['payment_status']); ?> text-[10px]"></i>
+                            <?php echo $latest_payroll['payment_status']; ?>
                         </span>
-                        <a href="download_slip.php?pid=<?php echo $latest_payroll['id']; ?>" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/20 hover:bg-white/30 text-white text-sm font-semibold backdrop-blur-sm transition-all duration-200 hover:scale-105">
-                            <i class="fa-solid fa-download"></i> Download
-                        </a>
                     </div>
                 </div>
 
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
                     <div class="slip-item">
                         <span class="text-[11px] font-semibold text-white/60 uppercase tracking-wider">Basic</span>
-                        <p class="text-lg font-bold text-white mt-0.5">$<?php echo number_format($latest_payroll['basic_salary'], 2); ?></p>
+                        <p class="text-lg font-bold text-white mt-0.5"><?php echo $currency; ?> <?php echo number_format($latest_payroll['basic_salary'], 2); ?></p>
                     </div>
                     <div class="slip-item">
-                        <span class="text-[11px] font-semibold text-white/60 uppercase tracking-wider">OT</span>
-                        <p class="text-lg font-bold text-white mt-0.5">$<?php echo number_format($latest_payroll['ot_amount'] ?? 0, 2); ?></p>
+                        <span class="text-[11px] font-semibold text-white/60 uppercase tracking-wider">OT Pay</span>
+                        <p class="text-lg font-bold text-white mt-0.5"><?php echo $currency; ?> <?php echo number_format($latest_payroll['overtime_amount'] ?? 0, 2); ?></p>
                     </div>
                     <div class="slip-item">
                         <span class="text-[11px] font-semibold text-white/60 uppercase tracking-wider">Allowance</span>
-                        <p class="text-lg font-bold text-white mt-0.5">$<?php echo number_format($latest_payroll['allowance_amount'] ?? 0, 2); ?></p>
+                        <p class="text-lg font-bold text-white mt-0.5"><?php echo $currency; ?> <?php echo number_format($latest_payroll['allowance'] ?? 0, 2); ?></p>
                     </div>
                     <div class="slip-item">
                         <span class="text-[11px] font-semibold text-white/60 uppercase tracking-wider">Bonus</span>
-                        <p class="text-lg font-bold text-white mt-0.5">$<?php echo number_format($latest_payroll['bonus_amount'] ?? 0, 2); ?></p>
-                    </div>
-                    <div class="slip-item">
-                        <span class="text-[11px] font-semibold text-white/60 uppercase tracking-wider">Deductions</span>
-                        <p class="text-lg font-bold text-rose-300 mt-0.5">-$<?php echo number_format($latest_payroll['deduction_amount'] ?? 0, 2); ?></p>
+                        <p class="text-lg font-bold text-white mt-0.5"><?php echo $currency; ?> <?php echo number_format($latest_payroll['bonus'] ?? 0, 2); ?></p>
                     </div>
                     <div class="slip-item">
                         <span class="text-[11px] font-semibold text-white/60 uppercase tracking-wider">Leave Ded.</span>
-                        <p class="text-lg font-bold text-rose-300 mt-0.5">-$<?php echo number_format($latest_payroll['leave_deduction'] ?? 0, 2); ?></p>
+                        <p class="text-lg font-bold text-rose-300 mt-0.5">-<?php echo $currency; ?> <?php echo number_format($latest_payroll['leave_deduction'] ?? 0, 2); ?></p>
                     </div>
                     <div class="slip-item">
-                        <span class="text-[11px] font-semibold text-white/60 uppercase tracking-wider">Tax</span>
-                        <p class="text-lg font-bold text-rose-300 mt-0.5">-$<?php echo number_format($latest_payroll['tax_amount'] ?? 0, 2); ?></p>
+                        <span class="text-[11px] font-semibold text-white/60 uppercase tracking-wider">Late Ded.</span>
+                        <p class="text-lg font-bold text-rose-300 mt-0.5">-<?php echo $currency; ?> <?php echo number_format($latest_payroll['late_deduction'] ?? 0, 2); ?></p>
+                    </div>
+                    <div class="slip-item">
+                        <span class="text-[11px] font-semibold text-white/60 uppercase tracking-wider">Absent Ded.</span>
+                        <p class="text-lg font-bold text-rose-300 mt-0.5">-<?php echo $currency; ?> <?php echo number_format($latest_payroll['absent_deduction'] ?? 0, 2); ?></p>
                     </div>
                     <div class="net-highlight">
                         <span class="text-[11px] font-semibold text-white/80 uppercase tracking-wider">Net Pay</span>
-                        <p class="text-2xl font-extrabold text-white mt-0.5">$<?php echo number_format($latest_payroll['net_salary'], 2); ?></p>
-                    </div>
-                </div>
-            </div>
-            <?php endif; ?>
-
-            <!-- Annual Summary -->
-            <?php if ($annual_data): ?>
-            <div class="annual-card mb-6 animate-fade-in-up stagger-4">
-                <div class="flex items-center justify-between mb-5">
-                    <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500/20 to-teal-500/10 flex items-center justify-center">
-                            <i class="fa-solid fa-chart-line text-emerald-500"></i>
-                        </div>
-                        <div>
-                            <h3 class="text-base font-bold text-white">Annual Summary</h3>
-                            <span class="text-xs text-zinc-500"><?php echo $selected_year; ?> fiscal year</span>
-                        </div>
-                    </div>
-                    <div class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-sky-500/10 to-cyan-500/10 border border-sky-500/20">
-                        <i class="fa-solid fa-coins text-sky-400 text-sm"></i>
-                        <span class="text-lg font-extrabold text-sky-400">$<?php echo number_format($annual_data['net_annual_salary'], 2); ?></span>
-                    </div>
-                </div>
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div class="p-3 rounded-xl bg-white/[0.04] border border-white/[0.06]">
-                        <span class="text-[11px] font-bold uppercase tracking-wider text-zinc-500">Total Salary</span>
-                        <p class="text-base font-bold text-white mt-1">$<?php echo number_format($annual_data['total_salary'], 2); ?></p>
-                    </div>
-                    <div class="p-3 rounded-xl bg-amber-500/5 border border-amber-500/10">
-                        <span class="text-[11px] font-bold uppercase tracking-wider text-amber-500/70">OT</span>
-                        <p class="text-base font-bold text-amber-400 mt-1">+$<?php echo number_format($annual_data['total_ot'], 2); ?></p>
-                    </div>
-                    <div class="p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/10">
-                        <span class="text-[11px] font-bold uppercase tracking-wider text-emerald-500/70">Bonuses</span>
-                        <p class="text-base font-bold text-emerald-400 mt-1">+$<?php echo number_format($annual_data['total_bonus'], 2); ?></p>
-                    </div>
-                    <div class="p-3 rounded-xl bg-rose-500/5 border border-rose-500/10">
-                        <span class="text-[11px] font-bold uppercase tracking-wider text-rose-500/70">Deductions</span>
-                        <p class="text-base font-bold text-rose-400 mt-1">-$<?php echo number_format($annual_data['total_deduction'], 2); ?></p>
+                        <p class="text-2xl font-extrabold text-white mt-0.5"><?php echo $currency; ?> <?php echo number_format($latest_payroll['net_salary'], 2); ?></p>
                     </div>
                 </div>
             </div>
@@ -525,77 +439,87 @@ for ($m = 1; $m <= 12; $m++) {
                         <thead class="text-white text-xs font-bold uppercase tracking-wider">
                             <tr>
                                 <th class="px-6 py-4">Period</th>
-                                <th class="px-6 py-4 text-center">Status</th>
-                                <th class="px-6 py-4 text-right">Basic</th>
-                                <th class="px-6 py-4 text-right">OT</th>
-                                <th class="px-6 py-4 text-right">Bonus</th>
-                                <th class="px-6 py-4 text-right">Deductions</th>
-                                <th class="px-6 py-4 text-right">Gross</th>
-                                <th class="px-6 py-4 text-right font-bold">Net</th>
-                                <th class="px-6 py-4 text-center">Slip</th>
-                                <th class="px-6 py-4 text-center">Details</th>
+                                <th class="px-4 py-4 text-center">Status</th>
+                                <th class="px-4 py-4 text-center">Days</th>
+                                <th class="px-4 py-4 text-right">Basic</th>
+                                <th class="px-4 py-4 text-right">Allow.</th>
+                                <th class="px-4 py-4 text-right">OT</th>
+                                <th class="px-4 py-4 text-right">Bonus</th>
+                                <th class="px-4 py-4 text-right">Deductions</th>
+                                <th class="px-4 py-4 text-right">Gross</th>
+                                <th class="px-5 py-4 text-right font-bold">Net</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-white/[0.06]">
                             <?php foreach ($payroll_data as $idx => $p): ?>
+                            <?php
+                                $total_ded = $p['leave_deduction'] + $p['late_deduction'] + $p['absent_deduction'] + $p['other_deduction'];
+                            ?>
                             <tr class="table-row animate-fade-in-up" style="animation-delay: <?php echo 0.05 + ($idx * 0.03); ?>s;">
                                 <td class="px-6 py-4">
                                     <div class="flex items-center gap-3">
                                         <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-sky-500/15 to-cyan-500/10 flex items-center justify-center shrink-0">
                                             <i class="fa-regular fa-calendar text-sky-400 text-xs"></i>
                                         </div>
-                                        <span class="font-semibold text-white"><?php echo date('F', mktime(0,0,0,$p['payroll_month'],1)); ?> <?php echo $p['payroll_year']; ?></span>
+                                        <span class="font-semibold text-white"><?php echo date('F', mktime(0,0,0,$p['pay_month'],1)); ?> <?php echo $p['pay_year']; ?></span>
                                     </div>
                                 </td>
-                                <td class="px-6 py-4 text-center">
-                                    <span class="status-badge <?php echo get_payroll_status_badge($p['status'] ?? 'Generated'); ?>">
-                                        <i class="fa-solid <?php echo get_payroll_status_icon($p['status'] ?? 'Generated'); ?> text-[10px]"></i>
-                                        <?php echo $p['status'] ?? 'Generated'; ?>
+                                <td class="px-4 py-4 text-center">
+                                    <span class="status-badge <?php echo get_new_payroll_status_badge($p['payment_status']); ?>">
+                                        <i class="fa-solid <?php echo get_new_payroll_status_icon($p['payment_status']); ?> text-[10px]"></i>
+                                        <?php echo $p['payment_status']; ?>
                                     </span>
                                 </td>
-                                <td class="px-6 py-4 text-right font-mono text-white font-medium">$<?php echo number_format($p['basic_salary'], 2); ?></td>
-                                <td class="px-6 py-4 text-right">
-                                    <?php if ($p['ot_amount'] > 0): ?>
+                                <td class="px-4 py-4 text-center">
+                                    <span class="text-xs text-zinc-400">
+                                        <span class="text-emerald-400 font-bold"><?php echo $p['present_days']; ?></span>P /
+                                        <span class="text-blue-400 font-bold"><?php echo $p['leave_days']; ?></span>L /
+                                        <span class="text-amber-400 font-bold"><?php echo $p['late_days']; ?></span>LT /
+                                        <span class="text-red-400 font-bold"><?php echo $p['absent_days']; ?></span>A
+                                    </span>
+                                </td>
+                                <td class="px-4 py-4 text-right font-mono text-white font-medium"><?php echo $currency; ?> <?php echo number_format($p['basic_salary'], 2); ?></td>
+                                <td class="px-4 py-4 text-right">
+                                    <?php if ($p['allowance'] > 0): ?>
                                         <span class="inline-flex items-center gap-1 font-mono text-amber-400 font-medium">
-                                            <i class="fa-solid fa-plus text-[9px]"></i>$<?php echo number_format($p['ot_amount'], 2); ?>
+                                            <i class="fa-solid fa-plus text-[9px]"></i><?php echo $currency; ?> <?php echo number_format($p['allowance'], 2); ?>
                                         </span>
                                     <?php else: ?>
-                                        <span class="font-mono text-zinc-600">—</span>
+                                        <span class="font-mono text-zinc-600">&mdash;</span>
                                     <?php endif; ?>
                                 </td>
-                                <td class="px-6 py-4 text-right">
-                                    <?php if ($p['bonus_amount'] > 0): ?>
+                                <td class="px-4 py-4 text-right">
+                                    <?php if ($p['overtime_amount'] > 0): ?>
+                                        <span class="inline-flex items-center gap-1 font-mono text-amber-400 font-medium">
+                                            <i class="fa-solid fa-plus text-[9px]"></i><?php echo $currency; ?> <?php echo number_format($p['overtime_amount'], 2); ?>
+                                        </span>
+                                    <?php else: ?>
+                                        <span class="font-mono text-zinc-600">&mdash;</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td class="px-4 py-4 text-right">
+                                    <?php if ($p['bonus'] > 0): ?>
                                         <span class="inline-flex items-center gap-1 font-mono text-emerald-400 font-medium">
-                                            <i class="fa-solid fa-plus text-[9px]"></i>$<?php echo number_format($p['bonus_amount'], 2); ?>
+                                            <i class="fa-solid fa-plus text-[9px]"></i><?php echo $currency; ?> <?php echo number_format($p['bonus'], 2); ?>
                                         </span>
                                     <?php else: ?>
-                                        <span class="font-mono text-zinc-600">—</span>
+                                        <span class="font-mono text-zinc-600">&mdash;</span>
                                     <?php endif; ?>
                                 </td>
-                                <td class="px-6 py-4 text-right">
-                                    <?php if ($p['deduction_amount'] > 0): ?>
+                                <td class="px-4 py-4 text-right">
+                                    <?php if ($total_ded > 0): ?>
                                         <span class="inline-flex items-center gap-1 font-mono text-rose-400 font-medium">
-                                            <i class="fa-solid fa-minus text-[9px]"></i>$<?php echo number_format($p['deduction_amount'], 2); ?>
+                                            <i class="fa-solid fa-minus text-[9px]"></i><?php echo $currency; ?> <?php echo number_format($total_ded, 2); ?>
                                         </span>
                                     <?php else: ?>
-                                        <span class="font-mono text-zinc-600">—</span>
+                                        <span class="font-mono text-zinc-600">&mdash;</span>
                                     <?php endif; ?>
                                 </td>
-                                <td class="px-6 py-4 text-right font-mono text-white font-medium">$<?php echo number_format($p['gross_salary'], 2); ?></td>
-                                <td class="px-6 py-4 text-right">
+                                <td class="px-4 py-4 text-right font-mono text-white font-medium"><?php echo $currency; ?> <?php echo number_format($p['gross_salary'], 2); ?></td>
+                                <td class="px-5 py-4 text-right">
                                     <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-500/10 border border-sky-500/20 font-mono text-sky-400 font-bold">
                                         <i class="fa-solid fa-dollar-sign text-[10px]"></i><?php echo number_format($p['net_salary'], 2); ?>
                                     </span>
-                                </td>
-                                <td class="px-6 py-4 text-center">
-                                    <a href="download_slip.php?pid=<?php echo $p['id']; ?>" title="Download Salary Slip" class="download-pill">
-                                        <i class="fa-solid fa-file-pdf"></i>
-                                    </a>
-                                </td>
-                                <td class="px-6 py-4 text-center">
-                                    <a href="payroll_detail.php?pid=<?php echo $p['id']; ?>" class="inline-flex items-center gap-1 text-xs font-semibold text-sky-400 hover:text-sky-300 transition-colors">
-                                        <i class="fa-solid fa-eye"></i> View
-                                    </a>
                                 </td>
                             </tr>
                             <?php endforeach; ?>

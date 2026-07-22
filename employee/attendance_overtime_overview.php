@@ -507,6 +507,7 @@ if ($view_mode === 'daily') {
                                     <span class="w-1.5 h-1.5 rounded-full bg-current opacity-80"></span>
                                     <?= get_attendance_status_label($att['status']) ?>
                                 </span>
+                                <?= get_auto_checkout_badge($att['is_auto_checkout'] ?? 0) ?>
                             <?php endif; ?>
                         </div>
 
@@ -523,6 +524,7 @@ if ($view_mode === 'daily') {
                                         <span class="inline-flex rounded-full px-3 py-1 text-[11px] font-bold <?= get_attendance_status_badge_class($att['status']) ?>">
                                             <?= get_attendance_status_label($att['status']) ?>
                                         </span>
+                                        <?= get_auto_checkout_badge($att['is_auto_checkout'] ?? 0) ?>
                                     </span>
                                 </div>
 
@@ -1049,6 +1051,7 @@ if ($view_mode === 'daily') {
                                         <span class="inline-flex rounded-full px-3 py-1 text-[11px] font-semibold <?= $a ? get_attendance_status_badge_class($a['status']) : 'bg-zinc-500/20 text-zinc-400' ?>">
                                             <?= $a ? get_attendance_status_label($a['status']) : ($dd['is_weekend'] ? 'Weekend' : 'No Record') ?>
                                         </span>
+                                        <?= $a ? get_auto_checkout_badge($a['is_auto_checkout'] ?? 0) : '' ?>
                                     </td>
                                 </tr>
                                 <?php endforeach; ?>

@@ -8,7 +8,7 @@ require_once '../config/helpers.php';
 set_mmt_timezone();
 
 $message = '';
-$message_type = '';
+$message_type = '';\n$currency = get_currency($conn);
 
 // ─── POST Handlers ─────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -16,15 +16,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $action = $_POST['action'] ?? '';
     $payroll_id = (int)($_POST['payroll_id'] ?? 0);
-    $admin_id = $_SESSION['admin_id'] ?? null;
 
     if ($payroll_id > 0) {
-        if ($action === 'approve') {
-            $result = update_payroll_status($conn, $payroll_id, 'Reviewed', $admin_id);
-            $message = $result ? 'Payroll approved and moved to Reviewed status.' : 'Failed to update payroll status.';
-            $message_type = $result ? 'success' : 'error';
-        } elseif ($action === 'pay') {
-            $result = update_payroll_status($conn, $payroll_id, 'Paid', $admin_id);
+        if ($action === 'pay') {
+            $result = update_new_payroll_status($conn, $payroll_id, 'Paid');
             $message = $result ? 'Payroll marked as Paid successfully.' : 'Failed to update payroll status.';
             $message_type = $result ? 'success' : 'error';
         } elseif ($action === 'cancel') {
@@ -33,7 +28,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $message = 'Remarks are required for cancellation.';
                 $message_type = 'error';
             } else {
-                $result = update_payroll_status($conn, $payroll_id, 'Cancelled', $admin_id, $remarks);
+                $result = update_new_payroll_status($conn, $payroll_id, 'Cancelled', $remarks);
                 $message = $result ? 'Payroll cancelled successfully.' : 'Failed to cancel payroll.';
                 $message_type = $result ? 'success' : 'error';
             }
@@ -74,17 +69,17 @@ if ($filter_dept > 0) {
     $types .= 'i';
 }
 if (!empty($filter_status) && in_array($filter_status, $valid_statuses)) {
-    $where[] = "p.status = ?";
+    $where[] = "p.payment_status = ?";
     $params[] = $filter_status;
     $types .= 's';
 }
 if ($filter_month > 0) {
-    $where[] = "p.payroll_month = ?";
+    $where[] = "p.pay_month = ?";
     $params[] = $filter_month;
     $types .= 'i';
 }
 if ($filter_year > 0) {
-    $where[] = "p.payroll_year = ?";
+    $where[] = "p.pay_year = ?";
     $params[] = $filter_year;
     $types .= 'i';
 }
@@ -92,7 +87,7 @@ if ($filter_year > 0) {
 $where_sql = !empty($where) ? 'WHERE ' . implode(' AND ', $where) : '';
 
 // Count total
-$count_sql = "SELECT COUNT(*) as total FROM payrolls p JOIN employee e ON p.employee_id = e.id $where_sql";
+$count_sql = "SELECT COUNT(*) as total FROM payroll p JOIN employee e ON p.employee_id = e.id $where_sql";
 $count_stmt = $conn->prepare($count_sql);
 if (!empty($params)) {
     $count_stmt->bind_param($types, ...$params);
@@ -106,12 +101,13 @@ $page = min($page, $total_pages);
 $offset = ($page - 1) * $per_page;
 
 // Fetch payroll data
-$sql = "SELECT p.*, e.name, e.employee_code, d.department_name
-        FROM payrolls p
+$sql = "SELECT p.*, e.name, e.employee_code, d.department_name, pos.position_name
+        FROM payroll p
         JOIN employee e ON p.employee_id = e.id
         LEFT JOIN departments d ON e.department_id = d.id
+        LEFT JOIN positions pos ON e.position_id = pos.id
         $where_sql
-        ORDER BY p.payroll_year DESC, p.payroll_month DESC, e.name ASC
+        ORDER BY p.pay_year DESC, p.pay_month DESC, e.name ASC
         LIMIT ? OFFSET ?";
 
 $types .= 'ii';
@@ -129,7 +125,7 @@ $total_net = 0;
 $total_deductions = 0;
 foreach ($payrolls as $p) {
     $total_net += $p['net_salary'];
-    $total_deductions += $p['deduction_amount'];
+    $total_deductions += ($p['total_deduction'] ?? $p['other_deduction'] ?? 0);
 }
 
 // Departments for filter
@@ -163,17 +159,12 @@ $query_string = http_build_query($qs_params);
             padding: 1.25rem;
             transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
         }
-        .payroll-stat:hover {
-            transform: translateY(-4px);
-            box-shadow: var(--shadow-card-hover);
-        }
+        .payroll-stat:hover { transform: translateY(-4px); box-shadow: var(--shadow-card-hover); }
         .payroll-stat::after {
             content: '';
             position: absolute;
-            top: -50%;
-            right: -50%;
-            width: 100%;
-            height: 100%;
+            top: -50%; right: -50%;
+            width: 100%; height: 100%;
             border-radius: 50%;
             opacity: 0.06;
             transition: opacity 0.3s;
@@ -183,204 +174,99 @@ $query_string = http_build_query($qs_params);
         .payroll-stat.net::after { background: #10B981; }
         .payroll-stat.ded::after { background: #F43F5E; }
         .stat-icon-box {
-            width: 2.75rem;
-            height: 2.75rem;
+            width: 2.75rem; height: 2.75rem;
             border-radius: 0.875rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1rem;
-            flex-shrink: 0;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1rem; flex-shrink: 0;
         }
         .sheet-card {
-            position: relative;
-            overflow: hidden;
+            position: relative; overflow: hidden;
             background: var(--glass-strong-bg);
             backdrop-filter: blur(20px);
             border: 1px solid var(--glass-strong-border);
             border-radius: 1.25rem;
             transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
         }
-        .sheet-card:hover {
-            box-shadow: var(--shadow-card-hover);
-        }
+        .sheet-card:hover { box-shadow: var(--shadow-card-hover); }
         .sheet-card::before {
             content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 3px;
+            position: absolute; top: 0; left: 0; right: 0; height: 3px;
             background: linear-gradient(90deg, #1E3A8A, #4F46E5, #F59E0B);
-            opacity: 0;
-            transition: opacity 0.3s ease;
+            opacity: 0; transition: opacity 0.3s ease;
         }
         .sheet-card:hover::before { opacity: 1; }
-        .table-row {
-            transition: all 0.2s ease;
-        }
-        .table-row:hover {
-            background: linear-gradient(90deg, rgba(139,92,246,0.03), rgba(217,70,239,0.02), transparent) !important;
-        }
+        .table-row { transition: all 0.2s ease; }
+        .table-row:hover { background: linear-gradient(90deg, rgba(139,92,246,0.03), rgba(217,70,239,0.02), transparent) !important; }
         .status-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.375rem;
-            padding: 0.35rem 0.75rem;
-            border-radius: 9999px;
-            font-size: 0.7rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
+            display: inline-flex; align-items: center; gap: 0.375rem;
+            padding: 0.35rem 0.75rem; border-radius: 9999px;
+            font-size: 0.7rem; font-weight: 600;
+            text-transform: uppercase; letter-spacing: 0.05em;
         }
-        .employee-cell {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-        }
+        .employee-cell { display: flex; align-items: center; gap: 0.75rem; }
         .employee-avatar {
-            width: 2.5rem;
-            height: 2.5rem;
-            border-radius: 0.75rem;
+            width: 2.5rem; height: 2.5rem; border-radius: 0.75rem;
             background: linear-gradient(135deg, #1E3A8A, #4F46E5);
-            color: white;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.7rem;
-            font-weight: 700;
-            flex-shrink: 0;
+            color: white; display: flex; align-items: center; justify-content: center;
+            font-size: 0.7rem; font-weight: 700; flex-shrink: 0;
             box-shadow: 0 4px 12px rgba(139,92,246,0.2);
         }
         .net-highlight {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.375rem;
-            padding: 0.375rem 0.75rem;
-            border-radius: 0.625rem;
-            background: rgba(139,92,246,0.1);
-            border: 1px solid rgba(139,92,246,0.2);
-            color: #A78BFA;
-            font-weight: 700;
-            font-family: 'Courier New', monospace;
+            display: inline-flex; align-items: center; gap: 0.375rem;
+            padding: 0.375rem 0.75rem; border-radius: 0.625rem;
+            background: rgba(139,92,246,0.1); border: 1px solid rgba(139,92,246,0.2);
+            color: #A78BFA; font-weight: 700; font-family: 'Courier New', monospace;
         }
         .action-btn {
-            width: 2rem;
-            height: 2rem;
-            border-radius: 0.5rem;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.8rem;
-            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            width: 2rem; height: 2rem; border-radius: 0.5rem;
+            display: inline-flex; align-items: center; justify-content: center;
+            font-size: 0.8rem; transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
         }
         .action-btn:hover { transform: translateY(-1px); }
-        .action-view {
-            background: rgba(99,102,241,0.12);
-            color: #818CF8;
-            border: 1px solid rgba(99,102,241,0.2);
-        }
+        .action-view { background: rgba(99,102,241,0.12); color: #818CF8; border: 1px solid rgba(99,102,241,0.2); }
         .action-view:hover { background: rgba(99,102,241,0.2); box-shadow: 0 4px 12px rgba(99,102,241,0.15); }
-        .action-approve {
-            background: rgba(16,185,129,0.12);
-            color: #34D399;
-            border: 1px solid rgba(16,185,129,0.2);
-        }
-        .action-approve:hover { background: rgba(16,185,129,0.2); box-shadow: 0 4px 12px rgba(16,185,129,0.15); }
-        .action-pay {
-            background: rgba(168,85,247,0.12);
-            color: #C084FC;
-            border: 1px solid rgba(168,85,247,0.2);
-        }
-        .action-pay:hover { background: rgba(168,85,247,0.2); box-shadow: 0 4px 12px rgba(168,85,247,0.15); }
-        .action-cancel {
-            background: rgba(244,63,94,0.12);
-            color: #FB7185;
-            border: 1px solid rgba(244,63,94,0.2);
-        }
+        .action-pay { background: rgba(16,185,129,0.12); color: #34D399; border: 1px solid rgba(16,185,129,0.2); }
+        .action-pay:hover { background: rgba(16,185,129,0.2); box-shadow: 0 4px 12px rgba(16,185,129,0.15); }
+        .action-cancel { background: rgba(244,63,94,0.12); color: #FB7185; border: 1px solid rgba(244,63,94,0.2); }
         .action-cancel:hover { background: rgba(244,63,94,0.2); box-shadow: 0 4px 12px rgba(244,63,94,0.15); }
         .filter-input {
-            background: white/[0.06];
-            border: 1px solid white/10;
-            color: white;
-            text-sm;
-            border-radius: 0.75rem;
-            padding: 0.625rem 0.875rem;
-            outline: none;
-            transition: all 0.2s ease;
-        }
-        .filter-input:focus {
-            ring: 2px;
-            box-shadow: 0 0 0 2px rgba(99,102,241,0.3);
+            background: white/[0.06]; border: 1px solid white/10;
+            color: white; text-sm; border-radius: 0.75rem;
+            padding: 0.625rem 0.875rem; outline: none; transition: all 0.2s ease;
         }
         .filter-btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            padding: 0.625rem 1.25rem;
-            border-radius: 0.75rem;
+            display: inline-flex; align-items: center; gap: 0.5rem;
+            padding: 0.625rem 1.25rem; border-radius: 0.75rem;
             background: linear-gradient(135deg, #4F46E5, #1E3A8A);
-            color: white;
-            font-weight: 600;
-            font-size: 0.875rem;
+            color: white; font-weight: 600; font-size: 0.875rem;
             transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
             box-shadow: 0 4px 15px rgba(79,70,229,0.25);
         }
-        .filter-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(79,70,229,0.35);
-        }
+        .filter-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(79,70,229,0.35); }
         .reset-btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            padding: 0.625rem 1.25rem;
-            border-radius: 0.75rem;
-            background: rgba(255,255,255,0.06);
-            border: 1px solid rgba(255,255,255,0.1);
-            color: #94A3B8;
-            font-weight: 600;
-            font-size: 0.875rem;
+            display: inline-flex; align-items: center; gap: 0.5rem;
+            padding: 0.625rem 1.25rem; border-radius: 0.75rem;
+            background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+            color: #94A3B8; font-weight: 600; font-size: 0.875rem;
             transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
         }
-        .reset-btn:hover {
-            background: rgba(255,255,255,0.1);
-            color: white;
-            transform: translateY(-2px);
-        }
+        .reset-btn:hover { background: rgba(255,255,255,0.1); color: white; transform: translateY(-2px); }
         .pagination-btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            min-width: 2.25rem;
-            height: 2.25rem;
-            border-radius: 0.625rem;
-            font-size: 0.8rem;
-            font-weight: 600;
-            transition: all 0.2s ease;
+            display: inline-flex; align-items: center; justify-content: center;
+            min-width: 2.25rem; height: 2.25rem; border-radius: 0.625rem;
+            font-size: 0.8rem; font-weight: 600; transition: all 0.2s ease;
             border: 1px solid transparent;
         }
-        .pagination-btn.active {
-            background: linear-gradient(135deg, #4F46E5, #1E3A8A);
-            color: white;
-            box-shadow: 0 4px 12px rgba(79,70,229,0.3);
-        }
-        .pagination-btn:not(.active) {
-            background: rgba(255,255,255,0.04);
-            color: #94A3B8;
-            border-color: rgba(255,255,255,0.08);
-        }
-        .pagination-btn:not(.active):hover {
-            background: rgba(255,255,255,0.08);
-            color: white;
-        }
+        .pagination-btn.active { background: linear-gradient(135deg, #4F46E5, #1E3A8A); color: white; box-shadow: 0 4px 12px rgba(79,70,229,0.3); }
+        .pagination-btn:not(.active) { background: rgba(255,255,255,0.04); color: #94A3B8; border-color: rgba(255,255,255,0.08); }
+        .pagination-btn:not(.active):hover { background: rgba(255,255,255,0.08); color: white; }
     </style>
 </head>
 <body x-data="{}" class="bg-slate-50 dark:bg-[#0B1120] text-slate-900 dark:text-white font-sans antialiased min-h-screen flex">
     <?php include "../includes/sidebar.php"; ?>
     <div class="flex-1 flex flex-col min-w-0 main-wrapper">
         <?php
-            $page_title = "Payroll Management";
+            $page_title = "Payroll List";
             $page_subtitle = "View, filter, and manage all payroll records across employees and departments.";
             ob_start();
         ?>
@@ -479,7 +365,7 @@ $query_string = http_build_query($qs_params);
                         </div>
                         <div class="min-w-0 flex-1">
                             <span class="text-[11px] font-bold uppercase tracking-wider text-zinc-500">Total Net</span>
-                            <p class="text-xl font-extrabold text-emerald-400 mt-0.5 truncate">$<?php echo number_format($total_net, 2); ?></p>
+                            <p class="text-xl font-extrabold text-emerald-400 mt-0.5 truncate"><?php echo $currency; ?> <?php echo number_format($total_net, 2); ?></p>
                         </div>
                     </div>
                 </div>
@@ -490,7 +376,7 @@ $query_string = http_build_query($qs_params);
                         </div>
                         <div class="min-w-0 flex-1">
                             <span class="text-[11px] font-bold uppercase tracking-wider text-zinc-500">Total Deductions</span>
-                            <p class="text-xl font-extrabold text-rose-400 mt-0.5 truncate">$<?php echo number_format($total_deductions, 2); ?></p>
+                            <p class="text-xl font-extrabold text-rose-400 mt-0.5 truncate"><?php echo $currency; ?> <?php echo number_format($total_deductions, 2); ?></p>
                         </div>
                     </div>
                 </div>
@@ -526,10 +412,9 @@ $query_string = http_build_query($qs_params);
                                 <th class="px-6 py-4">Employee</th>
                                 <th class="px-4 py-4">Department</th>
                                 <th class="px-4 py-4">Period</th>
-                                <th class="px-6 py-4 text-right">Basic</th>
-                                <th class="px-6 py-4 text-right">OT</th>
-                                <th class="px-6 py-4 text-right">Bonus</th>
-                                <th class="px-6 py-4 text-right">Deduction</th>
+                                <th class="px-4 py-4 text-center">Present</th>
+                                <th class="px-4 py-4 text-center">Leave</th>
+                                <th class="px-4 py-4 text-center">OT Hours</th>
                                 <th class="px-6 py-4 text-right">Gross</th>
                                 <th class="px-6 py-4 text-right font-bold">Net</th>
                                 <th class="px-4 py-4 text-center">Status</th>
@@ -539,7 +424,7 @@ $query_string = http_build_query($qs_params);
                         <tbody class="divide-y divide-white/[0.06]">
                             <?php if (empty($payrolls)): ?>
                             <tr>
-                                <td colspan="11" class="px-6 py-20 text-center">
+                                <td colspan="10" class="px-6 py-20 text-center">
                                     <div class="w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-500/10 to-indigo-500/10 flex items-center justify-center mx-auto mb-5">
                                         <i class="fa-solid fa-file-invoice-dollar text-3xl text-zinc-500"></i>
                                     </div>
@@ -565,42 +450,19 @@ $query_string = http_build_query($qs_params);
                                         <span class="text-xs font-medium text-zinc-300"><?php echo htmlspecialchars($p['department_name'] ?? '—'); ?></span>
                                     </td>
                                     <td class="px-4 py-4">
-                                        <span class="text-xs font-medium text-zinc-300"><?php echo date('F', mktime(0, 0, 0, $p['payroll_month'], 1)) . ' ' . $p['payroll_year']; ?></span>
+                                        <span class="text-xs font-medium text-zinc-300"><?php echo date('F', mktime(0, 0, 0, $p['pay_month'], 1)) . ' ' . $p['pay_year']; ?></span>
                                     </td>
-                                    <td class="px-6 py-4 text-right font-mono text-white font-medium">$<?php echo number_format($p['basic_salary'], 2); ?></td>
+                                    <td class="px-4 py-4 text-center"><span class="text-xs font-bold text-emerald-400"><?php echo $p['present_days']; ?></span></td>
+                                    <td class="px-4 py-4 text-center"><span class="text-xs font-bold text-blue-400"><?php echo ($p['paid_leave_days'] ?? 0) + ($p['unpaid_leave_days'] ?? 0); ?></span></td>
+                                    <td class="px-4 py-4 text-center"><span class="text-xs font-bold text-purple-400"><?php echo number_format($p['overtime_hours'] ?? 0, 1); ?>h</span></td>
+                                    <td class="px-6 py-4 text-right font-mono text-white font-medium"><?php echo $currency; ?> <?php echo number_format($p['gross_salary'], 2); ?></td>
                                     <td class="px-6 py-4 text-right">
-                                        <?php if ($p['ot_amount'] > 0): ?>
-                                            <span class="inline-flex items-center gap-1 font-mono font-medium text-amber-400">$<?php echo number_format($p['ot_amount'], 2); ?></span>
-                                        <?php else: ?>
-                                            <span class="font-mono text-zinc-600">—</span>
-                                        <?php endif; ?>
-                                    </td>
-                                    <td class="px-6 py-4 text-right">
-                                        <?php if ($p['bonus_amount'] > 0): ?>
-                                            <span class="inline-flex items-center gap-1 font-mono font-medium text-emerald-400">
-                                                <i class="fa-solid fa-plus text-[9px]"></i>$<?php echo number_format($p['bonus_amount'], 2); ?>
-                                            </span>
-                                        <?php else: ?>
-                                            <span class="font-mono text-zinc-600">—</span>
-                                        <?php endif; ?>
-                                    </td>
-                                    <td class="px-6 py-4 text-right">
-                                        <?php if ($p['deduction_amount'] > 0): ?>
-                                            <span class="inline-flex items-center gap-1 font-mono font-medium text-rose-400">
-                                                <i class="fa-solid fa-minus text-[9px]"></i>$<?php echo number_format($p['deduction_amount'], 2); ?>
-                                            </span>
-                                        <?php else: ?>
-                                            <span class="font-mono text-zinc-600">—</span>
-                                        <?php endif; ?>
-                                    </td>
-                                    <td class="px-6 py-4 text-right font-mono text-zinc-300 font-medium">$<?php echo number_format($p['gross_salary'], 2); ?></td>
-                                    <td class="px-6 py-4 text-right">
-                                        <span class="net-highlight">$<?php echo number_format($p['net_salary'], 2); ?></span>
+                                        <span class="net-highlight"><?php echo $currency; ?> <?php echo number_format($p['net_salary'], 2); ?></span>
                                     </td>
                                     <td class="px-4 py-4 text-center">
-                                        <span class="status-badge border <?php echo get_payroll_status_badge($p['status']); ?>">
-                                            <i class="fa-solid <?php echo get_payroll_status_icon($p['status']); ?> text-[10px]"></i>
-                                            <?php echo $p['status']; ?>
+                                        <span class="status-badge <?php echo get_new_payroll_status_badge($p['payment_status']); ?>">
+                                            <i class="fa-solid <?php echo get_new_payroll_status_icon($p['payment_status']); ?> text-[10px]"></i>
+                                            <?php echo $p['payment_status']; ?>
                                         </span>
                                     </td>
                                     <td class="px-6 py-4 text-center">
@@ -609,19 +471,7 @@ $query_string = http_build_query($qs_params);
                                                 <i class="fa-solid fa-eye"></i>
                                             </a>
 
-                                            <?php if ($p['status'] === 'Generated'): ?>
-                                            <form method="POST" class="inline" onsubmit="return confirm('Are you sure you want to approve this payroll record?');">
-                                                <?php echo csrf_field(); ?>
-                                                <input type="hidden" name="action" value="approve">
-                                                <input type="hidden" name="payroll_id" value="<?php echo $p['id']; ?>">
-                                                <input type="hidden" name="query_string" value="<?php echo htmlspecialchars($query_string); ?>">
-                                                <button type="submit" class="action-btn action-approve" title="Approve (Move to Reviewed)">
-                                                    <i class="fa-solid fa-check-circle"></i>
-                                                </button>
-                                            </form>
-                                            <?php endif; ?>
-
-                                            <?php if ($p['status'] === 'Approved'): ?>
+                                            <?php if ($p['payment_status'] === 'Generated' || $p['payment_status'] === 'Pending'): ?>
                                             <form method="POST" class="inline" onsubmit="return confirm('Are you sure you want to mark this payroll as Paid?');">
                                                 <?php echo csrf_field(); ?>
                                                 <input type="hidden" name="action" value="pay">
@@ -633,7 +483,7 @@ $query_string = http_build_query($qs_params);
                                             </form>
                                             <?php endif; ?>
 
-                                            <?php if (!in_array($p['status'], ['Paid', 'Cancelled'])): ?>
+                                            <?php if (!in_array($p['payment_status'], ['Paid', 'Cancelled'])): ?>
                                             <button type="button" class="action-btn action-cancel" title="Cancel"
                                                 x-on:click="showCancelModal = true; cancelPayrollId = <?php echo $p['id']; ?>; cancelPayrollName = '<?php echo htmlspecialchars(addslashes($p['name'])); ?>'">
                                                 <i class="fa-solid fa-ban"></i>

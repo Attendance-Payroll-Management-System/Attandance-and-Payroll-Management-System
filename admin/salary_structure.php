@@ -382,7 +382,7 @@ $employees_json = json_encode($employees);
                                             </div>
                                             <div>
                                                 <span class="text-[11px] font-bold uppercase tracking-wider text-zinc-500">Basic Salary</span>
-                                                <p class="text-lg font-extrabold text-emerald-400 mt-0.5">$<?php echo number_format($latest['basic_salary'], 2); ?></p>
+                                                <p class="text-lg font-extrabold text-emerald-400 mt-0.5"><?php echo $currency; ?> <?php echo number_format($latest['basic_salary'], 2); ?></p>
                                             </div>
                                         </div>
                                     </div>
@@ -393,7 +393,7 @@ $employees_json = json_encode($employees);
                                             </div>
                                             <div>
                                                 <span class="text-[11px] font-bold uppercase tracking-wider text-zinc-500">Daily Rate</span>
-                                                <p class="text-lg font-extrabold text-blue-400 mt-0.5">$<?php echo number_format($latest['daily_rate'] ?? 0, 2); ?></p>
+                                                <p class="text-lg font-extrabold text-blue-400 mt-0.5"><?php echo $currency; ?> <?php echo number_format($latest['daily_rate'] ?? 0, 2); ?></p>
                                             </div>
                                         </div>
                                     </div>
@@ -404,7 +404,7 @@ $employees_json = json_encode($employees);
                                             </div>
                                             <div>
                                                 <span class="text-[11px] font-bold uppercase tracking-wider text-zinc-500">Hourly Rate</span>
-                                                <p class="text-lg font-extrabold text-indigo-400 mt-0.5">$<?php echo number_format($latest['hourly_rate'] ?? 0, 2); ?></p>
+                                                <p class="text-lg font-extrabold text-indigo-400 mt-0.5"><?php echo $currency; ?> <?php echo number_format($latest['hourly_rate'] ?? 0, 2); ?></p>
                                             </div>
                                         </div>
                                     </div>
@@ -415,7 +415,7 @@ $employees_json = json_encode($employees);
                                             </div>
                                             <div>
                                                 <span class="text-[11px] font-bold uppercase tracking-wider text-zinc-500">OT Rate</span>
-                                                <p class="text-lg font-extrabold text-amber-400 mt-0.5">$<?php echo number_format($latest['ot_rate'] ?? 0, 2); ?>/hr</p>
+                                                <p class="text-lg font-extrabold text-amber-400 mt-0.5"><?php echo $currency; ?> <?php echo number_format($latest['ot_rate'] ?? 0, 2); ?>/hr</p>
                                             </div>
                                         </div>
                                     </div>
@@ -448,16 +448,16 @@ $employees_json = json_encode($employees);
                                                     </div>
                                                 </td>
                                                 <td class="px-6 py-4 text-right">
-                                                    <span class="font-mono font-semibold text-emerald-400">$<?php echo number_format($h['basic_salary'], 2); ?></span>
+                                                    <span class="font-mono font-semibold text-emerald-400"><?php echo $currency; ?> <?php echo number_format($h['basic_salary'], 2); ?></span>
                                                 </td>
                                                 <td class="px-6 py-4 text-right">
-                                                    <span class="font-mono text-blue-400">$<?php echo number_format($h['daily_rate'] ?? 0, 2); ?></span>
+                                                    <span class="font-mono text-blue-400"><?php echo $currency; ?> <?php echo number_format($h['daily_rate'] ?? 0, 2); ?></span>
                                                 </td>
                                                 <td class="px-6 py-4 text-right">
-                                                    <span class="font-mono text-indigo-400">$<?php echo number_format($h['hourly_rate'] ?? 0, 2); ?></span>
+                                                    <span class="font-mono text-indigo-400"><?php echo $currency; ?> <?php echo number_format($h['hourly_rate'] ?? 0, 2); ?></span>
                                                 </td>
                                                 <td class="px-6 py-4 text-right">
-                                                    <span class="font-mono text-amber-400">$<?php echo number_format($h['ot_rate'] ?? 0, 2); ?>/hr</span>
+                                                    <span class="font-mono text-amber-400"><?php echo $currency; ?> <?php echo number_format($h['ot_rate'] ?? 0, 2); ?>/hr</span>
                                                 </td>
                                                 <td class="px-6 py-4 text-center">
                                                     <?php

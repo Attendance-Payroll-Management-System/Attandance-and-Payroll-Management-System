@@ -134,6 +134,7 @@ CREATE TABLE IF NOT EXISTS attendance (
     check_in_source VARCHAR(20) DEFAULT 'web',
     check_out_source VARCHAR(20) DEFAULT 'web',
     is_manual TINYINT(1) DEFAULT 0,
+    is_auto_checkout TINYINT(1) DEFAULT 0,
     remarks TEXT DEFAULT NULL,
     total_working_hours DECIMAL(5,2) DEFAULT NULL,
     UNIQUE KEY unique_employee_date (employee_id, attendance_date),
@@ -253,13 +254,13 @@ CREATE TABLE IF NOT EXISTS deductions (
 
 -- ============================================================
 -- 9. PAYROLL TABLES
--- ============================================================
+-- ===========================================================
 
 CREATE TABLE IF NOT EXISTS payrolls (
     id INT PRIMARY KEY AUTO_INCREMENT,
     employee_id INT NOT NULL,
     payroll_month TINYINT NOT NULL,
-    payroll_year YEAR NOT NULL,
+    payroll_year YEAR NOT NULL,  
     basic_salary DECIMAL(12,2) NOT NULL,
     allowance_amount DECIMAL(12,2) DEFAULT 0.00,
     ot_amount DECIMAL(12,2) DEFAULT 0.00,
@@ -460,6 +461,21 @@ INSERT IGNORE INTO company_policies (policy_key, policy_value, description) VALU
 ('unpaid_leave_deduct_full_day', '1', 'Deduct full daily salary for unpaid leave'),
 ('half_day_min_hours', '4', 'Minimum hours worked for half-day status'),
 ('full_day_min_hours', '8', 'Minimum hours for full-day present status'),
-('late_penalty_per_occurrence', '5000', 'Penalty amount per late occurrence in MMK');
+('late_penalty_per_occurrence', '5000', 'Penalty amount per late occurrence in MMK'),
+('auto_checkout_time', '17:30', 'Time for automatic check-out (MMT)'),
+('auto_checkout_enabled', '1', 'Enable automatic check-out feature');
 
 COMMIT;
+
+-- ============================================================
+-- MIGRATION: Add is_auto_checkout column to attendance table
+-- Run this if you have an existing database
+-- ============================================================
+SET @column_exists = (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS 
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'attendance' AND COLUMN_NAME = 'is_auto_checkout');
+SET @sql = IF(@column_exists = 0, 
+    'ALTER TABLE attendance ADD COLUMN is_auto_checkout TINYINT(1) DEFAULT 0 AFTER is_manual', 
+    'SELECT "Column is_auto_checkout already exists"');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;

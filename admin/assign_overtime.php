@@ -100,50 +100,64 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['assign_ot'])) {
 
                     log_activity($conn, $admin_id, 'overtime_assignment_created', "Created overtime assignment $code for " . ($assignment_type === 'department' ? 'department' : 'employee') . " on $ot_date");
 
+                    // Calculate total hours for notifications
+                    $start_ts = strtotime($start_time);
+                    $end_ts = strtotime($end_time);
+                    $total_hours = round(($end_ts - $start_ts) / 3600, 2);
+                    $date_display = date('M d, Y', strtotime($ot_date));
+                    $time_display = date('h:i A', strtotime($start_time)) . ' - ' . date('h:i A', strtotime($end_time));
+
                     // Send notifications only if assignment is not auto-cancelled
-                    if ($final_status !== 'Cancelled' && $assignment_type === 'department' && !empty($data['department_id'])) {
-                        $dept_id = (int)$data['department_id'];
-                        $date_display = date('M d, Y', strtotime($ot_date));
-                        $time_display = date('h:i A', strtotime($start_time)) . ' - ' . date('h:i A', strtotime($end_time));
-                        $emp_link = '../employee/overtimerequest.php';
-                        $admin_link = "assignment_detail.php?id=$assignment_id";
+                    if ($final_status !== 'Cancelled') {
+                        if ($assignment_type === 'department' && !empty($data['department_id'])) {
+                            $dept_id = (int)$data['department_id'];
+                            $emp_link = '../employee/overtimerequest.php';
+                            $admin_link = "assignment_detail.php?id=$assignment_id";
 
-                        // Get department name
-                        $dept_stmt = $conn->prepare("SELECT department_name FROM departments WHERE id = ?");
-                        $dept_stmt->bind_param('i', $dept_id);
-                        $dept_stmt->execute();
-                        $dept_name = $dept_stmt->get_result()->fetch_assoc()['department_name'] ?? 'your department';
-                        $dept_stmt->close();
+                            // Get department name
+                            $dept_stmt = $conn->prepare("SELECT department_name FROM departments WHERE id = ?");
+                            $dept_stmt->bind_param('i', $dept_id);
+                            $dept_stmt->execute();
+                            $dept_name = $dept_stmt->get_result()->fetch_assoc()['department_name'] ?? 'your department';
+                            $dept_stmt->close();
 
-                        // Get all active employees in the department
-                        $emp_stmt = $conn->prepare("SELECT id, name FROM employee WHERE department_id = ? AND status = 'active'");
-                        $emp_stmt->bind_param('i', $dept_id);
-                        $emp_stmt->execute();
-                        $dept_employees = $emp_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-                        $emp_stmt->close();
+                            // Get all active employees in the department
+                            $emp_stmt = $conn->prepare("SELECT id, name FROM employee WHERE department_id = ? AND status = 'active'");
+                            $emp_stmt->bind_param('i', $dept_id);
+                            $emp_stmt->execute();
+                            $dept_employees = $emp_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+                            $emp_stmt->close();
 
-                        // Find department manager (first active employee in the dept)
-                        $mgr_stmt = $conn->prepare("SELECT id, name FROM employee WHERE department_id = ? AND status = 'active' ORDER BY id ASC LIMIT 1");
-                        $mgr_stmt->bind_param('i', $dept_id);
-                        $mgr_stmt->execute();
-                        $manager = $mgr_stmt->get_result()->fetch_assoc();
-                        $mgr_stmt->close();
+                            // Notify each employee
+                            foreach ($dept_employees as $emp) {
+                                $msg = "You have been assigned overtime on $date_display ($time_display, {$total_hours}h) by $admin_name." . ($reason ? " Reason: $reason" : '');
+                                create_notification($conn, (int)$emp['id'], 'ot_assigned', $msg, $emp_link);
+                            }
 
-                        // Notify each employee
-                        foreach ($dept_employees as $emp) {
+                            // Notify admin (global notification)
+                            $admin_msg = "Overtime assignment $code created for $dept_name ($date_display, $time_display). " . count($dept_employees) . " employee(s) assigned.";
+                            create_notification($conn, null, 'ot_assigned', $admin_msg, $admin_link);
+
+                        } elseif ($assignment_type === 'employee' && !empty($data['employee_id'])) {
+                            $emp_id = (int)$data['employee_id'];
+                            $emp_link = '../employee/overtimerequest.php';
+                            $admin_link = "assignment_detail.php?id=$assignment_id";
+
+                            // Get employee name
+                            $emp_stmt = $conn->prepare("SELECT name FROM employee WHERE id = ?");
+                            $emp_stmt->bind_param('i', $emp_id);
+                            $emp_stmt->execute();
+                            $emp_name = $emp_stmt->get_result()->fetch_assoc()['name'] ?? 'Employee';
+                            $emp_stmt->close();
+
+                            // Notify the employee
                             $msg = "You have been assigned overtime on $date_display ($time_display, {$total_hours}h) by $admin_name." . ($reason ? " Reason: $reason" : '');
-                            create_notification($conn, (int)$emp['id'], 'ot_assigned', $msg, $emp_link);
-                        }
+                            create_notification($conn, $emp_id, 'ot_assigned', $msg, $emp_link);
 
-                        // Notify the department manager (if found and not already in the employee list notification)
-                        if ($manager) {
-                            $mgr_msg = "Overtime has been assigned to $dept_name on $date_display ($time_display, {$total_hours}h) by $admin_name." . ($reason ? " Reason: $reason" : '');
-                            create_notification($conn, (int)$manager['id'], 'ot_assigned', $mgr_msg, $admin_link);
+                            // Notify admin (global notification)
+                            $admin_msg = "Overtime assignment $code created for $emp_name ($date_display, $time_display).";
+                            create_notification($conn, null, 'ot_assigned', $admin_msg, $admin_link);
                         }
-
-                        // Notify admin (global notification)
-                        $admin_msg = "Overtime assignment $code created for $dept_name ($date_display, $time_display). " . count($dept_employees) . " employee(s) assigned.";
-                        create_notification($conn, null, 'ot_assigned', $admin_msg, $admin_link);
                     }
                 } else {
                     $message = 'Error creating overtime assignment. Please try again.';

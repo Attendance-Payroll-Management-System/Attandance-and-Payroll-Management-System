@@ -15,7 +15,7 @@ if (isset($_GET['download_pdf']) && isset($_GET['pid'])) {
     $pid = (int)$_GET['pid'];
     $stmt = $conn->prepare("
         SELECT p.*, e.name, e.employee_code
-        FROM payrolls p JOIN employee e ON p.employee_id = e.id WHERE p.id = ?
+        FROM payroll p JOIN employee e ON p.employee_id = e.id WHERE p.id = ?
     ");
     $stmt->bind_param('i', $pid);
     $stmt->execute();
@@ -23,8 +23,7 @@ if (isset($_GET['download_pdf']) && isset($_GET['pid'])) {
     $stmt->close();
 
     if ($slip) {
-        // Fetch AWOL deduction amount for this employee and month
-        $awol_stmt = $conn->prepare("SELECT COALESCE(SUM(amount), 0) as awol_total FROM deductions WHERE employee_id = ? AND deduction_date BETWEEN ? AND ? AND remarks = 'Auto Pension Fund Deduction for Unauthorized Absence'");
+        $awol_stmt = $conn->prepare("SELECT COALESCE(SUM(amount), 0) as awol_total FROM deductions WHERE employee_id = ? AND deduction_date BETWEEN ? AND ? AND remarks IN ('Auto Pension Fund Deduction for Unauthorized Absence', 'Auto Unpaid Absence Deduction')");
         $month_start_pdf = sprintf('%04d-%02d-01', $selected_year, $selected_month);
         $month_end_pdf = date('Y-m-t', strtotime($month_start_pdf));
         $awol_stmt->bind_param('iss', $slip['employee_id'], $month_start_pdf, $month_end_pdf);
@@ -32,6 +31,11 @@ if (isset($_GET['download_pdf']) && isset($_GET['pid'])) {
         $awol_data = $awol_stmt->get_result()->fetch_assoc();
         $slip['awol_deduction'] = $awol_data['awol_total'] ?? 0;
         $awol_stmt->close();
+
+        // Map new payroll table fields to expected format for PDF generator
+        $slip['ot_amount'] = $slip['overtime_amount'] ?? 0;
+        $slip['bonus_amount'] = $slip['bonus'] ?? 0;
+        $slip['deduction_amount'] = ($slip['leave_deduction'] ?? 0) + ($slip['half_day_deduction'] ?? 0) + ($slip['late_deduction'] ?? 0) + ($slip['absent_deduction'] ?? 0) + ($slip['other_deduction'] ?? 0);
 
         $pdfContent = generate_salary_slip_pdf($slip, $month_name, $selected_year);
         $filename = "Salary_Slip_{$slip['employee_code']}_{$month_name}_{$selected_year}.pdf";
@@ -48,14 +52,23 @@ if (isset($_GET['download_pdf']) && isset($_GET['pid'])) {
 // ─── Fetch payroll data ───────────────────────────────
 $payrolls = $conn->prepare("
     SELECT p.*, e.name, e.employee_code, e.basic_salary as emp_salary
-    FROM payrolls p JOIN employee e ON p.employee_id = e.id
-    WHERE p.payroll_month = ? AND p.payroll_year = ?
+    FROM payroll p JOIN employee e ON p.employee_id = e.id
+    WHERE p.pay_month = ? AND p.pay_year = ?
     ORDER BY e.name ASC
 ");
 $payrolls->bind_param('ii', $selected_month, $selected_year);
 $payrolls->execute();
 $payroll_data = $payrolls->get_result()->fetch_all(MYSQLI_ASSOC);
 $payrolls->close();
+
+// Map fields for display compatibility
+foreach ($payroll_data as &$p) {
+    $p['ot_amount'] = $p['overtime_amount'] ?? 0;
+    $p['bonus_amount'] = $p['bonus'] ?? 0;
+    $p['deduction_amount'] = ($p['leave_deduction'] ?? 0) + ($p['half_day_deduction'] ?? 0) + ($p['late_deduction'] ?? 0) + ($p['absent_deduction'] ?? 0) + ($p['other_deduction'] ?? 0);
+    if (!isset($p['half_days'])) $p['half_days'] = 0;
+}
+unset($p);
 
 $total_net = array_sum(array_column($payroll_data, 'net_salary'));
 $emp_count = count($payroll_data);
@@ -248,7 +261,7 @@ $emp_count = count($payroll_data);
                                 </div>
                                 <div class="flex-1 min-w-0">
                                     <span class="text-[11px] font-bold uppercase tracking-wider text-zinc-500">Total Net Pay</span>
-                                    <div class="text-xl font-extrabold text-emerald-400 mt-0.5">$<?php echo number_format($total_net, 2); ?></div>
+                                    <div class="text-xl font-extrabold text-emerald-400 mt-0.5"><?php echo $currency; ?> <?php echo number_format($total_net, 2); ?></div>
                                 </div>
                             </div>
                         </div>
@@ -268,7 +281,7 @@ $emp_count = count($payroll_data);
                             </div>
                             <div class="total-badge">
                                 <i class="fa-solid fa-coins text-emerald-500 text-sm"></i>
-                                <span class="text-sm font-bold text-emerald-400">$<?php echo number_format($total_net, 2); ?></span>
+                                <span class="text-sm font-bold text-emerald-400"><?php echo $currency; ?> <?php echo number_format($total_net, 2); ?></span>
                             </div>
                         </div>
                         <div class="overflow-x-auto">
@@ -308,11 +321,11 @@ $emp_count = count($payroll_data);
                                             <td class="px-4 py-4 text-center"><span class="text-xs font-bold text-amber-400"><?php echo $p['late_days'] ?? 0; ?></span></td>
                                             <td class="px-4 py-4 text-center"><span class="text-xs font-bold text-red-400"><?php echo $p['absent_days'] ?? 0; ?></span></td>
                                             <td class="px-4 py-4 text-center"><span class="text-xs font-bold text-purple-400"><?php echo number_format($p['overtime_hours'] ?? 0, 1); ?>h</span></td>
-                                            <td class="px-6 py-4 text-right font-mono text-white font-medium">$<?php echo number_format($p['basic_salary'], 2); ?></td>
+                                            <td class="px-6 py-4 text-right font-mono text-white font-medium"><?php echo $currency; ?> <?php echo number_format($p['basic_salary'], 2); ?></td>
                                             <td class="px-6 py-4 text-right">
                                                 <?php if ($p['ot_amount'] > 0): ?>
                                                     <span class="inline-flex items-center gap-1 font-mono text-amber-400 font-medium">
-                                                        <i class="fa-solid fa-plus text-[9px]"></i>$<?php echo number_format($p['ot_amount'], 2); ?>
+                                                        <i class="fa-solid fa-plus text-[9px]"></i><?php echo $currency; ?> <?php echo number_format($p['ot_amount'], 2); ?>
                                                     </span>
                                                 <?php else: ?>
                                                     <span class="font-mono text-zinc-600">—</span>
@@ -321,7 +334,7 @@ $emp_count = count($payroll_data);
                                             <td class="px-6 py-4 text-right">
                                                 <?php if ($p['bonus_amount'] > 0): ?>
                                                     <span class="inline-flex items-center gap-1 font-mono text-emerald-400 font-medium">
-                                                        <i class="fa-solid fa-plus text-[9px]"></i>$<?php echo number_format($p['bonus_amount'], 2); ?>
+                                                        <i class="fa-solid fa-plus text-[9px]"></i><?php echo $currency; ?> <?php echo number_format($p['bonus_amount'], 2); ?>
                                                     </span>
                                                 <?php else: ?>
                                                     <span class="font-mono text-zinc-600">—</span>
@@ -330,7 +343,7 @@ $emp_count = count($payroll_data);
                                             <td class="px-6 py-4 text-right">
                                                 <?php if ($p['deduction_amount'] > 0): ?>
                                                     <span class="inline-flex items-center gap-1 font-mono text-rose-400 font-medium">
-                                                        <i class="fa-solid fa-minus text-[9px]"></i>$<?php echo number_format($p['deduction_amount'], 2); ?>
+                                                        <i class="fa-solid fa-minus text-[9px]"></i><?php echo $currency; ?> <?php echo number_format($p['deduction_amount'], 2); ?>
                                                     </span>
                                                 <?php else: ?>
                                                     <span class="font-mono text-zinc-600">—</span>

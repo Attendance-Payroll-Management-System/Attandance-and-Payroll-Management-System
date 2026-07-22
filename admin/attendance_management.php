@@ -55,7 +55,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             $is_late = ($check_in && is_late_checkin($check_in)) ? 1 : 0;
 
-            $stmt = $conn->prepare("INSERT INTO attendance (employee_id, attendance_date, check_in, check_out, status, is_late, total_working_hours,remarks) VALUES (?, ?, ?, ?, ?, ?, ?,?)");
+            $stmt = $conn->prepare("INSERT INTO attendance (employee_id, attendance_date, check_in, check_out, status, is_late, total_working_hours,remarks) VALUES (?, ?, ?, ?, ?, ?, ?,?d .)");
             $stmt->bind_param('issssids', $emp_id, $att_date, $check_in, $check_out, $status, $is_late, $total_hours, $remarks);
             if ($stmt->execute()) {
                 $message = 'Manual attendance record added successfully.';
