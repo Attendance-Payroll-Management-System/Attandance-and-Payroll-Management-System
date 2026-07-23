@@ -347,7 +347,7 @@ CREATE TABLE IF NOT EXISTS attendance_processing_log (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- ============================================================
+-- ========== ==================================================
 -- 12. POLICIES TABLE
 -- ============================================================
 

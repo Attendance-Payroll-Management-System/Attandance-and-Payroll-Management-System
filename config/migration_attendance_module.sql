@@ -34,6 +34,8 @@ CREATE TABLE IF NOT EXISTS attendance_corrections (
     current_check_out TIME,
     requested_check_in TIME,
     requested_check_out TIME,
+    original_check_in TIME DEFAULT NULL,
+    original_check_out TIME DEFAULT NULL,
     reason TEXT NOT NULL,
     status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
     reviewed_by INT,
@@ -48,6 +50,38 @@ CREATE TABLE IF NOT EXISTS attendance_corrections (
     INDEX idx_corrections_status (status),
     INDEX idx_corrections_date (attendance_date)
 );
+
+-- Add audit columns to existing attendance_corrections table (MySQL 5.7 compatible)
+-- Run these only if the columns don't exist yet
+SET @dbname = DATABASE();
+SET @tablename = 'attendance_corrections';
+SET @columnname = 'original_check_in';
+SET @preparedStatement = (SELECT IF(
+  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+   WHERE TABLE_SCHEMA = @dbname
+   AND TABLE_NAME = @tablename
+   AND COLUMN_NAME = @columnname
+  ) > 0,
+  'SELECT 1',
+  CONCAT('ALTER TABLE ', @tablename, ' ADD COLUMN ', @columnname, ' TIME DEFAULT NULL AFTER requested_check_out')
+));
+PREPARE alterIfNotExists FROM @preparedStatement;
+EXECUTE alterIfNotExists;
+DEALLOCATE PREPARE alterIfNotExists;
+
+SET @columnname = 'original_check_out';
+SET @preparedStatement = (SELECT IF(
+  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+   WHERE TABLE_SCHEMA = @dbname
+   AND TABLE_NAME = @tablename
+   AND COLUMN_NAME = @columnname
+  ) > 0,
+  'SELECT 1',
+  CONCAT('ALTER TABLE ', @tablename, ' ADD COLUMN ', @columnname, ' TIME DEFAULT NULL AFTER original_check_in')
+));
+PREPARE alterIfNotExists FROM @preparedStatement;
+EXECUTE alterIfNotExists;
+DEALLOCATE PREPARE alterIfNotExists;
 
 -- 3. Attendance Logs (audit trail)
 CREATE TABLE IF NOT EXISTS attendance_logs (

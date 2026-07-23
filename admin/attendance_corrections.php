@@ -21,6 +21,8 @@ $conn->query("CREATE TABLE IF NOT EXISTS attendance_corrections (
     current_check_out TIME,
     requested_check_in TIME,
     requested_check_out TIME,
+    original_check_in TIME DEFAULT NULL,
+    original_check_out TIME DEFAULT NULL,
     reason TEXT NOT NULL,
     status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
     reviewed_by INT,
@@ -36,6 +38,15 @@ $conn->query("CREATE TABLE IF NOT EXISTS attendance_corrections (
     INDEX idx_corrections_date (attendance_date)
 )");
 
+// Add audit columns to existing attendance_corrections table (MySQL 5.7 compatible)
+foreach (['original_check_in', 'original_check_out'] as $col) {
+    $check = $conn->query("SELECT COUNT(*) AS cnt FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'attendance_corrections' AND COLUMN_NAME = '$col'");
+    if ($check && $check->fetch_assoc()['cnt'] == 0) {
+        $after = $col === 'original_check_in' ? 'requested_check_out' : 'original_check_in';
+        $conn->query("ALTER TABLE attendance_corrections ADD COLUMN $col TIME DEFAULT NULL AFTER $after");
+    }
+}
+
 // Handle approve/reject
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $correction_id = (int)($_POST['correction_id'] ?? 0);
@@ -50,40 +61,85 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($correction) {
             if ($action === 'approve') {
-                // Update the attendance record
+                // Resolve the attendance record: try by ID first, then by employee_id + date
+                $att_id = $correction['attendance_id'] ? (int)$correction['attendance_id'] : null;
+                $att_row = null;
+
+                if ($att_id) {
+                    $att_q = $conn->prepare("SELECT id, check_in, check_out FROM attendance WHERE id = ?");
+                    $att_q->bind_param('i', $att_id);
+                    $att_q->execute();
+                    $att_row = $att_q->get_result()->fetch_assoc();
+                    $att_q->close();
+                }
+
+                // Fallback: look up by employee_id + date
+                if (!$att_row) {
+                    $att_q = $conn->prepare("SELECT id, check_in, check_out FROM attendance WHERE employee_id = ? AND attendance_date = ?");
+                    $att_q->bind_param('is', $correction['employee_id'], $correction['attendance_date']);
+                    $att_q->execute();
+                    $att_row = $att_q->get_result()->fetch_assoc();
+                    $att_q->close();
+                    if ($att_row) $att_id = (int)$att_row['id'];
+                }
+
+                // If still no record, create one
+                if (!$att_row) {
+                    $ins = $conn->prepare("INSERT INTO attendance (employee_id, attendance_date, check_in, check_out, is_manual, auto_calculated) VALUES (?, ?, ?, ?, 1, 1)");
+                    $ins->bind_param('isss', $correction['employee_id'], $correction['attendance_date'], $correction['requested_check_in'], $correction['requested_check_out']);
+                    $ins->execute();
+                    $att_id = (int)$conn->insert_id;
+                    $ins->close();
+                    $att_row = ['id' => $att_id, 'check_in' => $correction['requested_check_in'], 'check_out' => $correction['requested_check_out']];
+                }
+
+                // Determine final values: use requested if provided, otherwise keep existing
+                $final_check_in  = $correction['requested_check_in']  ?: $att_row['check_in'];
+                $final_check_out = $correction['requested_check_out'] ?: $att_row['check_out'];
+
+                // Store original values in the correction record for audit trail
+                $audit = $conn->prepare("UPDATE attendance_corrections 
+                    SET original_check_in = ?, original_check_out = ? 
+                    WHERE id = ?");
+                $audit->bind_param('ssi', $att_row['check_in'], $att_row['check_out'], $correction_id);
+                $audit->execute();
+                $audit->close();
+
+                // Update the attendance record with corrected times
                 $update = $conn->prepare("UPDATE attendance SET 
                     check_in = ?, check_out = ?, is_manual = 1 
                     WHERE id = ?");
-                $update->bind_param('ssi', $correction['requested_check_in'], $correction['requested_check_out'], $correction['attendance_id']);
-                
-                if ($update->execute()) {
-                    // Recalculate status
-                    $att = $conn->prepare("SELECT check_in, check_out FROM attendance WHERE id = ?");
-                    $att->bind_param('i', $correction['attendance_id']);
-                    $att->execute();
-                    $att_data = $att->get_result()->fetch_assoc();
-                    $att->close();
+                $update->bind_param('ssi', $final_check_in, $final_check_out, $att_id);
 
-                    if ($att_data['check_in'] && $att_data['check_out']) {
-                        $total_hours = round((strtotime($att_data['check_out']) - strtotime($att_data['check_in'])) / 3600, 2);
-                        recalculate_attendance_after_checkout($conn, $correction['attendance_id'], $correction['employee_id'], $correction['attendance_date'], $att_data['check_in'], $att_data['check_out'], $total_hours);
+                if ($update->execute()) {
+                    $update->close();
+
+                    // Recalculate total working hours
+                    $total_hours = 0;
+                    if ($final_check_in && $final_check_out) {
+                        $total_hours = round((strtotime($final_check_out) - strtotime($final_check_in)) / 3600, 2);
+                        if ($total_hours < 0) $total_hours = 0;
                     }
 
+                    // Recalculate all attendance fields (status, is_late, total_working_hours, deductions)
+                    recalculate_attendance_after_checkout($conn, $att_id, $correction['employee_id'], $correction['attendance_date'], $final_check_in, $final_check_out, $total_hours);
+
+                    // Mark correction as approved
                     $stmt = $conn->prepare("UPDATE attendance_corrections SET status = 'approved', reviewed_by = ?, reviewed_at = NOW() WHERE id = ?");
                     $stmt->bind_param('ii', $_SESSION['admin_id'], $correction_id);
                     $stmt->execute();
                     $stmt->close();
 
                     create_notification($conn, $correction['employee_id'], 'attendance_correction', 'Your attendance correction for ' . $correction['attendance_date'] . ' has been approved.', 'attendance.php');
-                    log_activity($conn, $_SESSION['admin_id'], 'approve_correction', "Attendance correction #$correction_id approved");
+                    log_activity($conn, $_SESSION['admin_id'], 'approve_correction', "Attendance correction #$correction_id approved. Check-in: " . ($final_check_in ?? 'N/A') . ", Check-out: " . ($final_check_out ?? 'N/A') . ", Hours: $total_hours");
 
-                    $message = 'Correction request approved successfully.';
+                    $message = 'Correction request approved successfully. Attendance record updated.';
                     $message_type = 'success';
                 } else {
                     $message = 'Error updating attendance: ' . $update->error;
                     $message_type = 'error';
+                    $update->close();
                 }
-                $update->close();
             } elseif ($action === 'reject') {
                 $rejection_reason = trim($_POST['rejection_reason'] ?? '');
                 $stmt = $conn->prepare("UPDATE attendance_corrections SET status = 'rejected', reviewed_by = ?, reviewed_at = NOW(), rejection_reason = ? WHERE id = ?");
@@ -218,6 +274,22 @@ while ($row = $res->fetch_assoc()) {
                         <p class="text-sm font-semibold text-emerald-400">In: <?php echo $c['requested_check_in'] ? date('h:i A', strtotime($c['requested_check_in'])) : '—'; ?> | Out: <?php echo $c['requested_check_out'] ? date('h:i A', strtotime($c['requested_check_out'])) : '—'; ?></p>
                     </div>
                 </div>
+
+                <?php if ($c['status'] === 'approved' && ($c['original_check_in'] || $c['original_check_out'])): ?>
+                <div class="mt-2 p-3 bg-emerald-500/5 border border-emerald-500/10 rounded-xl">
+                    <p class="text-xs text-emerald-400 font-semibold mb-1"><i class="fa-solid fa-check-circle mr-1"></i> Audit Trail — Values Applied</p>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                        <div>
+                            <span class="text-zinc-500">Original:</span>
+                            <span class="text-zinc-300 ml-1">In: <?php echo $c['original_check_in'] ? date('h:i A', strtotime($c['original_check_in'])) : '—'; ?> | Out: <?php echo $c['original_check_out'] ? date('h:i A', strtotime($c['original_check_out'])) : '—'; ?></span>
+                        </div>
+                        <div>
+                            <span class="text-zinc-500">Corrected:</span>
+                            <span class="text-emerald-400 font-semibold ml-1">In: <?php echo $c['requested_check_in'] ? date('h:i A', strtotime($c['requested_check_in'])) : '—'; ?> | Out: <?php echo $c['requested_check_out'] ? date('h:i A', strtotime($c['requested_check_out'])) : '—'; ?></span>
+                        </div>
+                    </div>
+                </div>
+                <?php endif; ?>
 
                 <div class="mt-2">
                     <p class="text-xs text-zinc-500 mb-1">Reason</p>
