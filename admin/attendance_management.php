@@ -55,9 +55,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             $is_late = ($check_in && is_late_checkin($check_in)) ? 1 : 0;
 
-            $stmt = $conn->prepare("INSERT INTO attendance (employee_id, attendance_date, check_in, check_out, status, is_late, total_working_hours,remarks) VALUES (?, ?, ?, ?, ?, ?, ?,?d .)");
+            $stmt = $conn->prepare("INSERT INTO attendance (employee_id, attendance_date, check_in, check_out, status, is_late, total_working_hours, remarks) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
             $stmt->bind_param('issssids', $emp_id, $att_date, $check_in, $check_out, $status, $is_late, $total_hours, $remarks);
             if ($stmt->execute()) {
+                $new_att_id = $conn->insert_id;
+                handle_awol_deduction_on_status_change($conn, $emp_id, $status, $new_att_id, $att_date);
                 $message = 'Manual attendance record added successfully.';
                 $message_type = 'success';
                 log_activity($conn, $_SESSION['admin_id'], 'add_manual_attendance', "Manual attendance added for employee #$emp_id on $att_date");
@@ -85,6 +87,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt = $conn->prepare("UPDATE attendance SET check_in = ?, check_out = ?, status = ?, is_late = ?, total_working_hours = ?, remarks = ?, is_manual = 1 WHERE id = ?");
         $stmt->bind_param('sssidii', $check_in, $check_out, $status, $is_late, $total_hours, $remarks, $att_id);
         if ($stmt->execute()) {
+            $att_row = $conn->query("SELECT employee_id, attendance_date FROM attendance WHERE id = $att_id")->fetch_assoc();
+            if ($att_row) {
+                handle_awol_deduction_on_status_change($conn, (int)$att_row['employee_id'], $status, $att_id, $att_row['attendance_date']);
+            }
             $message = 'Attendance record updated successfully.';
             $message_type = 'success';
             log_activity($conn, $_SESSION['admin_id'], 'edit_attendance', "Attendance #$att_id updated by admin");
@@ -97,9 +103,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($action === 'delete_attendance' && isset($_POST['att_id'])) {
         $att_id = (int)$_POST['att_id'];
+        $att_row = $conn->query("SELECT employee_id, attendance_date FROM attendance WHERE id = $att_id")->fetch_assoc();
         $stmt = $conn->prepare("DELETE FROM attendance WHERE id = ?");
         $stmt->bind_param('i', $att_id);
         if ($stmt->execute()) {
+            if ($att_row) {
+                remove_awol_deduction($conn, (int)$att_row['employee_id'], $att_row['attendance_date']);
+                remove_half_day_deduction($conn, (int)$att_row['employee_id'], $att_row['attendance_date']);
+            }
             $message = 'Attendance record deleted successfully.';
             $message_type = 'success';
             log_activity($conn, $_SESSION['admin_id'], 'delete_attendance', "Attendance #$att_id deleted by admin");
@@ -268,6 +279,13 @@ if (isset($_GET['export'])) {
     <title>HNIN AKARI NWE · Attendance Management</title>
     <link rel="icon" type="image/svg+xml" href="../favicon.svg">
     <?php include "../includes/header.php"; ?>
+    <style>
+        .status-select option { color: #1e293b; background: #f8fafc; }
+        @media (prefers-color-scheme: dark) {
+            .status-select option { color: #e2e8f0; background: #1e293b; }
+        }
+        .dark .status-select option { color: #e2e8f0; background: #1e293b; }
+    </style>
 </head>
 
 <body x-data="{ 
@@ -287,7 +305,7 @@ if (isset($_GET['export'])) {
         <main class="p-6 lg:p-8 space-y-6 flex-1 page-content w-full page-enter">
 
             <?php if ($message): ?>
-                <div class="flex items-center gap-3 p-4 rounded-xl border text-sm <?php echo $message_type === 'success' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-red-500/10 border-red-500/20 text-red-400'; ?>">
+                <div class="flex items-center gap-3 p-4 rounded-xl border text-sm <?php echo $message_type === 'success' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-red-500/10  text-red-400'; ?>">
                     <i class="fa-solid <?php echo $message_type === 'success' ? 'fa-check-circle' : 'fa-circle-exclamation'; ?>"></i>
                     <?php echo htmlspecialchars($message); ?>
                 </div>
@@ -352,7 +370,7 @@ if (isset($_GET['export'])) {
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-zinc-400 mb-1">Status</label>
-                        <select name="att_status" class="w-full bg-white/[0.06] border border-white/10 text-white rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500/30">
+                        <select name="att_status" class="status-select w-full bg-white/[0.06] border border-white/10 text-white rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500/30">
                             <option value="">All</option>
                             <?php foreach ($statuses as $s): ?>
                                 <option value="<?php echo $s; ?>" <?php echo $filter_status === $s ? 'selected' : ''; ?>><?php echo get_attendance_status_label($s); ?></option>
@@ -520,7 +538,7 @@ if (isset($_GET['export'])) {
                             </div>
                             <div>
                                 <label class="block text-sm font-semibold text-zinc-300 mb-1">Status *</label>
-                                <select name="status" required class="w-full bg-white/[0.06] border border-white/10 text-white rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500/30">
+                                <select name="status" required class="status-select w-full bg-white/[0.06] border border-white/10 text-white rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500/30">
                                     <?php foreach ($statuses as $s): ?>
                                         <option value="<?php echo $s; ?>"><?php echo get_attendance_status_label($s); ?></option>
                                     <?php endforeach; ?>
@@ -560,7 +578,7 @@ if (isset($_GET['export'])) {
                             </div>
                             <div>
                                 <label class="block text-sm font-semibold text-zinc-300 mb-1">Status</label>
-                                <select name="status" x-model="editStatus" class="w-full bg-white/[0.06] border border-white/10 text-white rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-sky-500/30">
+                                <select name="status" x-model="editStatus" class="status-select w-full bg-white/[0.06] border border-white/10 text-white rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-sky-500/30">
                                     <?php foreach ($statuses as $s): ?>
                                         <option value="<?php echo $s; ?>"><?php echo get_attendance_status_label($s); ?></option>
                                     <?php endforeach; ?>

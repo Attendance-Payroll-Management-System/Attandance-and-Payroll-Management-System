@@ -41,6 +41,9 @@ $summary = $conn->prepare("SELECT
     COUNT(*) as total_days,
     SUM(CASE WHEN check_in IS NOT NULL THEN 1 ELSE 0 END) as present_days,
     SUM(CASE WHEN status = 'leave' THEN 1 ELSE 0 END) as leave_days,
+    SUM(CASE WHEN status = 'paid_leave' THEN 1 ELSE 0 END) as paid_leave_days,
+    SUM(CASE WHEN status = 'unpaid_leave' THEN 1 ELSE 0 END) as unpaid_leave_days,
+    SUM(CASE WHEN status = 'half_day' THEN 1 ELSE 0 END) as half_day_days,
     SUM(CASE WHEN status IN ('present', 'late') THEN 1 ELSE 0 END) as effective_present,
     SUM(CASE WHEN status IN ('awol', 'absent', 'full_absent', 'half_absent') THEN 1 ELSE 0 END) as absent_days,
     SUM(CASE WHEN status = 'late' THEN 1 ELSE 0 END) as late_days
@@ -55,6 +58,10 @@ $total_days = $stats['total_days'] ?? 0;
 $effective_present = $stats['effective_present'] ?? 0;
 $absent_days = $stats['absent_days'] ?? 0;
 $late_days = $stats['late_days'] ?? 0;
+$half_day_days = $stats['half_day_days'] ?? 0;
+$paid_leave_days = $stats['paid_leave_days'] ?? 0;
+$unpaid_leave_days = $stats['unpaid_leave_days'] ?? 0;
+$leave_total = $paid_leave_days + $unpaid_leave_days + ($stats['leave_days'] ?? 0);
 $present_rate = $total_days > 0 ? round(($effective_present / $total_days) * 100, 1) . '%' : '0%';
 $absent_rate = $total_days > 0 ? round(($absent_days / $total_days) * 100, 1) . '%' : '0%';
 
@@ -125,6 +132,20 @@ while ($row = $cal_result->fetch_assoc()) {
         $calendar_data[$d]['type'] = 'weekend';
         $calendar_data[$d]['status'] = 'Weekend';
         $calendar_data[$d]['meta'] = 'Non-working day';
+    } elseif ($status == 'half_day') {
+        $calendar_data[$d]['type'] = 'half_day';
+        $calendar_data[$d]['status'] = 'Half Day';
+        $calendar_data[$d]['meta'] = $time_range ? $time_range . ' (Half Day)' : 'Half Day';
+        $calendar_data[$d]['check_in'] = $check_in;
+        $calendar_data[$d]['check_out'] = $check_out;
+    } elseif ($status == 'paid_leave') {
+        $calendar_data[$d]['type'] = 'paid_leave';
+        $calendar_data[$d]['status'] = 'Paid Leave';
+        $calendar_data[$d]['meta'] = 'Approved Paid Leave';
+    } elseif ($status == 'unpaid_leave') {
+        $calendar_data[$d]['type'] = 'unpaid_leave';
+        $calendar_data[$d]['status'] = 'Unpaid Leave';
+        $calendar_data[$d]['meta'] = 'Approved Unpaid Leave';
     } elseif ($status == 'half_absent') {
         $calendar_data[$d]['type'] = 'half_day';
         $calendar_data[$d]['status'] = 'Half Day';
@@ -220,15 +241,15 @@ $cal_query->close();
             </div>
 
             <!-- ═══ Summary Stats ═══ -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
                 <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-5">
                     <div class="flex items-start justify-between">
                         <div class="flex items-center gap-3">
                             <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-500/20 to-cyan-500/20 text-blue-400 flex items-center justify-center text-lg group-hover:scale-110 transition-transform"><i class="fa-solid fa-calendar-check"></i></div>
                             <div>
-                                <span class="text-xs font-semibold uppercase tracking-wider text-zinc-400">Present Days</span>
-                                <div class="text-2xl font-bold text-white mt-0.5"><?= $effective_present ?><span class="text-sm font-medium text-zinc-400">/ <?= date('t', strtotime($month_start)) ?> Days</span></div>
-                                <span class="text-xs text-blue-400 font-medium">Includes Late</span>
+                                <span class="text-xs font-semibold uppercase tracking-wider text-zinc-400">Present</span>
+                                <div class="text-2xl font-bold text-white mt-0.5"><?= $effective_present ?><span class="text-sm font-medium text-zinc-400">/ <?= date('t', strtotime($month_start)) ?></span></div>
+                                <span class="text-xs text-blue-400 font-medium">Days</span>
                             </div>
                         </div>
                     </div>
@@ -236,35 +257,59 @@ $cal_query->close();
                 <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-5">
                     <div class="flex items-start justify-between">
                         <div class="flex items-center gap-3">
-                            <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-purple-500/20 to-pink-500/20 text-purple-400 flex items-center justify-center text-lg group-hover:scale-110 transition-transform"><i class="fa-solid fa-clock"></i></div>
+                            <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-amber-500/20 to-yellow-500/20 text-amber-400 flex items-center justify-center text-lg group-hover:scale-110 transition-transform"><i class="fa-solid fa-hourglass-half"></i></div>
                             <div>
-                                <span class="text-xs font-semibold uppercase tracking-wider text-zinc-400">OT Hours (Month)</span>
-                                <div class="text-2xl font-bold text-white mt-0.5"><?= $ot_hours ?></div>
+                                <span class="text-xs font-semibold uppercase tracking-wider text-zinc-400">Late</span>
+                                <div class="text-2xl font-bold text-white mt-0.5"><?= $late_days ?></div>
+                                <span class="text-xs text-amber-400 font-medium">Days</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-5">
+                    <div class="flex items-start justify-between">
+                        <div class="flex items-center gap-3">
+                            <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-teal-500/20 to-cyan-500/20 text-teal-400 flex items-center justify-center text-lg group-hover:scale-110 transition-transform"><i class="fa-solid fa-clock"></i></div>
+                            <div>
+                                <span class="text-xs font-semibold uppercase tracking-wider text-zinc-400">Half Day</span>
+                                <div class="text-2xl font-bold text-white mt-0.5"><?= $half_day_days ?></div>
+                                <span class="text-xs text-teal-400 font-medium">Days</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-5">
+                    <div class="flex items-start justify-between">
+                        <div class="flex items-center gap-3">
+                            <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-sky-500/20 to-blue-500/20 text-sky-400 flex items-center justify-center text-lg group-hover:scale-110 transition-transform"><i class="fa-solid fa-plane-departure"></i></div>
+                            <div>
+                                <span class="text-xs font-semibold uppercase tracking-wider text-zinc-400">Leave</span>
+                                <div class="text-2xl font-bold text-white mt-0.5"><?= $leave_total ?></div>
+                                <span class="text-xs text-sky-400 font-medium">Days</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-5">
+                    <div class="flex items-start justify-between">
+                        <div class="flex items-center gap-3">
+                            <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-red-500/20 to-rose-500/20 text-red-400 flex items-center justify-center text-lg group-hover:scale-110 transition-transform"><i class="fa-solid fa-calendar-xmark"></i></div>
+                            <div>
+                                <span class="text-xs font-semibold uppercase tracking-wider text-zinc-400">Absent</span>
+                                <div class="text-2xl font-bold text-white mt-0.5"><?= $absent_days ?></div>
+                                <span class="text-xs text-red-400 font-medium">Days</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-5">
+                    <div class="flex items-start justify-between">
+                        <div class="flex items-center gap-3">
+                            <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-purple-500/20 to-pink-500/20 text-purple-400 flex items-center justify-center text-lg group-hover:scale-110 transition-transform"><i class="fa-solid fa-stopwatch"></i></div>
+                            <div>
+                                <span class="text-xs font-semibold uppercase tracking-wider text-zinc-400">OT Hours</span>
+                                <div class="text-2xl font-bold text-white mt-0.5"><?= number_format($ot_hours, 1); ?>h</div>
                                 <span class="text-xs text-purple-400 font-medium">Approved</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-5">
-                    <div class="flex items-start justify-between">
-                        <div class="flex items-center gap-3">
-                            <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-emerald-500/20 to-teal-500/20 text-emerald-400 flex items-center justify-center text-lg group-hover:scale-110 transition-transform"><i class="fa-solid fa-plane-departure"></i></div>
-                            <div>
-                                <span class="text-xs font-semibold uppercase tracking-wider text-zinc-400">Leave Days</span>
-                                <div class="text-2xl font-bold text-white mt-0.5"><?= $stats['leave_days'] ?? 0 ?></div>
-                                <span class="text-xs text-emerald-400 font-medium">This Month</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="card-hover group glass-strong rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-5">
-                    <div class="flex items-start justify-between">
-                        <div class="flex items-center gap-3">
-                            <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-amber-500/20 to-yellow-500/20 text-amber-400 flex items-center justify-center text-lg group-hover:scale-110 transition-transform"><i class="fa-solid fa-chart-simple"></i></div>
-                            <div>
-                                <span class="text-xs font-semibold uppercase tracking-wider text-zinc-400">Present Rate</span>
-                                <div class="text-2xl font-bold text-white mt-0.5"><?= $present_rate ?></div>
-                                <span class="text-xs text-amber-400 font-medium">Attendance Rate</span>
                             </div>
                         </div>
                     </div>
@@ -373,16 +418,40 @@ $cal_query->close();
                 :root:not(.dark) .cal-day.status-leave .status-dot { background: #3B82F6; }
 
                 .cal-day.status-half_day {
-                    background: linear-gradient(135deg, rgba(168,85,247,0.18), rgba(147,51,234,0.10));
-                    border-color: rgba(168,85,247,0.30);
-                    color: #C084FC;
+                    background: linear-gradient(135deg, rgba(20,184,166,0.18), rgba(13,148,136,0.10));
+                    border-color: rgba(20,184,166,0.30);
+                    color: #2DD4BF;
                 }
-                .cal-day.status-half_day .day-label { color: #D8B4FE; }
-                .cal-day.status-half_day .status-dot { background: #C084FC; box-shadow: 0 0 5px rgba(168,85,247,0.5); }
-                .cal-day.status-half_day:hover { background: linear-gradient(135deg, rgba(168,85,247,0.25), rgba(147,51,234,0.15)); box-shadow: 0 0 0 2px rgba(168,85,247,0.25), 0 4px 16px rgba(168,85,247,0.18); }
-                :root:not(.dark) .cal-day.status-half_day { background: linear-gradient(135deg, rgba(147,51,234,0.12), rgba(124,58,237,0.06)); border-color: rgba(147,51,234,0.25); color: #7C3AED; }
-                :root:not(.dark) .cal-day.status-half_day .day-label { color: #6D28D9; }
-                :root:not(.dark) .cal-day.status-half_day .status-dot { background: #A855F7; }
+                .cal-day.status-half_day .day-label { color: #5EEAD4; }
+                .cal-day.status-half_day .status-dot { background: #2DD4BF; box-shadow: 0 0 5px rgba(20,184,166,0.5); }
+                .cal-day.status-half_day:hover { background: linear-gradient(135deg, rgba(20,184,166,0.25), rgba(13,148,136,0.15)); box-shadow: 0 0 0 2px rgba(20,184,166,0.25), 0 4px 16px rgba(20,184,166,0.18); }
+                :root:not(.dark) .cal-day.status-half_day { background: linear-gradient(135deg, rgba(13,148,136,0.12), rgba(15,118,110,0.06)); border-color: rgba(13,148,136,0.25); color: #0D9488; }
+                :root:not(.dark) .cal-day.status-half_day .day-label { color: #0F766E; }
+                :root:not(.dark) .cal-day.status-half_day .status-dot { background: #14B8A6; }
+
+                .cal-day.status-paid_leave {
+                    background: linear-gradient(135deg, rgba(14,165,233,0.18), rgba(2,132,199,0.10));
+                    border-color: rgba(14,165,233,0.30);
+                    color: #38BDF8;
+                }
+                .cal-day.status-paid_leave .day-label { color: #7DD3FC; }
+                .cal-day.status-paid_leave .status-dot { background: #38BDF8; box-shadow: 0 0 5px rgba(14,165,233,0.5); }
+                .cal-day.status-paid_leave:hover { background: linear-gradient(135deg, rgba(14,165,233,0.25), rgba(2,132,199,0.15)); box-shadow: 0 0 0 2px rgba(14,165,233,0.25), 0 4px 16px rgba(14,165,233,0.18); }
+                :root:not(.dark) .cal-day.status-paid_leave { background: linear-gradient(135deg, rgba(2,132,199,0.12), rgba(3,105,160,0.06)); border-color: rgba(2,132,199,0.25); color: #0EA5E9; }
+                :root:not(.dark) .cal-day.status-paid_leave .day-label { color: #0284C7; }
+                :root:not(.dark) .cal-day.status-paid_leave .status-dot { background: #0EA5E9; }
+
+                .cal-day.status-unpaid_leave {
+                    background: linear-gradient(135deg, rgba(251,146,60,0.18), rgba(249,115,22,0.10));
+                    border-color: rgba(251,146,60,0.30);
+                    color: #FB923C;
+                }
+                .cal-day.status-unpaid_leave .day-label { color: #FDBA74; }
+                .cal-day.status-unpaid_leave .status-dot { background: #FB923C; box-shadow: 0 0 5px rgba(251,146,60,0.5); }
+                .cal-day.status-unpaid_leave:hover { background: linear-gradient(135deg, rgba(251,146,60,0.25), rgba(249,115,22,0.15)); box-shadow: 0 0 0 2px rgba(251,146,60,0.25), 0 4px 16px rgba(251,146,60,0.18); }
+                :root:not(.dark) .cal-day.status-unpaid_leave { background: linear-gradient(135deg, rgba(249,115,22,0.12), rgba(234,88,12,0.06)); border-color: rgba(249,115,22,0.25); color: #F97316; }
+                :root:not(.dark) .cal-day.status-unpaid_leave .day-label { color: #EA580C; }
+                :root:not(.dark) .cal-day.status-unpaid_leave .status-dot { background: #F97316; }
 
                 .cal-day.status-holiday {
                     background: linear-gradient(135deg, rgba(156,163,175,0.14), rgba(107,114,128,0.08));
@@ -503,11 +572,14 @@ $cal_query->close();
                             $filter_statuses = [
                                 'present' => ['label' => 'Present', 'color' => 'emerald'],
                                 'late' => ['label' => 'Late', 'color' => 'amber'],
+                                'half_day' => ['label' => 'Half Day', 'color' => 'teal'],
                                 'leave' => ['label' => 'Leave', 'color' => 'blue'],
+                                'paid_leave' => ['label' => 'Paid Leave', 'color' => 'sky'],
+                                'unpaid_leave' => ['label' => 'Unpaid Leave', 'color' => 'orange'],
                                 'awol' => ['label' => 'Absent', 'color' => 'red'],
                                 'absent' => ['label' => 'Absent', 'color' => 'red'],
                                 'full_absent' => ['label' => 'Absent', 'color' => 'red'],
-                                'half_absent' => ['label' => 'Half Day', 'color' => 'purple'],
+                                'half_absent' => ['label' => 'Half Day', 'color' => 'teal'],
                                 'public_holiday' => ['label' => 'Holiday', 'color' => 'gray'],
                                 'weekend' => ['label' => 'Weekend', 'color' => 'gray'],
                             ];
@@ -597,13 +669,31 @@ $cal_query->close();
                             color: #C084FC;
                         }
 
+                        .filter-tab-active.filter-teal {
+                            background: rgba(20, 184, 166, 0.2);
+                            border-color: rgba(20, 184, 166, 0.3);
+                            color: #2DD4BF;
+                        }
+
+                        .filter-tab-active.filter-sky {
+                            background: rgba(14, 165, 233, 0.2);
+                            border-color: rgba(14, 165, 233, 0.3);
+                            color: #38BDF8;
+                        }
+
+                        .filter-tab-active.filter-orange {
+                            background: rgba(251, 146, 60, 0.2);
+                            border-color: rgba(251, 146, 60, 0.3);
+                            color: #FB923C;
+                        }
+
                         .filter-tab-active.filter-gray {
                             background: rgba(156, 163, 175, 0.15);
                             border-color: rgba(156, 163, 175, 0.25);
                             color: #9CA3AF;
                         }
 
-                        .filter-tab-active:not(.filter-emerald):not(.filter-red):not(.filter-amber):not(.filter-blue):not(.filter-purple):not(.filter-gray) {
+                        .filter-tab-active:not(.filter-emerald):not(.filter-red):not(.filter-amber):not(.filter-blue):not(.filter-purple):not(.filter-teal):not(.filter-sky):not(.filter-orange):not(.filter-gray) {
                             background: rgba(99, 102, 241, 0.2);
                             border-color: rgba(99, 102, 241, 0.3);
                             color: #818CF8;
@@ -698,9 +788,11 @@ $cal_query->close();
                             <div class="legend-item"><span class="legend-dot" style="background: linear-gradient(135deg, #10B981, #059669);"></span>Present</div>
                             <div class="legend-item"><span class="legend-dot" style="background: linear-gradient(135deg, #EF4444, #DC2626);"></span>Absent</div>
                             <div class="legend-item"><span class="legend-dot" style="background: linear-gradient(135deg, #F59E0B, #D97706);"></span>Late</div>
-                            <div class="legend-item"><span class="legend-dot" style="background: linear-gradient(135deg, #3B82F6, #2563EB);"></span>Leave</div>
-                            <div class="legend-item"><span class="legend-dot" style="background: linear-gradient(135deg, #A855F7, #7C3AED);"></span>Half Day</div>
+                            <div class="legend-item"><span class="legend-dot" style="background: linear-gradient(135deg, #14B8A6, #0D9488);"></span>Half Day</div>
+                            <div class="legend-item"><span class="legend-dot" style="background: linear-gradient(135deg, #0EA5E9, #0284C7);"></span>Paid Leave</div>
+                            <div class="legend-item"><span class="legend-dot" style="background: linear-gradient(135deg, #F97316, #EA580C);"></span>Unpaid Leave</div>
                             <div class="legend-item"><span class="legend-dot" style="background: linear-gradient(135deg, #9CA3AF, #6B7280);"></span>Holiday</div>
+                            <div class="legend-item"><span class="legend-dot" style="background: rgba(255,255,255,0.06);"></span>Weekend</div>
                         </div>
                     </div>
 
@@ -726,8 +818,9 @@ $cal_query->close();
                             $today_class = $day['is_today'] ? ' is-today' : '';
                             $tt_color_map = [
                                 'present' => '#34D399', 'absent' => '#F87171', 'late' => '#FBBF24',
-                                'leave' => '#60A5FA', 'half_day' => '#C084FC', 'holiday' => '#9CA3AF',
+                                'leave' => '#60A5FA', 'half_day' => '#2DD4BF', 'holiday' => '#9CA3AF',
                                 'weekend' => '#6B7280', 'none' => '#6B7280',
+                                'paid_leave' => '#38BDF8', 'unpaid_leave' => '#FB923C',
                             ];
                             $tt_color = $tt_color_map[$day['type']] ?? '#6B7280';
                         ?>

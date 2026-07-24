@@ -7,6 +7,7 @@ require_once '../config/helpers.php';
 
 $message = '';
 $message_type = '';
+$currency = get_currency($conn);
 
 // Add deduction (individual or bulk)
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_deduction'])) {

@@ -4,6 +4,7 @@ require_once '../config/auth.php';
 require_admin_login();
 require_once '../config/db.php';
 require_once '../config/helpers.php';
+require_once '../config/notifications.php';
 
 set_mmt_timezone();
 

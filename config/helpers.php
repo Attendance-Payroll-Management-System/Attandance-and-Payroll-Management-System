@@ -592,10 +592,8 @@ function recalculate_attendance_after_checkout(mysqli $conn, int $attendance_id,
     $stmt->execute();
     $stmt->close();
 
-    // Handle AWOL deduction on status change
-    if ($old_status !== $new_status) {
-        handle_awol_deduction_on_status_change($conn, $employee_id, $new_status, $attendance_id, $date);
-    }
+    // Always handle deductions based on final status
+    handle_awol_deduction_on_status_change($conn, $employee_id, $new_status, $attendance_id, $date);
 
     return $new_status;
 }

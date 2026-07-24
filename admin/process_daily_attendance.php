@@ -112,7 +112,7 @@ if (!$reconcile_only && !$auto_checkout_only && $_SERVER['REQUEST_METHOD'] === '
     // Try to log the processing run (table may not exist)
     $log_check = $conn->query("SHOW TABLES LIKE 'attendance_processing_log'");
     if ($log_check && $log_check->num_rows > 0) {
-        $log = $conn->prepare("INSERT INTO attendance_processing_log (process_date, processed_by, employees_processed, awol_marked, weekend_marked, holiday_marked) VALUES (?, ?, ?, ?, ?, ?)");
+        $log = $conn->prepare("INSERT INTO attendance_processing_log (process_date, processed_by, employees_processed, awol_marked, weekend_marked, holiday_marked) VALUES (?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE processed_by = VALUES(processed_by), employees_processed = VALUES(employees_processed), awol_marked = VALUES(awol_marked), weekend_marked = VALUES(weekend_marked), holiday_marked = VALUES(holiday_marked)");
         $who = 'admin_' . ($_SESSION['admin_id'] ?? 0);
         $log->bind_param('ssiiii', $process_date, $who, $result['processed'], $result['awol'], $result['weekend'], $result['holiday']);
         $log->execute();
